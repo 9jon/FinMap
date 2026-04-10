@@ -503,7 +503,7 @@ font-weight:800;
 }
 
 .hero-title span{
-color:#24bb45;
+color:#16732d;
 font-size: 120px;
 }
 
@@ -806,7 +806,7 @@ text-align:center;
 
 .how-stat-card {
     position: relative;
-    background: linear-gradient(180deg, #18be55 0%, #2ca049 100%);
+    background: linear-gradient(180deg, #1a9645 0%, #157d3a 100%);
     min-height: 250px;
     padding: 26px 24px 24px;
     color: #ffffff;
@@ -1036,7 +1036,7 @@ display:none;
 
 .security-section{
     padding: 130px 0;
-    background: linear-gradient(180deg, #16a34a, #15803d);
+    background: linear-gradient(180deg, #12803a, #15803d);
     position: relative;
     overflow: hidden;
 }
