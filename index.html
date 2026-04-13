@@ -155,6 +155,8 @@
 
       </nav>
 
+<button class="menu-toggle d-lg-none" id="menuToggle"><i class="bi bi-list"></i></button>
+
       <div class="actions d-flex align-items-center">
         <div class="login-wrapper">
 
@@ -304,9 +306,7 @@
 </section>
 
 
-<div class="security-lock-floating">
-  <img src="./FinMap_Projeto/img/cadeado.png" alt="Segurança">
-</div>
+
 
 <section class="security-section">
 
@@ -607,6 +607,35 @@
   <script src="./FinMap_Projeto/js/script.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
+
+
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-top">
+    <span class="mobile-logo">FinMap</span>
+    <button id="closeMenu"><i class="bi bi-x"></i></button>
+  </div>
+
+  <div class="mobile-actions">
+    <a href="#" class="mobile-btn-primary">Get Started</a>
+    <a href="#" class="mobile-login">Log In</a>
+  </div>
+
+  <div class="mobile-links">
+    <div class="mobile-item"><span>Inteligência</span><i class="bi bi-arrow-right"></i></div>
+    <div class="mobile-item"><span>Segurança</span><i class="bi bi-arrow-right"></i></div>
+    <div class="mobile-item"><span>Como Funciona</span><i class="bi bi-arrow-right"></i></div>
+    <div class="mobile-item"><span>Ajuda</span><i class="bi bi-arrow-right"></i></div>
+  </div>
+</div>
+
+<script>
+const menuToggle = document.getElementById('menuToggle');
+const mobileMenu = document.getElementById('mobileMenu');
+const closeMenu = document.getElementById('closeMenu');
+
+menuToggle.addEventListener('click', () => mobileMenu.classList.add('active'));
+closeMenu.addEventListener('click', () => mobileMenu.classList.remove('active'));
+</script>
 
 </body>
 
