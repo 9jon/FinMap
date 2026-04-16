@@ -1691,7 +1691,7 @@ scroll-behavior:smooth;
 .mobile-menu{
     position:fixed;
     inset:0;
-    background:#000;
+    background:#ffffff;
     transform:translateX(100%);
     transition:0.4s;
     z-index:3000;
@@ -1706,7 +1706,6 @@ scroll-behavior:smooth;
     margin-bottom:30px;
 }
 
-.mobile-logo{color:#fff;font-weight:700;}
 
 .mobile-actions{display:flex;flex-direction:column;gap:12px;margin-bottom:30px;}
 
@@ -1715,7 +1714,7 @@ scroll-behavior:smooth;
     padding:14px;
     border-radius:12px;
     text-align:center;
-    color:#fff;
+    color:#ffffff;
     text-decoration:none;
 }
 
@@ -1726,7 +1725,7 @@ scroll-behavior:smooth;
     justify-content:space-between;
     padding:18px 0;
     border-bottom:1px solid rgba(255,255,255,0.1);
-    color:#fff;
+    color:#000000;
 }
 
 /* LOCK FIX */

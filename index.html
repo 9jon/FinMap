@@ -1,642 +1,641 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+  <!DOCTYPE html>
+  <html lang="pt-br">
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinMap</title>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinMap</title>
 
-<script>
-    if ("scrollRestoration" in history) {
-      history.scrollRestoration = "manual";
-    }
+  <script>
+      if ("scrollRestoration" in history) {
+        history.scrollRestoration = "manual";
+      }
 
-    window.addEventListener("pageshow", () => {
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 0);
-    });
+      window.addEventListener("pageshow", () => {
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+        }, 0);
+      });
 
-    window.addEventListener("load", () => {
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 0);
-    });
-  </script>
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+        }, 0);
+      });
+    </script>
 
 
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="./FinMap_Projeto/css/style.css">
-</head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="./FinMap_Projeto/css/style.css">
+  </head>
 
-<body>
+  <body>
 
-  <header class="main-header" id="header">
+    <header class="main-header" id="header">
 
-    <div class="container header-content">
+      <div class="container header-content">
 
-      <div class="logo">
-  <a href="#">
-    <img src="./FinMap_Projeto/img/Logo_moderno_da_FINMAP_em_verde-removebg-preview.png" alt="FinMap">
+        <div class="logo">
+    <a href="#">
+      <img src="./FinMap_Projeto/img/Logo_moderno_da_FINMAP_em_verde-removebg-preview.png" alt="FinMap">
+    </a>
+  </div>
+
+        <nav class="menu d-none d-lg-flex">
+
+          <div class="menu-item">
+            <a href="#">Inteligência <i class="bi bi-chevron-down"></i></a>
+
+            <div class="dropdown-panel">
+              <div class="dropdown-left">
+                <a href="#">Visão Geral</a>
+                <a href="#">Análises</a>
+                <a href="#">Automação</a>
+                <a href="#">Insights</a>
+                <a href="#">Relatórios</a>
+              </div>
+
+              <div class="dropdown-right">
+                <div class="dropdown-card">
+                  <h4>Decisões Inteligentes</h4>
+                  <p>Use IA para interpretar dados e sugerir ações com mais rapidez.</p>
+                </div>
+
+                <div class="dropdown-card">
+                  <h4>Previsões Financeiras</h4>
+                  <p>Antecipe cenários e acompanhe tendências com mais precisão.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <a href="#">Segurança <i class="bi bi-chevron-down"></i></a>
+
+            <div class="dropdown-panel">
+              <div class="dropdown-left">
+                <a href="#">Proteção de Dados</a>
+                <a href="#">Criptografia</a>
+                <a href="#">Monitoramento</a>
+                <a href="#">Controle de Acesso</a>
+                <a href="#">Conformidade</a>
+              </div>
+
+              <div class="dropdown-right">
+                <div class="dropdown-card">
+                  <h4>Segurança em Tempo Real</h4>
+                  <p>Monitore acessos e atividades críticas em um só lugar.</p>
+                </div>
+
+                <div class="dropdown-card">
+                  <h4>Privacidade Avançada</h4>
+                  <p>Proteja as informações sensíveis do seu negócio com confiança.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <a href="#">Como Funciona <i class="bi bi-chevron-down"></i></a>
+
+            <div class="dropdown-panel">
+              <div class="dropdown-left">
+                <a href="#">Etapas</a>
+                <a href="#">Integração</a>
+                <a href="#">Fluxo da Plataforma</a>
+                <a href="#">Painéis</a>
+                <a href="#">Implementação</a>
+              </div>
+
+              <div class="dropdown-right">
+                <div class="dropdown-card">
+                  <h4>Processo Simplificado</h4>
+                  <p>Configure sua conta, conecte seus dados e acompanhe tudo em tempo real.</p>
+                </div>
+
+                <div class="dropdown-card">
+                  <h4>Operação Guiada</h4>
+                  <p>Uma estrutura clara para facilitar a adoção da plataforma.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-item">
+            <a href="#">Ajuda <i class="bi bi-chevron-down"></i></a>
+
+            <div class="dropdown-panel">
+              <div class="dropdown-left">
+                <a href="#">Central de Ajuda</a>
+                <a href="#">Documentação</a>
+                <a href="#">Suporte</a>
+                <a href="#">Perguntas Frequentes</a>
+                <a href="#">Contato</a>
+              </div>
+
+              <div class="dropdown-right">
+                <div class="dropdown-card">
+                  <h4>Suporte Especializado</h4>
+                  <p>Encontre respostas rápidas e fale com a equipe quando precisar.</p>
+                </div>
+
+                <div class="dropdown-card">
+                  <h4>Documentação Completa</h4>
+                  <p>Guias claros para usar todos os recursos da plataforma.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </nav>
+
+  <button class="menu-toggle d-lg-none" id="menuToggle"><i class="bi bi-list"></i></button>
+
+        <div class="actions d-flex align-items-center">
+          <div class="login-wrapper">
+
+            <a href="login.html" class="login">Logar</a>
+
+            <div class="login-dropdown">
+              <a href="#">Ir para o login</a>
+            </div>
+
+          </div>
+
+          <a href="registro.html" class="btn-register">
+      Registre-se
   </a>
-</div>
-
-      <nav class="menu d-none d-lg-flex">
-
-        <div class="menu-item">
-          <a href="#">Inteligência <i class="bi bi-chevron-down"></i></a>
-
-          <div class="dropdown-panel">
-            <div class="dropdown-left">
-              <a href="#">Visão Geral</a>
-              <a href="#">Análises</a>
-              <a href="#">Automação</a>
-              <a href="#">Insights</a>
-              <a href="#">Relatórios</a>
-            </div>
-
-            <div class="dropdown-right">
-              <div class="dropdown-card">
-                <h4>Decisões Inteligentes</h4>
-                <p>Use IA para interpretar dados e sugerir ações com mais rapidez.</p>
-              </div>
-
-              <div class="dropdown-card">
-                <h4>Previsões Financeiras</h4>
-                <p>Antecipe cenários e acompanhe tendências com mais precisão.</p>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div class="menu-item">
-          <a href="#">Segurança <i class="bi bi-chevron-down"></i></a>
+      </div>
+    </header>
+    
+    <section class="hero-section">
 
-          <div class="dropdown-panel">
-            <div class="dropdown-left">
-              <a href="#">Proteção de Dados</a>
-              <a href="#">Criptografia</a>
-              <a href="#">Monitoramento</a>
-              <a href="#">Controle de Acesso</a>
-              <a href="#">Conformidade</a>
-            </div>
+      <div class="container">
 
-            <div class="dropdown-right">
-              <div class="dropdown-card">
-                <h4>Segurança em Tempo Real</h4>
-                <p>Monitore acessos e atividades críticas em um só lugar.</p>
-              </div>
+        <div class="hero-center">
 
-              <div class="dropdown-card">
-                <h4>Privacidade Avançada</h4>
-                <p>Proteja as informações sensíveis do seu negócio com confiança.</p>
-              </div>
-            </div>
-          </div>
-        </div>
+          <h1 class="hero-title">
+            O mapa inteligente que
+            <span>antecipa</span>
+            suas finanças
+          </h1>
 
-        <div class="menu-item">
-          <a href="#">Como Funciona <i class="bi bi-chevron-down"></i></a>
-
-          <div class="dropdown-panel">
-            <div class="dropdown-left">
-              <a href="#">Etapas</a>
-              <a href="#">Integração</a>
-              <a href="#">Fluxo da Plataforma</a>
-              <a href="#">Painéis</a>
-              <a href="#">Implementação</a>
-            </div>
-
-            <div class="dropdown-right">
-              <div class="dropdown-card">
-                <h4>Processo Simplificado</h4>
-                <p>Configure sua conta, conecte seus dados e acompanhe tudo em tempo real.</p>
-              </div>
-
-              <div class="dropdown-card">
-                <h4>Operação Guiada</h4>
-                <p>Uma estrutura clara para facilitar a adoção da plataforma.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="menu-item">
-          <a href="#">Ajuda <i class="bi bi-chevron-down"></i></a>
-
-          <div class="dropdown-panel">
-            <div class="dropdown-left">
-              <a href="#">Central de Ajuda</a>
-              <a href="#">Documentação</a>
-              <a href="#">Suporte</a>
-              <a href="#">Perguntas Frequentes</a>
-              <a href="#">Contato</a>
-            </div>
-
-            <div class="dropdown-right">
-              <div class="dropdown-card">
-                <h4>Suporte Especializado</h4>
-                <p>Encontre respostas rápidas e fale com a equipe quando precisar.</p>
-              </div>
-
-              <div class="dropdown-card">
-                <h4>Documentação Completa</h4>
-                <p>Guias claros para usar todos os recursos da plataforma.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </nav>
-
-<button class="menu-toggle d-lg-none" id="menuToggle"><i class="bi bi-list"></i></button>
-
-      <div class="actions d-flex align-items-center">
-        <div class="login-wrapper">
-
-          <a href="login.html" class="login">Logar</a>
-
-          <div class="login-dropdown">
-            <a href="#">Ir para o login</a>
+          <div class="hero-actions">
+            <a href="#" class="hero-btn-primary">Começar agora</a>
+            <a href="#" class="hero-btn-secondary">Ver como funciona</a>
           </div>
 
         </div>
 
-        <a href="registro.html" class="btn-register">
-    Registre-se
-</a>
+        <div class="hero-glow"></div>
+
       </div>
 
-    </div>
-  </header>
-  
-  <section class="hero-section">
+      <div class="hero-orb orb-1" data-speed="18"></div>
+      <div class="hero-orb orb-2" data-speed="28"></div>
+      <div class="hero-orb orb-3" data-speed="22"></div>
 
+
+
+    </section>
+
+    <section class="how-section" id="como-funciona">
     <div class="container">
 
-      <div class="hero-center">
+      <div class="section-header reveal">
+        <h2 class="section-title">
+          O FinMap conecta, interpreta e prevê sua vida financeira
+        </h2>
+        <p class="section-description">
+          Da conexão com APIs bancárias à leitura OCR de notas fiscais, o sistema transforma
+          dados dispersos em análises inteligentes, alertas e decisões mais estratégicas.
+        </p>
+      </div>
 
-        <h1 class="hero-title">
-          O mapa inteligente que
-          <span>antecipa</span>
-          suas finanças
-        </h1>
+      <div class="how-stats-grid reveal">
 
-        <div class="hero-actions">
-          <a href="#" class="hero-btn-primary">Começar agora</a>
-          <a href="#" class="hero-btn-secondary">Ver como funciona</a>
+        <article class="how-stat-card">
+          <div class="how-stat-icon">
+            <i class="bi bi-bank2"></i>
+          </div>
+          <span class="how-stat-label">Conexão bancária</span>
+          <h3>API Bank</h3>
+          <p>
+            Integra contas e movimentações bancárias para capturar transações em tempo real
+            com mais precisão e menos esforço manual.
+          </p>
+        </article>
+
+        <article class="how-stat-card">
+          <div class="how-stat-icon">
+            <i class="bi bi-receipt-cutoff"></i>
+          </div>
+          <span class="how-stat-label">Leitura OCR</span>
+          <h3>Notas fiscais</h3>
+          <p>
+            Extrai informações de comprovantes e notas por foto, convertendo dados físicos
+            em registros financeiros estruturados automaticamente.
+          </p>
+        </article>
+
+        <article class="how-stat-card">
+          <div class="how-stat-icon">
+            <i class="bi bi-cpu"></i>
+          </div>
+          <span class="how-stat-label">Análise inteligente</span>
+          <h3>Classificação IA</h3>
+          <p>
+            Organiza despesas, identifica padrões de consumo e entende o comportamento
+            financeiro para gerar uma leitura mais profunda dos gastos.
+          </p>
+        </article>
+
+        <article class="how-stat-card">
+          <div class="how-stat-icon">
+            <i class="bi bi-graph-up-arrow"></i>
+          </div>
+          <span class="how-stat-label">Previsão financeira</span>
+          <h3>Insights preditivos</h3>
+          <p>
+            Antecipação de riscos, projeções de orçamento e alertas estratégicos para apoiar
+            decisões antes que o problema aconteça.
+          </p>
+        </article>
+
+      </div>
+
+      <div class="bank-integration reveal">
+    <div class="bank-logos">
+
+      <div class="bank-logo" aria-label="Nubank">
+        <img src="./FinMap_Projeto/img/nubank_logo_icon_248348 (1).png" alt="Nubank">
+      </div>
+
+      <div class="bank-logo" aria-label="Itaú">
+        <img src="./FinMap_Projeto/img/itau-preto.svg" alt="Itaú">
+      </div>
+
+      <div class="bank-logo" aria-label="Banco do Brasil">
+        <img src="./FinMap_Projeto/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Banco do Brasil">
+      </div>
+
+      <div class="bank-logo" aria-label="Bradesco">
+        <img src="./FinMap_Projeto/img/Bradesco-logo.svg" alt="Bradesco">
+      </div>
+
+      <div class="bank-logo" aria-label="Santander">
+        <img src="./FinMap_Projeto/img/santander-logo.svg" alt="Santander">
+      </div>
+
+      <div class="bank-logo" aria-label="Inter">
+        <img src="./FinMap_Projeto/img/inter-banco.svg" alt="Inter">
+      </div>
+
+    </div>
+  </div>
+
+    </div>
+  </section>
+
+
+
+
+  <section class="security-section">
+
+    <div class="container security-container">
+
+      <div class="security-left">
+        <h2 class="security-title">
+          Seus dados financeiros protegidos com padrão bancário
+        </h2>
+      </div>
+
+      <div class="security-right-card">
+
+        <div class="security-item">
+          <i class="bi bi-shield-lock"></i>
+          <div>
+            <h4>Criptografia de ponta</h4>
+            <p>Todos os dados são protegidos com padrões modernos de segurança.</p>
+          </div>
+        </div>
+
+        <div class="security-item">
+          <i class="bi bi-bank"></i>
+          <div>
+            <h4>Integração Open Finance</h4>
+            <p>Conexões seguras com bancos através de APIs oficiais.</p>
+          </div>
+        </div>
+
+        <div class="security-item">
+          <i class="bi bi-person-lock"></i>
+          <div>
+            <h4>Privacidade garantida</h4>
+            <p>Seus dados nunca são vendidos ou compartilhados.</p>
+          </div>
+        </div>
+
+        <div class="security-item">
+          <i class="bi bi-server"></i>
+          <div>
+            <h4>Infraestrutura confiável</h4>
+            <p>Arquitetura preparada para alta disponibilidade e proteção.</p>
+          </div>
         </div>
 
       </div>
 
-      <div class="hero-glow"></div>
-
     </div>
-
-    <div class="hero-orb orb-1" data-speed="18"></div>
-    <div class="hero-orb orb-2" data-speed="28"></div>
-    <div class="hero-orb orb-3" data-speed="22"></div>
-
-
 
   </section>
 
-  <section class="how-section" id="como-funciona">
-  <div class="container">
+  <section class="benefits-section">
 
-    <div class="section-header reveal">
-      <h2 class="section-title">
-        O FinMap conecta, interpreta e prevê sua vida financeira
-      </h2>
-      <p class="section-description">
-        Da conexão com APIs bancárias à leitura OCR de notas fiscais, o sistema transforma
-        dados dispersos em análises inteligentes, alertas e decisões mais estratégicas.
-      </p>
-    </div>
+    <div class="container benefits-wrap">
 
-    <div class="how-stats-grid reveal">
+      <!-- LEFT -->
+      <div class="benefits-left reveal">
 
-      <article class="how-stat-card">
-        <div class="how-stat-icon">
-          <i class="bi bi-bank2"></i>
+        <h2 class="benefits-title">
+          Mais controle e clareza sobre o seu dinheiro
+        </h2>
+
+        <div class="benefits-nav">
+
+          <button class="benefits-btn prev-btn" type="button" aria-label="Anterior">
+            <i class="bi bi-arrow-left"></i>
+          </button>
+
+          <button class="benefits-btn next-btn" type="button" aria-label="Próximo">
+            <i class="bi bi-arrow-right"></i>
+          </button>
+
         </div>
-        <span class="how-stat-label">Conexão bancária</span>
-        <h3>API Bank</h3>
-        <p>
-          Integra contas e movimentações bancárias para capturar transações em tempo real
-          com mais precisão e menos esforço manual.
-        </p>
-      </article>
 
-      <article class="how-stat-card">
-        <div class="how-stat-icon">
-          <i class="bi bi-receipt-cutoff"></i>
+      </div>
+
+
+      <!-- RIGHT -->
+      <div class="benefits-right reveal">
+
+        <div class="benefits-slider" id="benefitsSlider">
+
+          <!-- CARD 1 -->
+          <article class="benefit-card active">
+
+            <div class="benefit-card-icon">
+              <i class="bi bi-eye"></i>
+            </div>
+
+            <div class="benefit-card-content">
+              <h4>Visão completa dos gastos</h4>
+              <p>
+                Entenda exatamente para onde seu dinheiro está indo,
+                com leitura clara por categorias e movimentações.
+              </p>
+            </div>
+
+            <span class="benefit-card-tag">
+              Controle total
+            </span>
+
+          </article>
+
+
+          <!-- CARD 2 -->
+          <article class="benefit-card">
+
+            <div class="benefit-card-icon">
+              <i class="bi bi-bell"></i>
+            </div>
+
+            <div class="benefit-card-content">
+              <h4>Alertas inteligentes</h4>
+              <p>
+                Receba avisos antes que seus gastos saiam do controle
+                e antecipe desequilíbrios financeiros.
+              </p>
+            </div>
+
+            <span class="benefit-card-tag">
+              Monitoramento
+            </span>
+
+          </article>
+
+
+          <!-- CARD 3 -->
+          <article class="benefit-card">
+
+            <div class="benefit-card-icon">
+              <i class="bi bi-lightning-charge"></i>
+            </div>
+
+            <div class="benefit-card-content">
+              <h4>Automação financeira</h4>
+              <p>
+                O sistema organiza dados automaticamente via API bancária
+                e OCR, reduzindo trabalho manual.
+              </p>
+            </div>
+
+            <span class="benefit-card-tag">
+              Mais agilidade
+            </span>
+
+          </article>
+
+
+          <!-- CARD 4 -->
+          <article class="benefit-card">
+
+            <div class="benefit-card-icon">
+              <i class="bi bi-graph-up"></i>
+            </div>
+
+            <div class="benefit-card-content">
+              <h4>Decisões mais inteligentes</h4>
+              <p>
+                Use análises e previsões para planejar melhor seu orçamento
+                e tomar decisões com mais confiança.
+              </p>
+            </div>
+
+            <span class="benefit-card-tag">
+              Insights IA
+            </span>
+
+          </article>
+
         </div>
-        <span class="how-stat-label">Leitura OCR</span>
-        <h3>Notas fiscais</h3>
-        <p>
-          Extrai informações de comprovantes e notas por foto, convertendo dados físicos
-          em registros financeiros estruturados automaticamente.
-        </p>
-      </article>
 
-      <article class="how-stat-card">
-        <div class="how-stat-icon">
-          <i class="bi bi-cpu"></i>
+      </div>
+
+    </div>
+
+  </section>
+
+  <footer class="footer text-light pt-5 pb-4">
+
+    <div class="container text-md-left">
+      <div class="row text-md-left">
+        <div class="text-p col-md-4 col-lg-4 col-xl-4 mx-auto mt-4">
+          <h5 class="text-uppercase mb-4 fw-bold">FinMap</h5>
+          <p>
+            Plataforma inteligente de gestão financeira que utiliza IA para
+            organizar seus gastos, prever investimentos e ajudar você a
+            alcançar seus objetivos financeiros.
+          </p>
         </div>
-        <span class="how-stat-label">Análise inteligente</span>
-        <h3>Classificação IA</h3>
-        <p>
-          Organiza despesas, identifica padrões de consumo e entende o comportamento
-          financeiro para gerar uma leitura mais profunda dos gastos.
-        </p>
-      </article>
 
-      <article class="how-stat-card">
-        <div class="how-stat-icon">
-          <i class="bi bi-graph-up-arrow"></i>
+        <div class="col-md-3 col-lg-2 col-xl-2 mx-auto mt-3">
+          <h5 class="text-uppercase mb-4 fw-bold">Links úteis</h5>
+          <p><a href="#" class="text-decoration-none">Início</a></p>
+          <p><a href="#" class="text-decoration-none">Serviços</a></p>
+          <p><a href="#" class="text-decoration-none">Planos</a></p>
+          <p><a href="#" class="text-decoration-none">Contato</a></p>
         </div>
-        <span class="how-stat-label">Previsão financeira</span>
-        <h3>Insights preditivos</h3>
-        <p>
-          Antecipação de riscos, projeções de orçamento e alertas estratégicos para apoiar
-          decisões antes que o problema aconteça.
-        </p>
-      </article>
 
-    </div>
-
-    <div class="bank-integration reveal">
-  <div class="bank-logos">
-
-    <div class="bank-logo" aria-label="Nubank">
-      <img src="./FinMap_Projeto/img/nubank_logo_icon_248348 (1).png" alt="Nubank">
-    </div>
-
-    <div class="bank-logo" aria-label="Itaú">
-      <img src="./FinMap_Projeto/img/itau-preto.svg" alt="Itaú">
-    </div>
-
-    <div class="bank-logo" aria-label="Banco do Brasil">
-      <img src="./FinMap_Projeto/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Banco do Brasil">
-    </div>
-
-    <div class="bank-logo" aria-label="Bradesco">
-      <img src="./FinMap_Projeto/img/Bradesco-logo.svg" alt="Bradesco">
-    </div>
-
-    <div class="bank-logo" aria-label="Santander">
-      <img src="./FinMap_Projeto/img/santander-logo.svg" alt="Santander">
-    </div>
-
-    <div class="bank-logo" aria-label="Inter">
-      <img src="./FinMap_Projeto/img/inter-banco.svg" alt="Inter">
-    </div>
-
-  </div>
-</div>
-
-  </div>
-</section>
-
-
-
-
-<section class="security-section">
-
-  <div class="container security-container">
-
-    <div class="security-left">
-      <h2 class="security-title">
-        Seus dados financeiros protegidos com padrão bancário
-      </h2>
-    </div>
-
-    <div class="security-right-card">
-
-      <div class="security-item">
-        <i class="bi bi-shield-lock"></i>
-        <div>
-          <h4>Criptografia de ponta</h4>
-          <p>Todos os dados são protegidos com padrões modernos de segurança.</p>
+        <div class="col-md-3 col-lg-2 col-xl-2 mx-auto mt-3">
+          <h5 class="text-uppercase mb-4 fw-bold">Suporte</h5>
+          <p><a href="#" class="text-decoration-none">Central de ajuda</a></p>
+          <p><a href="#" class="text-decoration-none">Política de privacidade</a></p>
+          <p><a href="#" class="text-decoration-none">Termos de uso</a></p>
         </div>
-      </div>
 
-      <div class="security-item">
-        <i class="bi bi-bank"></i>
-        <div>
-          <h4>Integração Open Finance</h4>
-          <p>Conexões seguras com bancos através de APIs oficiais.</p>
+        <div class="col-md-4 col-lg-3 col-xl-3 mx-auto mt-3">
+          <h5 class="text-uppercase mb-4 fw-bold">Contato</h5>
+          <p>São José dos Campos, Brasil</p>
+          <p>suporte@finmap.com</p>
+          <p>+55 (12) 99999-9999</p>
         </div>
-      </div>
-
-      <div class="security-item">
-        <i class="bi bi-person-lock"></i>
-        <div>
-          <h4>Privacidade garantida</h4>
-          <p>Seus dados nunca são vendidos ou compartilhados.</p>
-        </div>
-      </div>
-
-      <div class="security-item">
-        <i class="bi bi-server"></i>
-        <div>
-          <h4>Infraestrutura confiável</h4>
-          <p>Arquitetura preparada para alta disponibilidade e proteção.</p>
-        </div>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-<section class="benefits-section">
-
-  <div class="container benefits-wrap">
-
-    <!-- LEFT -->
-    <div class="benefits-left reveal">
-
-      <h2 class="benefits-title">
-        Mais controle e clareza sobre o seu dinheiro
-      </h2>
-
-      <div class="benefits-nav">
-
-        <button class="benefits-btn prev-btn" type="button" aria-label="Anterior">
-          <i class="bi bi-arrow-left"></i>
-        </button>
-
-        <button class="benefits-btn next-btn" type="button" aria-label="Próximo">
-          <i class="bi bi-arrow-right"></i>
-        </button>
 
       </div>
 
-    </div>
-
-
-    <!-- RIGHT -->
-    <div class="benefits-right reveal">
-
-      <div class="benefits-slider" id="benefitsSlider">
-
-        <!-- CARD 1 -->
-        <article class="benefit-card active">
-
-          <div class="benefit-card-icon">
-            <i class="bi bi-eye"></i>
-          </div>
-
-          <div class="benefit-card-content">
-            <h4>Visão completa dos gastos</h4>
-            <p>
-              Entenda exatamente para onde seu dinheiro está indo,
-              com leitura clara por categorias e movimentações.
-            </p>
-          </div>
-
-          <span class="benefit-card-tag">
-            Controle total
-          </span>
-
-        </article>
-
-
-        <!-- CARD 2 -->
-        <article class="benefit-card">
-
-          <div class="benefit-card-icon">
-            <i class="bi bi-bell"></i>
-          </div>
-
-          <div class="benefit-card-content">
-            <h4>Alertas inteligentes</h4>
-            <p>
-              Receba avisos antes que seus gastos saiam do controle
-              e antecipe desequilíbrios financeiros.
-            </p>
-          </div>
-
-          <span class="benefit-card-tag">
-            Monitoramento
-          </span>
-
-        </article>
-
-
-        <!-- CARD 3 -->
-        <article class="benefit-card">
-
-          <div class="benefit-card-icon">
-            <i class="bi bi-lightning-charge"></i>
-          </div>
-
-          <div class="benefit-card-content">
-            <h4>Automação financeira</h4>
-            <p>
-              O sistema organiza dados automaticamente via API bancária
-              e OCR, reduzindo trabalho manual.
-            </p>
-          </div>
-
-          <span class="benefit-card-tag">
-            Mais agilidade
-          </span>
-
-        </article>
-
-
-        <!-- CARD 4 -->
-        <article class="benefit-card">
-
-          <div class="benefit-card-icon">
-            <i class="bi bi-graph-up"></i>
-          </div>
-
-          <div class="benefit-card-content">
-            <h4>Decisões mais inteligentes</h4>
-            <p>
-              Use análises e previsões para planejar melhor seu orçamento
-              e tomar decisões com mais confiança.
-            </p>
-          </div>
-
-          <span class="benefit-card-tag">
-            Insights IA
-          </span>
-
-        </article>
-
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-<footer class="footer text-light pt-5 pb-4">
-
-  <div class="container text-md-left">
-    <div class="row text-md-left">
-      <div class="text-p col-md-4 col-lg-4 col-xl-4 mx-auto mt-4">
-        <h5 class="text-uppercase mb-4 fw-bold">FinMap</h5>
-        <p>
-          Plataforma inteligente de gestão financeira que utiliza IA para
-          organizar seus gastos, prever investimentos e ajudar você a
-          alcançar seus objetivos financeiros.
-        </p>
-      </div>
-
-      <div class="col-md-3 col-lg-2 col-xl-2 mx-auto mt-3">
-        <h5 class="text-uppercase mb-4 fw-bold">Links úteis</h5>
-        <p><a href="#" class="text-decoration-none">Início</a></p>
-        <p><a href="#" class="text-decoration-none">Serviços</a></p>
-        <p><a href="#" class="text-decoration-none">Planos</a></p>
-        <p><a href="#" class="text-decoration-none">Contato</a></p>
-      </div>
-
-      <div class="col-md-3 col-lg-2 col-xl-2 mx-auto mt-3">
-        <h5 class="text-uppercase mb-4 fw-bold">Suporte</h5>
-        <p><a href="#" class="text-decoration-none">Central de ajuda</a></p>
-        <p><a href="#" class="text-decoration-none">Política de privacidade</a></p>
-        <p><a href="#" class="text-decoration-none">Termos de uso</a></p>
-      </div>
-
-      <div class="col-md-4 col-lg-3 col-xl-3 mx-auto mt-3">
-        <h5 class="text-uppercase mb-4 fw-bold">Contato</h5>
-        <p>São José dos Campos, Brasil</p>
-        <p>suporte@finmap.com</p>
-        <p>+55 (12) 99999-9999</p>
-      </div>
-
-    </div>
-
-    <hr class="mb-4">
-
-    <div class="row align-items-center">
+      <hr class="mb-4">
 
       <div class="row align-items-center">
 
-  <div class="col-md-7 col-lg-8">
-    <p class="footer-text mb-0">
-      © 2026 FinMap - Todos os direitos reservados
-    </p>
+        <div class="row align-items-center">
+
+    <div class="col-md-7 col-lg-8">
+      <p class="footer-text mb-0">
+        © 2026 FinMap - Todos os direitos reservados
+      </p>
+    </div>
+
+    <div class="col-md-5 col-lg-4 text-md-end footer-links">
+
+      <a href="#" class="me-3">
+        <i class="bi bi-facebook"></i> Facebook
+      </a>
+
+      <a href="#" class="me-3">
+        <i class="bi bi-instagram"></i> Instagram
+      </a>
+
+      <a href="#">
+        <i class="bi bi-linkedin"></i> LinkedIn
+      </a>
+
+    </div>
+
+  </div>
   </div>
 
-  <div class="col-md-5 col-lg-4 text-md-end footer-links">
+  <a href="#" class="back-top">
+    <span class="arrow-box">
+      <i class="bi bi-arrow-up"></i>
+    </span>
+    <span class="back-text">Voltar para o topo</span>
+  </a>
 
-    <a href="#" class="me-3">
-      <i class="bi bi-facebook"></i> Facebook
-    </a>
+  </footer>
 
-    <a href="#" class="me-3">
-      <i class="bi bi-instagram"></i> Instagram
-    </a>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const benefitCards = document.querySelectorAll(".benefit-card");
+      const prevBtn = document.querySelector(".prev-btn");
+      const nextBtn = document.querySelector(".next-btn");
 
-    <a href="#">
-      <i class="bi bi-linkedin"></i> LinkedIn
-    </a>
+      if (!benefitCards.length || !prevBtn || !nextBtn) return;
 
-  </div>
+      let currentIndex = 0;
 
-</div>
-</div>
+      function updateBenefitsSlider() {
+        benefitCards.forEach((card, index) => {
+          card.classList.remove("active", "next", "hidden");
 
-<a href="#" class="back-top">
-  <span class="arrow-box">
-    <i class="bi bi-arrow-up"></i>
-  </span>
-  <span class="back-text">Voltar para o topo</span>
-</a>
+          if (index === currentIndex) {
+            card.classList.add("active");
+          } else if (index === (currentIndex + 1) % benefitCards.length) {
+            card.classList.add("next");
+          } else {
+            card.classList.add("hidden");
+          }
+        });
+      }
 
-</footer>
+      prevBtn.addEventListener("mousedown", (e) => e.preventDefault());
+      nextBtn.addEventListener("mousedown", (e) => e.preventDefault());
 
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const benefitCards = document.querySelectorAll(".benefit-card");
-    const prevBtn = document.querySelector(".prev-btn");
-    const nextBtn = document.querySelector(".next-btn");
-
-    if (!benefitCards.length || !prevBtn || !nextBtn) return;
-
-    let currentIndex = 0;
-
-    function updateBenefitsSlider() {
-      benefitCards.forEach((card, index) => {
-        card.classList.remove("active", "next", "hidden");
-
-        if (index === currentIndex) {
-          card.classList.add("active");
-        } else if (index === (currentIndex + 1) % benefitCards.length) {
-          card.classList.add("next");
-        } else {
-          card.classList.add("hidden");
-        }
+      prevBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentIndex = (currentIndex - 1 + benefitCards.length) % benefitCards.length;
+        updateBenefitsSlider();
       });
-    }
 
-    prevBtn.addEventListener("mousedown", (e) => e.preventDefault());
-    nextBtn.addEventListener("mousedown", (e) => e.preventDefault());
+      nextBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentIndex = (currentIndex + 1) % benefitCards.length;
+        updateBenefitsSlider();
+      });
 
-    prevBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentIndex = (currentIndex - 1 + benefitCards.length) % benefitCards.length;
       updateBenefitsSlider();
     });
+  </script>
 
-    nextBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentIndex = (currentIndex + 1) % benefitCards.length;
-      updateBenefitsSlider();
-    });
-
-    updateBenefitsSlider();
-  });
-</script>
-
-  <script src="./FinMap_Projeto/js/script.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="./FinMap_Projeto/js/script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
 
 
-<div class="mobile-menu" id="mobileMenu">
-  <div class="mobile-top">
-    <span class="mobile-logo">FinMap</span>
-    <button id="closeMenu"><i class="bi bi-x"></i></button>
-  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-top">
+      <button id="closeMenu"><i class="bi bi-x"></i></button>
+    </div>
 
-  <div class="mobile-actions">
-    <a href="#" class="mobile-btn-primary">Get Started</a>
-    <a href="#" class="mobile-login">Log In</a>
-  </div>
-
-  <div class="mobile-links">
-    <div class="mobile-item"><span>Inteligência</span><i class="bi bi-arrow-right"></i></div>
-    <div class="mobile-item"><span>Segurança</span><i class="bi bi-arrow-right"></i></div>
-    <div class="mobile-item"><span>Como Funciona</span><i class="bi bi-arrow-right"></i></div>
-    <div class="mobile-item"><span>Ajuda</span><i class="bi bi-arrow-right"></i></div>
-  </div>
+    <div class="mobile-actions">
+  <a href="registro.html" class="mobile-btn-primary">Registre-se</a>
+  <a href="login.html" class="mobile-login">Logar</a>
 </div>
 
-<script>
-const menuToggle = document.getElementById('menuToggle');
-const mobileMenu = document.getElementById('mobileMenu');
-const closeMenu = document.getElementById('closeMenu');
+    <div class="mobile-links">
+      <div class="mobile-item"><span>Inteligência</span><i class="bi bi-arrow-right"></i></div>
+      <div class="mobile-item"><span>Segurança</span><i class="bi bi-arrow-right"></i></div>
+      <div class="mobile-item"><span>Como Funciona</span><i class="bi bi-arrow-right"></i></div>
+      <div class="mobile-item"><span>Ajuda</span><i class="bi bi-arrow-right"></i></div>
+    </div>
+  </div>
 
-menuToggle.addEventListener('click', () => mobileMenu.classList.add('active'));
-closeMenu.addEventListener('click', () => mobileMenu.classList.remove('active'));
-</script>
+  <script>
+  const menuToggle = document.getElementById('menuToggle');
+  const mobileMenu = document.getElementById('mobileMenu');
+  const closeMenu = document.getElementById('closeMenu');
 
-</body>
+  menuToggle.addEventListener('click', () => mobileMenu.classList.add('active'));
+  closeMenu.addEventListener('click', () => mobileMenu.classList.remove('active'));
+  </script>
 
-</html>
+  </body>
+
+  </html>
