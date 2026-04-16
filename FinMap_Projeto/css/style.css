@@ -508,7 +508,7 @@ animation:fadeUp 0.9s ease forwards;
 .hero-title span{
     color:#16732d;
     font-size: clamp(48px, 10vw, 120px);
-    display: block; /* força quebra controlada e evita estourar lateral */
+    display: block; 
 }
 
 .hero-description{
@@ -810,7 +810,7 @@ text-align:center;
 
 .how-stat-card {
     position: relative;
-    background: linear-gradient(180deg, #1ca34b 0%, #157d3a 100%);
+    background: linear-gradient(180deg, #157d3a 0%, #157d3a 100%);
     min-height: 250px;
     padding: 26px 24px 24px;
     color: #ffffff;
