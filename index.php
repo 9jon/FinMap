@@ -43,7 +43,7 @@
 
         <div class="logo">
     <a href="#">
-      <img src="./FinMap_Projeto/img/Logo_moderno_da_FINMAP_em_verde-removebg-preview.png" alt="FinMap">
+      <img src="assets/img/Logo_moderno_da_FINMAP_em_verde-removebg-preview.png" alt="FinMap">
     </a>
   </div>
 
@@ -160,7 +160,7 @@
         <div class="actions d-flex align-items-center">
           <div class="login-wrapper">
 
-            <a href="login.html" class="login">Logar</a>
+            <a href="login/login.php" class="login">Logar</a>
 
             <div class="login-dropdown">
               <a href="#">Ir para o login</a>
@@ -168,7 +168,7 @@
 
           </div>
 
-          <a href="registro.html" class="btn-register">
+          <a href="login/registro.php" class="btn-register">
       Registre-se
   </a>
         </div>
@@ -276,27 +276,28 @@
     <div class="bank-logos">
 
       <div class="bank-logo" aria-label="Nubank">
-        <img src="./FinMap_Projeto/img/nubank_logo_icon_248348 (1).png" alt="Nubank">
+        <img src="assets/img/nubank_logo_icon_248348 (1).png" alt="Nubank">
+
       </div>
 
       <div class="bank-logo" aria-label="Itaú">
-        <img src="./FinMap_Projeto/img/itau-preto.svg" alt="Itaú">
+        <img src="assets/img/itau-preto.svg" alt="Itaú">
       </div>
 
       <div class="bank-logo" aria-label="Banco do Brasil">
-        <img src="./FinMap_Projeto/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Banco do Brasil">
+        <img src="assets/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Banco do Brasil">
       </div>
 
       <div class="bank-logo" aria-label="Bradesco">
-        <img src="./FinMap_Projeto/img/Bradesco-logo.svg" alt="Bradesco">
+        <img src="assets/img/Bradesco-logo.svg" alt="Bradesco">
       </div>
 
       <div class="bank-logo" aria-label="Santander">
-        <img src="./FinMap_Projeto/img/santander-logo.svg" alt="Santander">
+        <img src="assets/img/santander-logo.svg" alt="Santander">
       </div>
 
       <div class="bank-logo" aria-label="Inter">
-        <img src="./FinMap_Projeto/img/inter-banco.svg" alt="Inter">
+        <img src="assets/img/inter-banco.svg" alt="Inter">
       </div>
 
     </div>
@@ -604,7 +605,7 @@
     });
   </script>
 
-    <script src="./FinMap_Projeto/js/script.js"></script>
+    <script src="assets/js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
 
@@ -615,8 +616,8 @@
     </div>
 
     <div class="mobile-actions">
-  <a href="registro.html" class="mobile-btn-primary">Registre-se</a>
-  <a href="login.html" class="mobile-login">Logar</a>
+  <a href="login/registro.php" class="mobile-btn-primary">Registre-se</a>
+  <a href="login/login.php" class="mobile-login">Logar</a>
 </div>
 
     <div class="mobile-links">

@@ -11,7 +11,7 @@
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-  <link rel="stylesheet" href="./FinMap_Projeto/css/config-renda.css">
+  <link rel="stylesheet" href="../assets/css/config-renda.css">
 </head>
 <body>
 
@@ -19,7 +19,7 @@
     <section class="income-shell">
 
       <div class="income-topbar">
-        <a href="index.html" class="brand">
+        <a href="../index.php" class="brand">
           <span class="brand-mark"></span>
           <span class="brand-text">FinMap</span>
         </a>
@@ -178,7 +178,7 @@
           </div>
 
           <div class="form-actions">
-            <a href="dashboard.html" class="ghost-btn">Pular por enquanto</a>
+            <a href="dashboard.php" class="ghost-btn">Pular por enquanto</a>
             <button type="submit" class="primary-btn">Salvar e continuar</button>
           </div>
 
@@ -354,7 +354,7 @@
 
       localStorage.setItem("finmapConfiguracaoRenda", JSON.stringify(dadosConfiguracaoRenda));
 
-      window.location.href = "fonte-dados.html";
+      window.location.href = "fonte-dados.php";
     });
 
     preencherDadosSalvos();

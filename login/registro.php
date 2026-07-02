@@ -8,7 +8,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<link rel="stylesheet" href="./FinMap_Projeto/css/registro.css">
+<link rel="stylesheet" href="../assets/css/registro.css">
 
 </head> 
 
@@ -95,7 +95,7 @@ Criar conta
 
 <div class="login-redirect text-center mt-4">
 <span>Já tem uma conta?</span>
-<a href="login.html" class="login-link">Entrar</a>
+<a href="login.php" class="login-link">Entrar</a>
 </div>
 
 </form>
@@ -137,7 +137,7 @@ document.getElementById("registroForm").addEventListener("submit", function(e){
 
 e.preventDefault();
 
-window.location.href = "config-renda.html";
+window.location.href = "../pages/config-renda.php";
 
 });
 
