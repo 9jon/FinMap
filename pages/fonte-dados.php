@@ -12,7 +12,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
-  <link rel="stylesheet" href="./FinMap_Projeto/css/fonte-dados.css">
+  <link rel="stylesheet" href="../assets/css/fonte-dados.css">
 </head>
 <body>
 
@@ -20,7 +20,7 @@
     <section class="data-source-shell container">
 
       <div class="topbar">
-        <a href="index.html" class="brand">
+        <a href="../index.php" class="brand">
           <span class="brand-mark"></span>
           <span class="brand-text">FinMap</span>
         </a>
@@ -138,7 +138,7 @@
           </div>
 
           <div class="actions">
-            <a href="config-renda.html" class="ghost-btn">Voltar</a>
+            <a href="config-renda.php" class="ghost-btn">Voltar</a>
             <button type="submit" class="primary-btn">Continuar</button>
           </div>
         </form>
@@ -175,7 +175,7 @@
         return;
       }
 
-      window.location.href = "dashboard.html";
+      window.location.href = "dashboard.php";
     });
   </script>
 

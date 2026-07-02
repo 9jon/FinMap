@@ -134,7 +134,7 @@
 
   <section class="main-actions">
     <div class="main-actions__grid">
-  <article class="action-card action-card--green" data-link-page="./orcamento-mensal.html">
+  <article class="action-card action-card--green" data-link-page="orcamento-mensal.php">
     <div class="action-icon">
       <i class="bi bi-calendar2-week"></i>
     </div>
@@ -142,7 +142,7 @@
     <p>Veja quanto da sua renda já foi comprometido neste mês</p>
   </article>
 
-  <article class="action-card action-card--purple" data-link-page="./metas-financeiras.html">
+  <article class="action-card action-card--purple" data-link-page="metas-financeiras.php">
     <div class="action-icon">
       <i class="bi bi-bullseye"></i>
     </div>
@@ -150,7 +150,7 @@
     <p>Defina objetivos e acompanhe sua evolução com clareza</p>
   </article>
 
-  <article class="action-card action-card--orange" data-link-page="./poupanca-invisivel.html">
+  <article class="action-card action-card--orange" data-link-page="poupanca-invisivel.php">
     <div class="action-icon">
       <i class="bi bi-piggy-bank"></i>
     </div>
@@ -158,7 +158,7 @@
     <p>Converta desperdícios recorrentes em reserva automática</p>
   </article>
 
-  <article class="action-card action-card--red" data-link-page="./alertas-preditivos.html">
+  <article class="action-card action-card--red" data-link-page="alertas-preditivos.php">
     <div class="action-icon">
       <i class="bi bi-exclamation-triangle"></i>
     </div>
@@ -166,7 +166,7 @@
     <p>Receba avisos antes de um possível desequilíbrio financeiro</p>
   </article>
 
-  <article class="action-card action-card--blue" data-link-page="./revisar-lancamentos.html">
+  <article class="action-card action-card--blue" data-link-page="revisar-lancamentos.php">
     <div class="action-icon">
       <i class="bi bi-check2-square"></i>
     </div>
@@ -1520,19 +1520,19 @@
 
   if (goToGoalsPageBtn) {
     goToGoalsPageBtn.addEventListener("click", () => {
-      window.location.href = "./metas-financeiras.html";
+      window.location.href = "metas-financeiras.php";
     });
   }
 
   if (goToGoalsPageFromMenu) {
     goToGoalsPageFromMenu.addEventListener("click", () => {
-      window.location.href = "./metas-financeiras.html";
+      window.location.href = "metas-financeiras.php";
     });
   }
 
   if (goToGoalsCreateFromMenu) {
     goToGoalsCreateFromMenu.addEventListener("click", () => {
-      window.location.href = "./metas-financeiras.html";
+      window.location.href = "metas-financeiras.php";
     });
   }
 

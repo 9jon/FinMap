@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./FinMap_Projeto/css/dashboard.css">
-  <link rel="stylesheet" href="./FinMap_Projeto/css/poupanca-invisivel.css">
+  <link rel="stylesheet" href="../assets/css/dashboard.css">
+  <link rel="stylesheet" href="../assets/css/poupanca-invisivel.css">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
 
   <main class="invisible-savings-page">
     <div class="back-navigation">
-  <a href="./dashboard.html" class="back-btn">
+  <a href="dashboard.php" class="back-btn">
     <i class="bi bi-chevron-left"></i>
     <span>Voltar</span>
   </a>
