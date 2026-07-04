@@ -53,8 +53,8 @@ h3 {
 }
 
 .form-control:focus {
-  border-color: #24bb45;
-  box-shadow: 0 0 0 0.2rem rgba(36, 187, 69, 0.12);
+  border-color: #16a34a;
+  box-shadow: 0 0 0 0.2rem rgba(22, 163, 74, 0.12);
 }
 
 .input-group-text {
@@ -68,7 +68,7 @@ h3 {
 }
 
 .eye-btn:hover i {
-  color: #24bb45;
+  color: #16a34a;
 }
 
 .options-row {
@@ -86,8 +86,8 @@ h3 {
 }
 
 .form-check-input:checked {
-  background-color: #24bb45;
-  border-color: #24bb45;
+  background-color: #16a34a;
+  border-color: #16a34a;
 }
 
 .form-check-label {
@@ -97,7 +97,7 @@ h3 {
 
 .forgot-link {
   font-size: 14px;
-  color: #24bb45;
+  color: #16a34a;
   text-decoration: none;
   font-weight: 500;
   transition: 0.25s ease;
@@ -196,7 +196,7 @@ h3 {
 
 .register-link {
   margin-left: 6px;
-  color: #24bb45;
+  color: #16a34a;
   text-decoration: none;
   font-weight: 600;
   transition: 0.25s ease;
