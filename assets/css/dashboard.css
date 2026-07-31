@@ -369,7 +369,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 26px;
   box-shadow: var(--shadow);
-}
+} 
 
 .main-actions__header {
   margin-bottom: 24px;

@@ -32,7 +32,7 @@
       integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
   </head>
 
   <body>
@@ -272,36 +272,57 @@
 
       </div>
 
-      <div class="bank-integration reveal">
-    <div class="bank-logos">
+      <section class="bank-integration reveal" aria-labelledby="bank-integration-title">
+        <h3 id="bank-integration-title" class="visually-hidden">Bancos integrados ao FinMap</h3>
 
-      <div class="bank-logo" aria-label="Nubank">
-        <img src="assets/img/nubank_logo_icon_248348 (1).png" alt="Nubank">
+        <div class="bank-logos">
+          <div class="bank-logos__viewport">
+            <div class="bank-logos__track">
+              <ul class="bank-logos__group">
+                <li class="bank-logo">
+                  <img src="assets/img/nubank_logo_icon_248348 (1).png" alt="Logo do Nubank">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/itau-preto.svg" alt="Logo do Itaú">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Logo do Banco do Brasil">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/Bradesco-logo.svg" alt="Logo do Bradesco">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/santander-logo.svg" alt="Logo do Santander">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/inter-banco.svg" alt="Logo do Banco Inter">
+                </li>
+              </ul>
 
-      </div>
-
-      <div class="bank-logo" aria-label="Itaú">
-        <img src="assets/img/itau-preto.svg" alt="Itaú">
-      </div>
-
-      <div class="bank-logo" aria-label="Banco do Brasil">
-        <img src="assets/img/banco-do-brasil-01-logo-black-and-white.svg" alt="Banco do Brasil">
-      </div>
-
-      <div class="bank-logo" aria-label="Bradesco">
-        <img src="assets/img/Bradesco-logo.svg" alt="Bradesco">
-      </div>
-
-      <div class="bank-logo" aria-label="Santander">
-        <img src="assets/img/santander-logo.svg" alt="Santander">
-      </div>
-
-      <div class="bank-logo" aria-label="Inter">
-        <img src="assets/img/inter-banco.svg" alt="Inter">
-      </div>
-
-    </div>
-  </div>
+              <ul class="bank-logos__group" aria-hidden="true">
+                <li class="bank-logo">
+                  <img src="assets/img/nubank_logo_icon_248348 (1).png" alt="">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/itau-preto.svg" alt="">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/banco-do-brasil-01-logo-black-and-white.svg" alt="">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/Bradesco-logo.svg" alt="">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/santander-logo.svg" alt="">
+                </li>
+                <li class="bank-logo">
+                  <img src="assets/img/inter-banco.svg" alt="">
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
 
     </div>
   </section>
