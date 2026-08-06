@@ -1,3 +1,73 @@
+<?php
+
+session_start();
+include '../config/conn.php';
+
+// Por enquanto fixo, até o login gravar isso na sessão de verdade
+$usuario_id = $_SESSION['usuario_id'] ?? 1;
+
+// --- Dados do usuário (nome, iniciais, saldo) ---
+$stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$usuario = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
+$iniciais = $usuario['avatar_iniciais'] ?? 'US';
+$saldoTotal = $usuario['saldo_total'] ?? 0;
+
+// --- Receitas do mês atual ---
+$stmt = $conn->prepare("
+    SELECT COALESCE(SUM(valor), 0) AS total
+    FROM transacoes
+    WHERE usuario_id = ? AND tipo = 'receita' AND status = 'aprovado'
+      AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$receitasMes = $stmt->get_result()->fetch_assoc()['total'];
+$stmt->close();
+
+// --- Despesas do mês atual ---
+$stmt = $conn->prepare("
+    SELECT COALESCE(SUM(valor), 0) AS total
+    FROM transacoes
+    WHERE usuario_id = ? AND tipo = 'despesa' AND status = 'aprovado'
+      AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$despesasMes = $stmt->get_result()->fetch_assoc()['total'];
+$stmt->close();
+
+// --- Últimas 5 transações aprovadas ---
+$stmt = $conn->prepare("
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+    FROM transacoes t
+    LEFT JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ? AND t.status = 'aprovado'
+    ORDER BY t.data_transacao DESC
+    LIMIT 5
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$transacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+// --- Até 3 metas mais recentes ---
+$stmt = $conn->prepare("
+    SELECT id, nome, valor_meta, valor_guardado, icone, cor
+    FROM metas_financeiras
+    WHERE usuario_id = ?
+    ORDER BY criado_em DESC
+    LIMIT 3
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$metas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -44,7 +114,7 @@
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
-        JD
+        <?= htmlspecialchars($iniciais) ?>
       </button>
     </div>
   </header>
@@ -52,7 +122,7 @@
   <section class="finance-overview">
     <div class="overview-header">
       <div class="overview-title-group">
-        <h2>Olá, João!</h2>
+        <h2>Olá, <?= htmlspecialchars($primeiroNome) ?>!</h2>
         <p>Aqui está um resumo inteligente das suas finanças hoje.</p>
       </div>
     </div>
@@ -74,7 +144,7 @@
               </button>
             </div>
 
-            <strong class="finance-card__value">R$ 12.450,75</strong>
+            <strong class="finance-card__value">R$ <?= number_format($saldoTotal, 2, ',', '.') ?></strong>
           </div>
 
           <div class="finance-card__icon finance-card__icon--glass">
@@ -94,7 +164,7 @@
         <div class="finance-card__top">
           <div>
             <span class="finance-card__label">Receitas</span>
-            <strong class="finance-card__value">R$ 5.800,00</strong>
+            <strong class="finance-card__value">R$ <?= number_format($receitasMes, 2, ',', '.') ?></strong>
           </div>
 
           <div class="finance-card__icon finance-card__icon--green-soft">
@@ -114,7 +184,7 @@
         <div class="finance-card__top">
           <div>
             <span class="finance-card__label">Despesas</span>
-            <strong class="finance-card__value">R$ 3.245,50</strong>
+            <strong class="finance-card__value">R$ <?= number_format($despesasMes, 2, ',', '.') ?></strong>
           </div>
 
           <div class="finance-card__icon finance-card__icon--red-soft">
@@ -190,95 +260,32 @@
         </div>
 
         <div class="recent-transactions-panel__list">
-          <article class="transaction-item">
-            <div class="transaction-item__left">
-              <div class="transaction-item__icon transaction-item__icon--income">
-                <i class="bi bi-arrow-up-right"></i>
-              </div>
+          <?php if (empty($transacoes)): ?>
+            <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
+          <?php else: ?>
+            <?php foreach ($transacoes as $t): ?>
+              <?php $isReceita = $t['tipo'] === 'receita'; ?>
+              <article class="transaction-item">
+                <div class="transaction-item__left">
+                  <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
+                    <i class="bi bi-arrow-<?= $isReceita ? 'up' : 'down' ?>-right"></i>
+                  </div>
 
-              <div class="transaction-item__info">
-                <h4>Salário</h4>
-                <p>Receita</p>
-              </div>
-            </div>
+                  <div class="transaction-item__info">
+                    <h4><?= htmlspecialchars($t['descricao']) ?></h4>
+                    <p><?= htmlspecialchars($t['categoria_nome'] ?? 'Sem categoria') ?></p>
+                  </div>
+                </div>
 
-            <div class="transaction-item__right">
-              <strong class="transaction-item__value transaction-item__value--positive">+ R$ 5.800,00</strong>
-              <span class="transaction-item__date">01 Dez</span>
-            </div>
-          </article>
-
-          <article class="transaction-item">
-            <div class="transaction-item__left">
-              <div class="transaction-item__icon transaction-item__icon--expense">
-                <i class="bi bi-arrow-down-right"></i>
-              </div>
-
-              <div class="transaction-item__info">
-                <h4>Aluguel</h4>
-                <p>Moradia</p>
-              </div>
-            </div>
-
-            <div class="transaction-item__right">
-              <strong class="transaction-item__value transaction-item__value--negative">R$ 1.200,00</strong>
-              <span class="transaction-item__date">05 Dez</span>
-            </div>
-          </article>
-
-          <article class="transaction-item">
-            <div class="transaction-item__left">
-              <div class="transaction-item__icon transaction-item__icon--expense">
-                <i class="bi bi-arrow-down-right"></i>
-              </div>
-
-              <div class="transaction-item__info">
-                <h4>Supermercado</h4>
-                <p>Alimentação</p>
-              </div>
-            </div>
-
-            <div class="transaction-item__right">
-              <strong class="transaction-item__value transaction-item__value--negative">R$ 450,80</strong>
-              <span class="transaction-item__date">10 Dez</span>
-            </div>
-          </article>
-
-          <article class="transaction-item">
-            <div class="transaction-item__left">
-              <div class="transaction-item__icon transaction-item__icon--income">
-                <i class="bi bi-arrow-up-right"></i>
-              </div>
-
-              <div class="transaction-item__info">
-                <h4>Freelance</h4>
-                <p>Receita extra</p>
-              </div>
-            </div>
-
-            <div class="transaction-item__right">
-              <strong class="transaction-item__value transaction-item__value--positive">+ R$ 850,00</strong>
-              <span class="transaction-item__date">15 Dez</span>
-            </div>
-          </article>
-
-          <article class="transaction-item">
-            <div class="transaction-item__left">
-              <div class="transaction-item__icon transaction-item__icon--expense">
-                <i class="bi bi-arrow-down-right"></i>
-              </div>
-
-              <div class="transaction-item__info">
-                <h4>Conta de luz</h4>
-                <p>Utilidades</p>
-              </div>
-            </div>
-
-            <div class="transaction-item__right">
-              <strong class="transaction-item__value transaction-item__value--negative">R$ 180,30</strong>
-              <span class="transaction-item__date">20 Dez</span>
-            </div>
-          </article>
+                <div class="transaction-item__right">
+                  <strong class="transaction-item__value transaction-item__value--<?= $isReceita ? 'positive' : 'negative' ?>">
+                    <?= $isReceita ? '+ ' : '' ?>R$ <?= number_format($t['valor'], 2, ',', '.') ?>
+                  </strong>
+                  <span class="transaction-item__date"><?= date('d M', strtotime($t['data_transacao'])) ?></span>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
       </section>
 
@@ -295,83 +302,60 @@
         </div>
 
         <div class="financial-goals-list" id="dashboardGoalsList">
-          <article class="goal-card">
-    <div class="goal-card__top">
-      <div class="goal-card__left">
-        <div class="goal-card__icon goal-card__icon--green">
-          <i class="bi bi-shield-check"></i>
-        </div>
-
-        <div class="goal-card__info">
-          <h4>Reserva de Emergência</h4>
-          <p>R$ 8.750 de R$ 15.000</p>
-        </div>
-      </div>
-
-      <span class="goal-card__badge">58%</span>
-    </div>
-
-    <div class="goal-card__progress">
-      <div class="goal-card__progress-fill goal-card__progress-fill--green" style="width: 58%;"></div>
-    </div>
-
-    <div class="goal-card__bottom">
-      <span>58% concluído</span>
-      <span>Faltam R$ 6.250</span>
-    </div>
-          </article>
-
-          <article class="goal-card">
-            <div class="goal-card__top">
-              <div class="goal-card__left">
-                <div class="goal-card__icon goal-card__icon--blue">
-                  <i class="bi bi-airplane"></i>
+          <?php if (empty($metas)): ?>
+            <article class="goal-card">
+              <div class="goal-card__top">
+                <div class="goal-card__left">
+                  <div class="goal-card__icon goal-card__icon--green">
+                    <i class="bi bi-bullseye"></i>
+                  </div>
+                  <div class="goal-card__info">
+                    <h4>Nenhuma meta criada</h4>
+                    <p>Crie sua primeira meta para acompanhar aqui no dashboard</p>
+                  </div>
                 </div>
-
-                <div class="goal-card__info">
-                  <h4>Viagem para Europa</h4>
-                  <p>R$ 3.200 de R$ 8.000</p>
-                </div>
+                <span class="goal-card__badge">0%</span>
               </div>
-
-              <span class="goal-card__badge">40%</span>
-            </div>
-
-            <div class="goal-card__progress">
-              <div class="goal-card__progress-fill goal-card__progress-fill--blue" style="width: 40%;"></div>
-            </div>
-
-            <div class="goal-card__bottom">
-              <span>40% concluído</span>
-              <span>Faltam R$ 4.800</span>
-            </div>
-          </article>
-
-          <article class="goal-card">
-            <div class="goal-card__top">
-              <div class="goal-card__left">
-                <div class="goal-card__icon goal-card__icon--orange">
-                  <i class="bi bi-car-front"></i>
-                </div>
-
-                <div class="goal-card__info">
-                  <h4>Novo carro</h4>
-                  <p>R$ 12.000 de R$ 45.000</p>
-                </div>
+              <div class="goal-card__progress">
+                <div class="goal-card__progress-fill goal-card__progress-fill--green" style="width: 0%;"></div>
               </div>
+              <div class="goal-card__bottom">
+                <span>0% concluído</span>
+                <span>Sem metas ativas</span>
+              </div>
+            </article>
+          <?php else: ?>
+            <?php foreach ($metas as $m):
+              $percent = $m['valor_meta'] > 0 ? min(($m['valor_guardado'] / $m['valor_meta']) * 100, 100) : 0;
+              $restante = max($m['valor_meta'] - $m['valor_guardado'], 0);
+            ?>
+              <article class="goal-card">
+                <div class="goal-card__top">
+                  <div class="goal-card__left">
+                    <div class="goal-card__icon goal-card__icon--<?= htmlspecialchars($m['cor']) ?>">
+                      <i class="bi bi-<?= htmlspecialchars($m['icone']) ?>"></i>
+                    </div>
 
-              <span class="goal-card__badge">27%</span>
-            </div>
+                    <div class="goal-card__info">
+                      <h4><?= htmlspecialchars($m['nome']) ?></h4>
+                      <p>R$ <?= number_format($m['valor_guardado'], 2, ',', '.') ?> de R$ <?= number_format($m['valor_meta'], 2, ',', '.') ?></p>
+                    </div>
+                  </div>
 
-            <div class="goal-card__progress">
-              <div class="goal-card__progress-fill goal-card__progress-fill--orange" style="width: 27%;"></div>
-            </div>
+                  <span class="goal-card__badge"><?= round($percent) ?>%</span>
+                </div>
 
-            <div class="goal-card__bottom">
-              <span>27% concluído</span>
-              <span>Faltam R$ 33.000</span>
-            </div>
-          </article>
+                <div class="goal-card__progress">
+                  <div class="goal-card__progress-fill goal-card__progress-fill--<?= htmlspecialchars($m['cor']) ?>" style="width: <?= $percent ?>%;"></div>
+                </div>
+
+                <div class="goal-card__bottom">
+                  <span><?= round($percent) ?>% concluído</span>
+                  <span>Faltam R$ <?= number_format($restante, 2, ',', '.') ?></span>
+                </div>
+              </article>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
 
         <button class="new-goal-btn" id="goToGoalsPageBtn" type="button">
@@ -643,7 +627,7 @@
           <div class="ai-chat-area__messages">
             <div class="ai-message ai-message--bot">
               <div class="ai-message__bubble">
-                Olá, João. Fiz uma leitura geral das suas finanças e identifiquei bons sinais de estabilidade. Quer que eu te mostre onde estão suas melhores oportunidades de economia?
+                Olá, <?= htmlspecialchars($primeiroNome) ?>. Fiz uma leitura geral das suas finanças e identifiquei bons sinais de estabilidade. Quer que eu te mostre onde estão suas melhores oportunidades de economia?
               </div>
             </div>
 
@@ -998,7 +982,7 @@
             <div class="settings-account-grid">
               <article class="settings-profile-card">
                 <h5>E-mail principal</h5>
-                <p>joao@email.com</p>
+                <p><?= htmlspecialchars($usuario['email'] ?? '—') ?></p>
                 <button class="settings-action-btn settings-action-btn--red-soft" type="button">
                   <i class="bi bi-envelope"></i>
                   Alterar e-mail
@@ -1048,101 +1032,30 @@
 
     <div class="dashboard-popout__body">
       <div class="all-transactions-list">
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--income">
-              <i class="bi bi-arrow-up-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Salário</h4>
-              <p>Receita</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--positive">+ R$ 5.800,00</strong>
-            <span class="transaction-item__date">01 Dez</span>
-          </div>
-        </article>
-
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--expense">
-              <i class="bi bi-arrow-down-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Aluguel</h4>
-              <p>Moradia</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--negative">R$ 1.200,00</strong>
-            <span class="transaction-item__date">05 Dez</span>
-          </div>
-        </article>
-
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--expense">
-              <i class="bi bi-arrow-down-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Supermercado</h4>
-              <p>Alimentação</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--negative">R$ 450,80</strong>
-            <span class="transaction-item__date">10 Dez</span>
-          </div>
-        </article>
-
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--income">
-              <i class="bi bi-arrow-up-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Freelance</h4>
-              <p>Receita extra</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--positive">+ R$ 850,00</strong>
-            <span class="transaction-item__date">15 Dez</span>
-          </div>
-        </article>
-
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--expense">
-              <i class="bi bi-arrow-down-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Conta de luz</h4>
-              <p>Utilidades</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--negative">R$ 180,30</strong>
-            <span class="transaction-item__date">20 Dez</span>
-          </div>
-        </article>
-
-        <article class="transaction-item">
-          <div class="transaction-item__left">
-            <div class="transaction-item__icon transaction-item__icon--expense">
-              <i class="bi bi-arrow-down-right"></i>
-            </div>
-            <div class="transaction-item__info">
-              <h4>Internet</h4>
-              <p>Utilidades</p>
-            </div>
-          </div>
-          <div class="transaction-item__right">
-            <strong class="transaction-item__value transaction-item__value--negative">R$ 119,90</strong>
-            <span class="transaction-item__date">22 Dez</span>
-          </div>
-        </article>
+        <?php if (empty($transacoes)): ?>
+          <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
+        <?php else: ?>
+          <?php foreach ($transacoes as $t): ?>
+            <?php $isReceita = $t['tipo'] === 'receita'; ?>
+            <article class="transaction-item">
+              <div class="transaction-item__left">
+                <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
+                  <i class="bi bi-arrow-<?= $isReceita ? 'up' : 'down' ?>-right"></i>
+                </div>
+                <div class="transaction-item__info">
+                  <h4><?= htmlspecialchars($t['descricao']) ?></h4>
+                  <p><?= htmlspecialchars($t['categoria_nome'] ?? 'Sem categoria') ?></p>
+                </div>
+              </div>
+              <div class="transaction-item__right">
+                <strong class="transaction-item__value transaction-item__value--<?= $isReceita ? 'positive' : 'negative' ?>">
+                  <?= $isReceita ? '+ ' : '' ?>R$ <?= number_format($t['valor'], 2, ',', '.') ?>
+                </strong>
+                <span class="transaction-item__date"><?= date('d M', strtotime($t['data_transacao'])) ?></span>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -1404,6 +1317,14 @@
     }[color] || "green";
   }
 
+  // ATENÇÃO: esta função ainda lê metas do localStorage (era assim no
+  // protótipo estático). Como agora o bloco PHP já renderiza as metas
+  // reais do banco direto no HTML, NÃO chamamos mais essa função
+  // automaticamente ao carregar a página (veja o final do script).
+  // Ela fica aqui só para não quebrar o botão "Atualizar metas no
+  // dashboard" do menu de metas — quando vocês migrarem a tela
+  // metas-financeiras.php para o banco também, essa função deve ser
+  // reescrita para buscar as metas via fetch() em vez de localStorage.
   function renderDashboardGoals() {
     if (!dashboardGoalsList) return;
 
@@ -1738,30 +1659,19 @@
     });
   }
 
-  function getStoredBalance() {
-    return localStorage.getItem("finmapSaldoTotal");
-  }
+  if (saldoEditInput) {
+    saldoEditInput.addEventListener("input", () => {
+      saldoEditInput.value = formatCurrencyBRL(saldoEditInput.value);
+    });
 
-  function setStoredBalance(value) {
-    localStorage.setItem("finmapSaldoTotal", value);
-  }
-
-  function applyBalanceToCard(value) {
-    if (saldoCardValue) {
-      saldoCardValue.textContent = formatCurrencyBRL(value);
-    }
-  }
-
-  function syncBalanceFromStorage() {
-    const stored = getStoredBalance();
-    if (stored) {
-      applyBalanceToCard(stored);
-    }
+    saldoEditInput.addEventListener("focus", () => {
+      saldoEditInput.value = formatCurrencyBRL(saldoEditInput.value);
+    });
   }
 
   if (openBalanceModal) {
     openBalanceModal.addEventListener("click", () => {
-      const currentValue = getStoredBalance() || (saldoCardValue ? saldoCardValue.textContent : "R$ 0,00");
+      const currentValue = saldoCardValue ? saldoCardValue.textContent : "R$ 0,00";
       if (saldoEditInput) {
         saldoEditInput.value = formatCurrencyBRL(currentValue);
       }
@@ -1776,29 +1686,25 @@
     });
   }
 
-  if (saldoEditInput) {
-    saldoEditInput.addEventListener("input", () => {
-      saldoEditInput.value = formatCurrencyBRL(saldoEditInput.value);
-    });
-
-    saldoEditInput.addEventListener("focus", () => {
-      saldoEditInput.value = formatCurrencyBRL(saldoEditInput.value);
-    });
-  }
-
+  // ATENÇÃO: por enquanto o formulário só atualiza o valor NA TELA
+  // (não grava no banco ainda). O próximo passo é criar um endpoint
+  // PHP (ex: atualizar-saldo.php) que recebe esse valor via fetch()
+  // e faz um UPDATE na tabela usuarios. Sem isso, o saldo volta ao
+  // valor do banco toda vez que a página é recarregada.
   if (balanceForm) {
     balanceForm.addEventListener("submit", (e) => {
       e.preventDefault();
       const formatted = formatCurrencyBRL(saldoEditInput ? saldoEditInput.value : "0");
-      setStoredBalance(formatted);
-      applyBalanceToCard(formatted);
+      if (saldoCardValue) {
+        saldoCardValue.textContent = formatted;
+      }
       closeModal(balanceModal);
     });
   }
 
-  syncBalanceFromStorage();
-
-  renderDashboardGoals();
+  // renderDashboardGoals() e syncBalanceFromStorage() NÃO são mais
+  // chamadas automaticamente aqui, porque o PHP já renderizou o
+  // saldo e as metas reais do banco direto no HTML acima.
   renderCategoryExpenses("this-month");
 </script>
 
