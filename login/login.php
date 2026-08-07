@@ -1,3 +1,42 @@
+<?php
+// login/login.php
+session_start();
+include '../config/conn.php';
+
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $senha = $_POST['senha'] ?? '';
+
+    if ($email === '' || $senha === '') {
+        $erro = 'Preencha e-mail e senha.';
+    } else {
+        $stmt = $conn->prepare("SELECT id, nome, senha_hash, onboarding_concluido FROM usuarios WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $usuario = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$usuario || !password_verify($senha, $usuario['senha_hash'])) {
+            $erro = 'E-mail ou senha incorretos.';
+        } else {
+            $_SESSION['usuario_id'] = $usuario['id'];
+            $_SESSION['usuario_nome'] = $usuario['nome'];
+            $conn->close();
+
+            // Se o usuário ainda não terminou o onboarding, manda pra config-renda.
+            // Se já terminou, manda direto pro dashboard.
+            if (!$usuario['onboarding_concluido']) {
+                header('Location: ../pages/config-renda.php');
+            } else {
+                header('Location: ../pages/dashboard.php');
+            }
+            exit;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -20,17 +59,23 @@
         <p class="subtitle mb-0">Acesse sua conta e continue no FinMap</p>
       </div>
 
-      <form id="loginForm">
+      <?php if ($erro): ?>
+        <div class="alert alert-danger py-2 px-3" style="font-size: 0.9rem;">
+          <?= htmlspecialchars($erro) ?>
+        </div>
+      <?php endif; ?>
+
+      <form id="loginForm" method="POST" action="login.php">
 
         <div class="mb-3">
           <label class="form-label">Email</label>
-          <input type="email" class="form-control" placeholder="seu@email.com">
+          <input type="email" name="email" class="form-control" placeholder="seu@email.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
         </div>
 
         <div class="mb-3">
           <label class="form-label">Senha</label>
           <div class="input-group">
-            <input type="password" class="form-control" id="senhaLogin" placeholder="Digite sua senha">
+            <input type="password" name="senha" class="form-control" id="senhaLogin" placeholder="Digite sua senha" required>
             <span class="input-group-text eye-btn" onclick="toggleSenhaLogin()" style="cursor:pointer;">
               <i id="iconeSenhaLogin" class="bi bi-eye-slash"></i>
             </span>
@@ -89,10 +134,9 @@
       }
     }
 
-    document.getElementById("loginForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      window.location.href = "../pages/dashboard.php";
-    });
+    /* O formulário agora envia de verdade pro servidor (method="POST"),
+       então não interceptamos mais o submit nem redirecionamos na mão
+       — o PHP lá em cima decide pra onde mandar o usuário. */
   </script>
 
 </body>
