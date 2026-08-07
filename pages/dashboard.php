@@ -1691,16 +1691,50 @@ $stmt->close();
   // PHP (ex: atualizar-saldo.php) que recebe esse valor via fetch()
   // e faz um UPDATE na tabela usuarios. Sem isso, o saldo volta ao
   // valor do banco toda vez que a página é recarregada.
-  if (balanceForm) {
-    balanceForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const formatted = formatCurrencyBRL(saldoEditInput ? saldoEditInput.value : "0");
-      if (saldoCardValue) {
-        saldoCardValue.textContent = formatted;
+  function parseCurrencyToNumber(value) {
+  const digits = getDigitsOnly(value);
+  return digits ? Number(digits) / 100 : 0;
+}
+
+if (balanceForm) {
+  balanceForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const valorNumerico = parseCurrencyToNumber(saldoEditInput ? saldoEditInput.value : "0");
+    const submitBtn = balanceForm.querySelector(".balance-modal__primary");
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Salvando...";
+    }
+
+    try {
+      const response = await fetch("atualizar-saldo.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ novo_saldo: valorNumerico })
+      });
+
+      const resultado = await response.json();
+
+      if (resultado.sucesso) {
+        if (saldoCardValue) {
+          saldoCardValue.textContent = "R$ " + resultado.novo_saldo;
+        }
+        closeModal(balanceModal);
+      } else {
+        alert("Não foi possível salvar o saldo: " + (resultado.erro || "erro desconhecido"));
       }
-      closeModal(balanceModal);
-    });
-  }
+    } catch (error) {
+      alert("Erro de conexão ao salvar o saldo. Tente novamente.");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Salvar saldo";
+      }
+    }
+  });
+}
 
   // renderDashboardGoals() e syncBalanceFromStorage() NÃO são mais
   // chamadas automaticamente aqui, porque o PHP já renderizou o
