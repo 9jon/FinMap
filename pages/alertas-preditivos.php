@@ -1,3 +1,169 @@
+ <?php
+session_start();
+require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+
+if (!isset($_SESSION['usuario_id'])) {
+    header('Location: ../login/login.php');
+    exit;
+}
+
+$usuario_id = (int)$_SESSION['usuario_id'];
+
+// -----------------------------------------------------------------
+// PROCESSAMENTO DAS AÇÕES (POST)
+// Em vez de AJAX, cada botão manda um <form method="post"> pra essa
+// mesma página. Depois de processar, redirecionamos pra ela mesma
+// (padrão Post/Redirect/Get) pra evitar reenvio ao atualizar a página.
+// -----------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
+
+    $acao = $_POST['acao'];
+
+    if ($acao === 'marcar_lido') {
+        $id = (int)($_POST['alerta_id'] ?? 0);
+
+        if ($id > 0) {
+            $sql = "UPDATE alertas_preditivos SET lido = 1 WHERE id = ? AND usuario_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $id, $usuario_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    if ($acao === 'aplicar_simulacao') {
+        $id = (int)($_POST['alerta_id'] ?? 0);
+        $reducao = (float)($_POST['reducao'] ?? 0);
+
+        if ($id > 0 && $reducao >= 0) {
+            $sqlBusca = "SELECT impacto_estimado FROM alertas_preditivos WHERE id = ? AND usuario_id = ?";
+            $stmtBusca = $conn->prepare($sqlBusca);
+            $stmtBusca->bind_param("ii", $id, $usuario_id);
+            $stmtBusca->execute();
+            $alerta = $stmtBusca->get_result()->fetch_assoc();
+            $stmtBusca->close();
+
+            if ($alerta) {
+                $novoImpacto = max((float)$alerta['impacto_estimado'] - $reducao, 0);
+
+                if ($novoImpacto <= 100) {
+                    $novaSeveridade = 'baixo';
+                } elseif ($novoImpacto <= 250) {
+                    $novaSeveridade = 'medio';
+                } else {
+                    $novaSeveridade = 'alto';
+                }
+
+                $sqlUpdate = "UPDATE alertas_preditivos
+                              SET impacto_estimado = ?, severidade = ?
+                              WHERE id = ? AND usuario_id = ?";
+                $stmtUpdate = $conn->prepare($sqlUpdate);
+                $stmtUpdate->bind_param("dsii", $novoImpacto, $novaSeveridade, $id, $usuario_id);
+                $stmtUpdate->execute();
+                $stmtUpdate->close();
+            }
+        }
+    }
+
+    if ($acao === 'salvar_config') {
+        $sensibilidade = $_POST['sensibilidade'] ?? 'equilibrado';
+        $alertasOrcamentoAtivo = isset($_POST['alertas_orcamento_ativo']) ? 1 : 0;
+        $alertasCategoriaAtivo = isset($_POST['alertas_categoria_ativo']) ? 1 : 0;
+
+        $valoresValidos = ['baixo', 'equilibrado', 'alto'];
+        if (in_array($sensibilidade, $valoresValidos, true)) {
+            $sql = "INSERT INTO alertas_configuracao (usuario_id, alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                      alertas_orcamento_ativo = VALUES(alertas_orcamento_ativo),
+                      alertas_categoria_ativo = VALUES(alertas_categoria_ativo),
+                      sensibilidade = VALUES(sensibilidade)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("iiis", $usuario_id, $alertasOrcamentoAtivo, $alertasCategoriaAtivo, $sensibilidade);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    header('Location: alertas-preditivos.php');
+    exit;
+}
+
+// -----------------------------------------------------------------
+// Funções auxiliares (ENUM do banco -> classes CSS/JS do protótipo)
+// -----------------------------------------------------------------
+function severidadeParaClasse(string $severidade): string
+{
+    return match ($severidade) {
+        'alto'  => 'high',
+        'medio' => 'medium',
+        'baixo' => 'low',
+        default => 'low',
+    };
+}
+
+function severidadeParaLabel(string $severidade): string
+{
+    return match ($severidade) {
+        'alto'  => 'Alto risco',
+        'medio' => 'Médio risco',
+        'baixo' => 'Baixo risco',
+        default => 'Baixo risco',
+    };
+}
+
+// -----------------------------------------------------------------
+// Busca os alertas do usuário
+// -----------------------------------------------------------------
+$sql = "SELECT id, titulo, descricao, severidade, impacto_estimado, horizonte, lido, criado_em
+        FROM alertas_preditivos
+        WHERE usuario_id = ?
+        ORDER BY FIELD(severidade, 'alto', 'medio', 'baixo'), criado_em DESC";
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$resultado = $stmt->get_result();
+
+$alertas = [];
+while ($linha = $resultado->fetch_assoc()) {
+    $alertas[] = $linha;
+}
+$stmt->close();
+
+// -----------------------------------------------------------------
+// Busca a configuração de sensibilidade do usuário
+// -----------------------------------------------------------------
+$sqlConfig = "SELECT alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade
+              FROM alertas_configuracao WHERE usuario_id = ?";
+$stmtConfig = $conn->prepare($sqlConfig);
+$stmtConfig->bind_param("i", $usuario_id);
+$stmtConfig->execute();
+$config = $stmtConfig->get_result()->fetch_assoc();
+$stmtConfig->close();
+
+$sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
+$alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
+$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+
+// -----------------------------------------------------------------
+// Array pro JS usar só pra exibição (detalhes, cálculo de resumo,
+// preview da simulação). Nenhuma ação grava usando esse array —
+// quem grava é sempre o PHP no topo da página, via POST normal.
+// -----------------------------------------------------------------
+$alertasParaJs = array_map(function ($a) {
+    return [
+        'id'            => (int)$a['id'],
+        'title'         => $a['titulo'],
+        'severity'      => severidadeParaClasse($a['severidade']),
+        'severityLabel' => severidadeParaLabel($a['severidade']),
+        'description'   => $a['descricao'],
+        'horizon'       => $a['horizonte'],
+        'impact'        => (float)$a['impacto_estimado'],
+        'read'          => (bool)$a['lido'],
+    ];
+}, $alertas);
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -20,7 +186,6 @@
         <div class="brand-mark">
           <i class="bi bi-graph-up-arrow"></i>
         </div>
-
         <div class="brand-copy">
           <h1>FinMap</h1>
           <p>Alertas preditivos inteligentes</p>
@@ -40,7 +205,7 @@
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
-        JD
+        <?= htmlspecialchars($_SESSION['avatar_iniciais'] ?? 'JD') ?>
       </button>
     </div>
   </header>
@@ -75,8 +240,8 @@
           </div>
           <div class="summary-card__content">
             <span>Risco atual</span>
-            <strong id="riskStatus">Moderado</strong>
-            <p id="riskText">Seu ritmo atual de gastos exige atenção para o fechamento do mês.</p>
+            <strong id="riskStatus">-</strong>
+            <p id="riskText">-</p>
           </div>
         </article>
 
@@ -86,7 +251,7 @@
           </div>
           <div class="summary-card__content">
             <span>Alertas ativos</span>
-            <strong id="activeAlertsCount">4</strong>
+            <strong id="activeAlertsCount"><?= count($alertas) ?></strong>
             <p>Quantidade de alertas relevantes no cenário atual.</p>
           </div>
         </article>
@@ -97,7 +262,7 @@
           </div>
           <div class="summary-card__content">
             <span>Não vistos</span>
-            <strong id="unreadAlertsCount">3</strong>
+            <strong id="unreadAlertsCount">-</strong>
             <p>Alertas que ainda precisam da sua atenção.</p>
           </div>
         </article>
@@ -120,161 +285,63 @@
           </div>
 
           <div class="alerts-list" id="alertsList">
-            <article class="alert-item alert-item--high" data-id="1" data-severity="high">
-              <div class="alert-item__left">
-                <div class="alert-item__icon alert-item__icon--high">
-                  <i class="bi bi-exclamation-octagon"></i>
-                </div>
+            <?php if (empty($alertas)): ?>
+              <p class="text-muted px-3 py-4 mb-0">Nenhum alerta no momento. Assim que o FinMap identificar algum risco, ele vai aparecer aqui.</p>
+            <?php endif; ?>
 
-                <div class="alert-item__content">
-                  <div class="alert-item__top">
-                    <h4>Seu orçamento pode estourar antes do fim do mês</h4>
-                    <span class="alert-badge alert-badge--high">Alto risco</span>
+            <?php foreach ($alertas as $a):
+              $classe = severidadeParaClasse($a['severidade']);
+              $label = severidadeParaLabel($a['severidade']);
+              $iconeSeveridade = match ($classe) {
+                  'high'   => 'bi-exclamation-octagon',
+                  'medium' => 'bi-graph-down-arrow',
+                  'low'    => 'bi-info-circle',
+              };
+            ?>
+              <article class="alert-item alert-item--<?= $classe ?>" data-id="<?= (int)$a['id'] ?>" data-severity="<?= $classe ?>">
+                <div class="alert-item__left">
+                  <div class="alert-item__icon alert-item__icon--<?= $classe ?>">
+                    <i class="bi <?= $iconeSeveridade ?>"></i>
                   </div>
 
-                  <p>Com o ritmo atual, suas despesas variáveis podem comprometer sua margem disponível nos próximos 8 dias.</p>
+                  <div class="alert-item__content">
+                    <div class="alert-item__top">
+                      <h4><?= htmlspecialchars($a['titulo']) ?></h4>
+                      <span class="alert-badge alert-badge--<?= $classe ?>"><?= $label ?></span>
+                    </div>
 
-                  <div class="alert-item__meta">
-                    <span><i class="bi bi-calendar-event"></i> Projeção em 8 dias</span>
-                    <span><i class="bi bi-wallet2"></i> Impacto estimado: R$ 420,00</span>
-                  </div>
+                    <p><?= htmlspecialchars($a['descricao']) ?></p>
 
-                  <div class="alert-item__actions">
-                    <button class="alert-action-btn alert-action-btn--ghost" type="button" data-open-details="1">
-                      <i class="bi bi-eye"></i>
-                      Ver detalhes
-                    </button>
+                    <div class="alert-item__meta">
+                      <span><i class="bi bi-calendar-event"></i> <?= htmlspecialchars($a['horizonte'] ?? '-') ?></span>
+                      <span><i class="bi bi-wallet2"></i> Impacto estimado: R$ <?= number_format((float)$a['impacto_estimado'], 2, ',', '.') ?></span>
+                    </div>
 
-                    <button class="alert-action-btn alert-action-btn--blue" type="button" data-open-simulate="1">
-                      <i class="bi bi-bar-chart-line"></i>
-                      Simular impacto
-                    </button>
+                    <div class="alert-item__actions">
+                      <button class="alert-action-btn alert-action-btn--ghost" type="button" data-open-details="<?= (int)$a['id'] ?>">
+                        <i class="bi bi-eye"></i>
+                        Ver detalhes
+                      </button>
 
-                    <button class="alert-action-btn alert-action-btn--green" type="button" data-mark-read="1">
-                      <i class="bi bi-check2-circle"></i>
-                      Marcar como visto
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </article>
+                      <button class="alert-action-btn alert-action-btn--blue" type="button" data-open-simulate="<?= (int)$a['id'] ?>">
+                        <i class="bi bi-bar-chart-line"></i>
+                        Simular impacto
+                      </button>
 
-            <article class="alert-item alert-item--medium" data-id="2" data-severity="medium">
-              <div class="alert-item__left">
-                <div class="alert-item__icon alert-item__icon--medium">
-                  <i class="bi bi-graph-down-arrow"></i>
-                </div>
-
-                <div class="alert-item__content">
-                  <div class="alert-item__top">
-                    <h4>Categoria alimentação acima da média planejada</h4>
-                    <span class="alert-badge alert-badge--medium">Médio risco</span>
-                  </div>
-
-                  <p>Os gastos com alimentação estão se afastando do comportamento ideal e podem reduzir sua folga mensal.</p>
-
-                  <div class="alert-item__meta">
-                    <span><i class="bi bi-calendar-event"></i> Tendência semanal</span>
-                    <span><i class="bi bi-wallet2"></i> Impacto estimado: R$ 180,00</span>
-                  </div>
-
-                  <div class="alert-item__actions">
-                    <button class="alert-action-btn alert-action-btn--ghost" type="button" data-open-details="2">
-                      <i class="bi bi-eye"></i>
-                      Ver detalhes
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--blue" type="button" data-open-simulate="2">
-                      <i class="bi bi-bar-chart-line"></i>
-                      Simular impacto
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--green" type="button" data-mark-read="2">
-                      <i class="bi bi-check2-circle"></i>
-                      Marcar como visto
-                    </button>
+                      <!-- Formulário simples: sem JS, sem fetch. Envia direto pro topo desta página. -->
+                      <form method="post" action="alertas-preditivos.php" style="display:inline;">
+                        <input type="hidden" name="acao" value="marcar_lido">
+                        <input type="hidden" name="alerta_id" value="<?= (int)$a['id'] ?>">
+                        <button class="alert-action-btn alert-action-btn--green" type="submit">
+                          <i class="bi bi-check2-circle"></i>
+                          Marcar como visto
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-
-            <article class="alert-item alert-item--medium" data-id="3" data-severity="medium">
-              <div class="alert-item__left">
-                <div class="alert-item__icon alert-item__icon--medium">
-                  <i class="bi bi-arrow-repeat"></i>
-                </div>
-
-                <div class="alert-item__content">
-                  <div class="alert-item__top">
-                    <h4>Assinaturas recorrentes estão pressionando seu mês</h4>
-                    <span class="alert-badge alert-badge--medium">Médio risco</span>
-                  </div>
-
-                  <p>Pagamentos automáticos com baixa utilização continuam consumindo uma parte importante do seu orçamento mensal.</p>
-
-                  <div class="alert-item__meta">
-                    <span><i class="bi bi-calendar-event"></i> Próxima cobrança em 5 dias</span>
-                    <span><i class="bi bi-wallet2"></i> Impacto estimado: R$ 148,00</span>
-                  </div>
-
-                  <div class="alert-item__actions">
-                    <button class="alert-action-btn alert-action-btn--ghost" type="button" data-open-details="3">
-                      <i class="bi bi-eye"></i>
-                      Ver detalhes
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--blue" type="button" data-open-simulate="3">
-                      <i class="bi bi-bar-chart-line"></i>
-                      Simular impacto
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--green" type="button" data-mark-read="3">
-                      <i class="bi bi-check2-circle"></i>
-                      Marcar como visto
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article class="alert-item alert-item--low" data-id="4" data-severity="low">
-              <div class="alert-item__left">
-                <div class="alert-item__icon alert-item__icon--low">
-                  <i class="bi bi-info-circle"></i>
-                </div>
-
-                <div class="alert-item__content">
-                  <div class="alert-item__top">
-                    <h4>Seu saldo livre pode ficar abaixo do ideal</h4>
-                    <span class="alert-badge alert-badge--low">Baixo risco</span>
-                  </div>
-
-                  <p>O cenário ainda está controlado, mas novas despesas não planejadas podem reduzir sua margem de segurança.</p>
-
-                  <div class="alert-item__meta">
-                    <span><i class="bi bi-calendar-event"></i> Projeção para 10 dias</span>
-                    <span><i class="bi bi-wallet2"></i> Impacto estimado: R$ 95,00</span>
-                  </div>
-
-                  <div class="alert-item__actions">
-                    <button class="alert-action-btn alert-action-btn--ghost" type="button" data-open-details="4">
-                      <i class="bi bi-eye"></i>
-                      Ver detalhes
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--blue" type="button" data-open-simulate="4">
-                      <i class="bi bi-bar-chart-line"></i>
-                      Simular impacto
-                    </button>
-
-                    <button class="alert-action-btn alert-action-btn--green" type="button" data-mark-read="4">
-                      <i class="bi bi-check2-circle"></i>
-                      Marcar como visto
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </article>
+              </article>
+            <?php endforeach; ?>
           </div>
         </section>
 
@@ -290,22 +357,22 @@
             <div class="quick-reading-list">
               <article class="quick-reading-card">
                 <span>Status geral</span>
-                <strong id="quickRiskStatus">Moderado</strong>
+                <strong id="quickRiskStatus">-</strong>
               </article>
 
               <article class="quick-reading-card">
                 <span>Maior pressão</span>
-                <strong id="quickMainPressure">Despesas variáveis</strong>
+                <strong id="quickMainPressure">-</strong>
               </article>
 
               <article class="quick-reading-card">
                 <span>Horizonte crítico</span>
-                <strong id="quickCriticalWindow">Próximos 8 dias</strong>
+                <strong id="quickCriticalWindow">-</strong>
               </article>
 
               <article class="quick-reading-card">
                 <span>Melhor ação</span>
-                <strong id="quickBestAction">Reduzir alimentação e extras</strong>
+                <strong id="quickBestAction">-</strong>
               </article>
             </div>
           </section>
@@ -321,14 +388,14 @@
             <div class="sensitivity-card">
               <div class="sensitivity-card__top">
                 <span>Nível configurado</span>
-                <strong id="sensitivityLabel">Equilibrado</strong>
+                <strong id="sensitivityLabel">-</strong>
               </div>
 
               <div class="sensitivity-card__bar">
-                <div class="sensitivity-card__fill" id="sensitivityFill" style="width: 66%;"></div>
+                <div class="sensitivity-card__fill" id="sensitivityFill" style="width: 0%;"></div>
               </div>
 
-              <p id="sensitivityText">Sensibilidade intermediária para detectar desvios antes de se tornarem críticos.</p>
+              <p id="sensitivityText">-</p>
             </div>
           </section>
         </aside>
@@ -336,7 +403,7 @@
     </section>
   </main>
 
-  <!-- MODAL DETALHES -->
+  <!-- MODAL DETALHES (só leitura, não precisa de form) -->
   <div class="alert-modal-overlay" id="detailsModal">
     <div class="alert-modal">
       <div class="alert-modal__header">
@@ -386,7 +453,7 @@
     </div>
   </div>
 
-  <!-- MODAL SIMULAÇÃO -->
+  <!-- MODAL SIMULAÇÃO: agora é um <form method="post"> de verdade -->
   <div class="alert-modal-overlay" id="simulateModal">
     <div class="alert-modal alert-modal--medium">
       <div class="alert-modal__header">
@@ -405,33 +472,38 @@
         </button>
       </div>
 
-      <div class="alert-modal__body">
-        <div class="simulate-grid">
-          <label class="alert-field">
-            <span>Redução simulada (R$)</span>
-            <input type="number" id="simulateValueInput" min="0" step="0.01" placeholder="100">
-          </label>
+      <form method="post" action="alertas-preditivos.php">
+        <input type="hidden" name="acao" value="aplicar_simulacao">
+        <input type="hidden" name="alerta_id" id="simulateAlertIdInput" value="">
 
-          <article class="simulate-result-card">
-            <span>Novo impacto estimado</span>
-            <strong id="simulatedImpactValue">R$ 0,00</strong>
-            <p id="simulatedImpactText">Insira um valor para ver como esse alerta mudaria.</p>
-          </article>
+        <div class="alert-modal__body">
+          <div class="simulate-grid">
+            <label class="alert-field">
+              <span>Redução simulada (R$)</span>
+              <input type="number" name="reducao" id="simulateValueInput" min="0" step="0.01" placeholder="100">
+            </label>
+
+            <article class="simulate-result-card">
+              <span>Novo impacto estimado</span>
+              <strong id="simulatedImpactValue">R$ 0,00</strong>
+              <p id="simulatedImpactText">Insira um valor para ver como esse alerta mudaria.</p>
+            </article>
+          </div>
         </div>
-      </div>
 
-      <div class="alert-modal__footer">
-        <button class="alert-footer-btn alert-footer-btn--secondary" id="cancelSimulateModal" type="button">
-          Cancelar
-        </button>
-        <button class="alert-footer-btn alert-footer-btn--primary" id="applySimulateBtn" type="button">
-          Aplicar simulação
-        </button>
-      </div>
+        <div class="alert-modal__footer">
+          <button class="alert-footer-btn alert-footer-btn--secondary" id="cancelSimulateModal" type="button">
+            Cancelar
+          </button>
+          <button class="alert-footer-btn alert-footer-btn--primary" type="submit">
+            Aplicar simulação
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- MODAL CONFIGURAÇÕES -->
+  <!-- MODAL CONFIGURAÇÕES: também um <form method="post"> normal -->
   <div class="alert-modal-overlay" id="settingsModalPred">
     <div class="alert-modal alert-modal--medium">
       <div class="alert-modal__header">
@@ -450,49 +522,53 @@
         </button>
       </div>
 
-      <div class="alert-modal__body">
-        <div class="settings-list">
-          <div class="settings-row">
-            <div>
-              <h4>Ativar alertas de orçamento</h4>
-              <p>Avisos quando o mês começa a sair da faixa ideal.</p>
+      <form method="post" action="alertas-preditivos.php">
+        <input type="hidden" name="acao" value="salvar_config">
+
+        <div class="alert-modal__body">
+          <div class="settings-list">
+            <div class="settings-row">
+              <div>
+                <h4>Ativar alertas de orçamento</h4>
+                <p>Avisos quando o mês começa a sair da faixa ideal.</p>
+              </div>
+              <label class="switch switch--green">
+                <input type="checkbox" name="alertas_orcamento_ativo" <?= $alertasOrcamentoAtivo ? 'checked' : '' ?>>
+                <span class="switch-slider"></span>
+              </label>
             </div>
-            <label class="switch switch--green">
-              <input type="checkbox" id="toggleBudgetAlerts" checked>
-              <span class="switch-slider"></span>
+
+            <div class="settings-row">
+              <div>
+                <h4>Ativar alertas por categoria</h4>
+                <p>Detecta desvios em grupos como alimentação e extras.</p>
+              </div>
+              <label class="switch switch--green">
+                <input type="checkbox" name="alertas_categoria_ativo" <?= $alertasCategoriaAtivo ? 'checked' : '' ?>>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <label class="alert-field">
+              <span>Sensibilidade</span>
+              <select name="sensibilidade">
+                <option value="baixo" <?= $sensibilidade === 'baixo' ? 'selected' : '' ?>>Baixo</option>
+                <option value="equilibrado" <?= $sensibilidade === 'equilibrado' ? 'selected' : '' ?>>Equilibrado</option>
+                <option value="alto" <?= $sensibilidade === 'alto' ? 'selected' : '' ?>>Alto</option>
+              </select>
             </label>
           </div>
-
-          <div class="settings-row">
-            <div>
-              <h4>Ativar alertas por categoria</h4>
-              <p>Detecta desvios em grupos como alimentação e extras.</p>
-            </div>
-            <label class="switch switch--green">
-              <input type="checkbox" id="toggleCategoryAlerts" checked>
-              <span class="switch-slider"></span>
-            </label>
-          </div>
-
-          <label class="alert-field">
-            <span>Sensibilidade</span>
-            <select id="sensitivitySelect">
-              <option value="baixo">Baixo</option>
-              <option value="equilibrado" selected>Equilibrado</option>
-              <option value="alto">Alto</option>
-            </select>
-          </label>
         </div>
-      </div>
 
-      <div class="alert-modal__footer">
-        <button class="alert-footer-btn alert-footer-btn--secondary" id="cancelSettingsModalPred" type="button">
-          Cancelar
-        </button>
-        <button class="alert-footer-btn alert-footer-btn--primary" id="saveSettingsBtn" type="button">
-          Salvar ajustes
-        </button>
-      </div>
+        <div class="alert-modal__footer">
+          <button class="alert-footer-btn alert-footer-btn--secondary" id="cancelSettingsModalPred" type="button">
+            Cancelar
+          </button>
+          <button class="alert-footer-btn alert-footer-btn--primary" type="submit">
+            Salvar ajustes
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -529,28 +605,6 @@
           <span>Agora mesmo</span>
         </div>
       </article>
-
-      <article class="notif-card notif-card--warning">
-        <div class="notif-card__icon">
-          <i class="bi bi-basket2"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Alimentação em alta</h4>
-          <p>A categoria alimentação está acima da média esperada para este período.</p>
-          <span>Hoje, 09:20</span>
-        </div>
-      </article>
-
-      <article class="notif-card notif-card--info">
-        <div class="notif-card__icon">
-          <i class="bi bi-stars"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Sugestão da IA</h4>
-          <p>Simular cortes nas despesas variáveis pode ajudar a recuperar margem mais rápido.</p>
-          <span>Hoje, 08:05</span>
-        </div>
-      </article>
     </div>
   </aside>
 
@@ -562,7 +616,6 @@
           <div class="ai-modal__icon">
             <i class="bi bi-stars"></i>
           </div>
-
           <div>
             <h3>Assistente IA FinMap</h3>
             <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
@@ -585,51 +638,20 @@
             <p>Seu cenário ainda é controlável, mas já existem sinais claros de pressão no fechamento do mês.</p>
           </div>
 
-          <div class="ai-summary-card ai-summary-card--soft">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Sugestão principal</span>
-              <i class="bi bi-lightbulb"></i>
-            </div>
-            <strong>Reduzir variáveis</strong>
-            <p>O caminho mais rápido para aliviar o risco atual está em alimentação, extras e recorrências menos prioritárias.</p>
-          </div>
-
           <div class="ai-shortcuts">
             <button class="ai-shortcut" type="button">Analisar meus alertas</button>
             <button class="ai-shortcut" type="button">Onde está o maior risco?</button>
-            <button class="ai-shortcut" type="button">Comparar cenários</button>
-            <button class="ai-shortcut" type="button">Criar plano rápido</button>
           </div>
         </aside>
 
         <section class="ai-chat-area">
-          <div class="ai-chat-area__messages">
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Detectei sinais de pressão no seu fechamento do mês. O principal foco atual está nas despesas variáveis.
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--user">
-              <div class="ai-message__bubble">
-                O que devo fazer primeiro?
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                O primeiro passo mais eficiente é revisar alimentação, extras e cobranças recorrentes. Isso tende a gerar alívio mais rápido do que mexer em custos fixos.
-              </div>
-            </div>
-          </div>
+          <div class="ai-chat-area__messages"></div>
 
           <form class="ai-chat-area__input">
             <button class="ai-input-action" type="button" aria-label="Anexar">
               <i class="bi bi-plus-lg"></i>
             </button>
-
             <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
             <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
               <i class="bi bi-send-fill"></i>
             </button>
@@ -642,70 +664,20 @@
   <script>
     const body = document.body;
 
-    const state = {
-      filter: "all",
-      sensitivity: "equilibrado",
-      budgetAlerts: true,
-      categoryAlerts: true,
-      currentAlertId: null,
-      alerts: [
-        {
-          id: 1,
-          title: "Seu orçamento pode estourar antes do fim do mês",
-          severity: "high",
-          severityLabel: "Alto risco",
-          description: "Com o ritmo atual, suas despesas variáveis podem comprometer sua margem disponível nos próximos 8 dias.",
-          horizon: "Projeção em 8 dias",
-          impact: 420,
-          read: false
-        },
-        {
-          id: 2,
-          title: "Categoria alimentação acima da média planejada",
-          severity: "medium",
-          severityLabel: "Médio risco",
-          description: "Os gastos com alimentação estão se afastando do comportamento ideal e podem reduzir sua folga mensal.",
-          horizon: "Tendência semanal",
-          impact: 180,
-          read: false
-        },
-        {
-          id: 3,
-          title: "Assinaturas recorrentes estão pressionando seu mês",
-          severity: "medium",
-          severityLabel: "Médio risco",
-          description: "Pagamentos automáticos com baixa utilização continuam consumindo uma parte importante do seu orçamento mensal.",
-          horizon: "Próxima cobrança em 5 dias",
-          impact: 148,
-          read: false
-        },
-        {
-          id: 4,
-          title: "Seu saldo livre pode ficar abaixo do ideal",
-          severity: "low",
-          severityLabel: "Baixo risco",
-          description: "O cenário ainda está controlado, mas novas despesas não planejadas podem reduzir sua margem de segurança.",
-          horizon: "Projeção para 10 dias",
-          impact: 95,
-          read: true
-        }
-      ]
-    };
+    // Só pra exibição: detalhes do modal e cálculo de resumo/preview.
+    // Nenhuma ação de gravação passa por aqui — isso é feito pelos
+    // <form method="post"> que já existem no HTML acima.
+    const alerts = <?= json_encode($alertasParaJs, JSON_UNESCAPED_UNICODE) ?>;
 
     function formatBRL(value) {
-      return value.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL"
-      });
+      return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     }
 
     function hasClassSafe(element, className) {
       return element && element.classList.contains(className);
     }
 
-    function lockBody() {
-      body.style.overflow = "hidden";
-    }
+    function lockBody() { body.style.overflow = "hidden"; }
 
     function unlockBody() {
       const hasOpenModal =
@@ -714,7 +686,6 @@
         hasClassSafe(document.getElementById("settingsModalPred"), "active") ||
         hasClassSafe(document.getElementById("notifPanel"), "active") ||
         hasClassSafe(document.getElementById("aiModal"), "active");
-
       body.style.overflow = hasOpenModal ? "hidden" : "";
     }
 
@@ -733,64 +704,137 @@
     }
 
     function openNotifications() {
-      const notifPanel = document.getElementById("notifPanel");
-      const notifOverlay = document.getElementById("notifOverlay");
-
-      if (!notifPanel || !notifOverlay) return;
-      notifPanel.classList.add("active");
-      notifOverlay.classList.add("active");
+      document.getElementById("notifPanel")?.classList.add("active");
+      document.getElementById("notifOverlay")?.classList.add("active");
       lockBody();
     }
 
     function closeNotifications() {
-      const notifPanel = document.getElementById("notifPanel");
-      const notifOverlay = document.getElementById("notifOverlay");
-
-      if (notifPanel) notifPanel.classList.remove("active");
-      if (notifOverlay) notifOverlay.classList.remove("active");
+      document.getElementById("notifPanel")?.classList.remove("active");
+      document.getElementById("notifOverlay")?.classList.remove("active");
       unlockBody();
     }
 
     function openAiModal() {
-      const aiModal = document.getElementById("aiModal");
-      if (!aiModal) return;
-      aiModal.classList.add("active");
+      document.getElementById("aiModal")?.classList.add("active");
       lockBody();
     }
 
     function closeAiModal() {
-      const aiModal = document.getElementById("aiModal");
-      if (!aiModal) return;
-      aiModal.classList.remove("active");
+      document.getElementById("aiModal")?.classList.remove("active");
       unlockBody();
     }
 
-    function getFilteredAlerts() {
-      if (state.filter === "all") return state.alerts;
-      return state.alerts.filter(alert => alert.severity === state.filter);
-    }
+    // Filtro visual (só esconde/mostra cards já renderizados pelo PHP)
+    document.querySelectorAll(".filter-chip").forEach((button) => {
+      button.addEventListener("click", () => {
+        const filtro = button.getAttribute("data-filter");
 
-    function updateFilterButtons() {
-      document.querySelectorAll(".filter-chip").forEach((button) => {
-        button.classList.toggle("active", button.getAttribute("data-filter") === state.filter);
+        document.querySelectorAll(".filter-chip").forEach((b) => {
+          b.classList.toggle("active", b === button);
+        });
+
+        document.querySelectorAll(".alert-item").forEach((item) => {
+          const severidade = item.getAttribute("data-severity");
+          item.style.display = (filtro === "all" || severidade === filtro) ? "" : "none";
+        });
       });
-    }
+    });
 
-    function updateAlertsVisibility() {
-      const visibleIds = new Set(getFilteredAlerts().map(alert => alert.id));
+    document.querySelectorAll("[data-open-details]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = Number(button.getAttribute("data-open-details"));
+        const alert = alerts.find(item => item.id === id);
+        if (!alert) return;
 
-      document.querySelectorAll(".alert-item").forEach((item) => {
-        const id = Number(item.getAttribute("data-id"));
-        item.style.display = visibleIds.has(id) ? "" : "none";
+        document.getElementById("detailTitle").textContent = alert.title;
+        document.getElementById("detailSeverity").textContent = alert.severityLabel;
+        document.getElementById("detailImpact").textContent = formatBRL(alert.impact);
+        document.getElementById("detailHorizon").textContent = alert.horizon;
+        document.getElementById("detailDescription").textContent = alert.description;
+
+        openModal("detailsModal");
       });
-    }
+    });
 
-    function updateSummary() {
-      const alerts = getFilteredAlerts();
-      const unread = state.alerts.filter(alert => !alert.read).length;
-      const active = state.alerts.length;
-      const highRisk = state.alerts.filter(alert => alert.severity === "high").length;
-      const mediumRisk = state.alerts.filter(alert => alert.severity === "medium").length;
+    document.querySelectorAll("[data-open-simulate]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = Number(button.getAttribute("data-open-simulate"));
+        const alert = alerts.find(item => item.id === id);
+        if (!alert) return;
+
+        document.getElementById("simulateAlertIdInput").value = id;
+        document.getElementById("simulateValueInput").value = "";
+        document.getElementById("simulatedImpactValue").textContent = formatBRL(alert.impact);
+        document.getElementById("simulatedImpactText").textContent = "Insira um valor para ver como esse alerta mudaria.";
+
+        openModal("simulateModal");
+      });
+    });
+
+    document.getElementById("simulateValueInput").addEventListener("input", (e) => {
+      const id = Number(document.getElementById("simulateAlertIdInput").value);
+      const alert = alerts.find(item => item.id === id);
+      if (!alert) return;
+
+      const reduction = Number(e.target.value) || 0;
+      const newImpact = Math.max(alert.impact - reduction, 0);
+
+      document.getElementById("simulatedImpactValue").textContent = formatBRL(newImpact);
+
+      if (reduction <= 0) {
+        document.getElementById("simulatedImpactText").textContent = "Insira um valor para ver como esse alerta mudaria.";
+      } else if (newImpact === 0) {
+        document.getElementById("simulatedImpactText").textContent = "Essa redução eliminaria o impacto previsto deste alerta.";
+      } else {
+        document.getElementById("simulatedImpactText").textContent = "Com essa redução, o alerta perderia parte da pressão prevista.";
+      }
+    });
+
+    document.getElementById("openSettingsModal").addEventListener("click", () => {
+      openModal("settingsModalPred");
+    });
+
+    document.getElementById("closeDetailsModal").addEventListener("click", () => closeModal("detailsModal"));
+    document.getElementById("closeSimulateModal").addEventListener("click", () => closeModal("simulateModal"));
+    document.getElementById("cancelSimulateModal").addEventListener("click", () => closeModal("simulateModal"));
+    document.getElementById("closeSettingsModalPred").addEventListener("click", () => closeModal("settingsModalPred"));
+    document.getElementById("cancelSettingsModalPred").addEventListener("click", () => closeModal("settingsModalPred"));
+
+    document.querySelectorAll(".alert-modal-overlay").forEach((overlay) => {
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove("active");
+          unlockBody();
+        }
+      });
+    });
+
+    document.getElementById("openNotificationsPanel").addEventListener("click", openNotifications);
+    document.getElementById("closeNotificationsPanel").addEventListener("click", closeNotifications);
+    document.getElementById("notifOverlay").addEventListener("click", closeNotifications);
+
+    document.getElementById("openAiModal").addEventListener("click", openAiModal);
+    document.getElementById("closeAiModal").addEventListener("click", closeAiModal);
+    document.getElementById("aiModal").addEventListener("click", (e) => {
+      if (e.target.id === "aiModal") closeAiModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeModal("detailsModal");
+        closeModal("simulateModal");
+        closeModal("settingsModalPred");
+        closeNotifications();
+        closeAiModal();
+      }
+    });
+
+    // Resumo (Risco atual, Não vistos, Leitura rápida, Sensibilidade)
+    (function atualizarResumo() {
+      const unread = alerts.filter(a => !a.read).length;
+      const highRisk = alerts.filter(a => a.severity === "high").length;
+      const mediumRisk = alerts.filter(a => a.severity === "medium").length;
 
       let riskStatus = "Controlado";
       let riskText = "Seu cenário atual está estável e sem grandes sinais de desequilíbrio.";
@@ -816,27 +860,22 @@
 
       document.getElementById("riskStatus").textContent = riskStatus;
       document.getElementById("riskText").textContent = riskText;
-      document.getElementById("activeAlertsCount").textContent = active;
       document.getElementById("unreadAlertsCount").textContent = unread;
-
       document.getElementById("quickRiskStatus").textContent = riskStatus;
       document.getElementById("quickMainPressure").textContent = quickPressure;
       document.getElementById("quickCriticalWindow").textContent = quickWindow;
       document.getElementById("quickBestAction").textContent = quickAction;
 
-      updateSensitivityUI();
-    }
-
-    function updateSensitivityUI() {
+      const sensibilidade = <?= json_encode($sensibilidade) ?>;
       const fill = document.getElementById("sensitivityFill");
       const label = document.getElementById("sensitivityLabel");
       const text = document.getElementById("sensitivityText");
 
-      if (state.sensitivity === "baixo") {
+      if (sensibilidade === "baixo") {
         label.textContent = "Baixo";
         fill.style.width = "36%";
         text.textContent = "Sensibilidade menor, focada apenas em desvios mais evidentes.";
-      } else if (state.sensitivity === "alto") {
+      } else if (sensibilidade === "alto") {
         label.textContent = "Alto";
         fill.style.width = "100%";
         text.textContent = "Sensibilidade alta para detectar movimentos pequenos antes que cresçam.";
@@ -845,184 +884,7 @@
         fill.style.width = "66%";
         text.textContent = "Sensibilidade intermediária para detectar desvios antes de se tornarem críticos.";
       }
-    }
-
-    function updateUI() {
-      updateFilterButtons();
-      updateAlertsVisibility();
-      updateSummary();
-    }
-
-    function openDetails(id) {
-      const alert = state.alerts.find(item => item.id === id);
-      if (!alert) return;
-
-      document.getElementById("detailTitle").textContent = alert.title;
-      document.getElementById("detailSeverity").textContent = alert.severityLabel;
-      document.getElementById("detailImpact").textContent = formatBRL(alert.impact);
-      document.getElementById("detailHorizon").textContent = alert.horizon;
-      document.getElementById("detailDescription").textContent = alert.description;
-
-      openModal("detailsModal");
-    }
-
-    function openSimulate(id) {
-      const alert = state.alerts.find(item => item.id === id);
-      if (!alert) return;
-
-      state.currentAlertId = id;
-      document.getElementById("simulateValueInput").value = "";
-      document.getElementById("simulatedImpactValue").textContent = formatBRL(alert.impact);
-      document.getElementById("simulatedImpactText").textContent = "Insira um valor para ver como esse alerta mudaria.";
-      openModal("simulateModal");
-    }
-
-    function markAsRead(id) {
-      const alert = state.alerts.find(item => item.id === id);
-      if (!alert) return;
-      alert.read = true;
-      updateUI();
-    }
-
-    document.querySelectorAll(".filter-chip").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.filter = button.getAttribute("data-filter");
-        updateUI();
-      });
-    });
-
-    document.querySelectorAll("[data-open-details]").forEach((button) => {
-      button.addEventListener("click", () => {
-        openDetails(Number(button.getAttribute("data-open-details")));
-      });
-    });
-
-    document.querySelectorAll("[data-open-simulate]").forEach((button) => {
-      button.addEventListener("click", () => {
-        openSimulate(Number(button.getAttribute("data-open-simulate")));
-      });
-    });
-
-    document.querySelectorAll("[data-mark-read]").forEach((button) => {
-      button.addEventListener("click", () => {
-        markAsRead(Number(button.getAttribute("data-mark-read")));
-      });
-    });
-
-    document.getElementById("openSettingsModal").addEventListener("click", () => {
-      document.getElementById("sensitivitySelect").value = state.sensitivity;
-      document.getElementById("toggleBudgetAlerts").checked = state.budgetAlerts;
-      document.getElementById("toggleCategoryAlerts").checked = state.categoryAlerts;
-      openModal("settingsModalPred");
-    });
-
-    document.getElementById("simulateValueInput").addEventListener("input", (e) => {
-      const alert = state.alerts.find(item => item.id === state.currentAlertId);
-      if (!alert) return;
-
-      const reduction = Number(e.target.value) || 0;
-      const newImpact = Math.max(alert.impact - reduction, 0);
-
-      document.getElementById("simulatedImpactValue").textContent = formatBRL(newImpact);
-
-      if (reduction <= 0) {
-        document.getElementById("simulatedImpactText").textContent = "Insira um valor para ver como esse alerta mudaria.";
-      } else if (newImpact === 0) {
-        document.getElementById("simulatedImpactText").textContent = "Essa redução eliminaria o impacto previsto deste alerta.";
-      } else {
-        document.getElementById("simulatedImpactText").textContent = "Com essa redução, o alerta perderia parte da pressão prevista.";
-      }
-    });
-
-    document.getElementById("applySimulateBtn").addEventListener("click", () => {
-      const alert = state.alerts.find(item => item.id === state.currentAlertId);
-      if (!alert) return;
-
-      const reduction = Number(document.getElementById("simulateValueInput").value) || 0;
-      alert.impact = Math.max(alert.impact - reduction, 0);
-
-      if (alert.impact <= 100) {
-        alert.severity = "low";
-        alert.severityLabel = "Baixo risco";
-      } else if (alert.impact <= 250) {
-        alert.severity = "medium";
-        alert.severityLabel = "Médio risco";
-      } else {
-        alert.severity = "high";
-        alert.severityLabel = "Alto risco";
-      }
-
-      const item = document.querySelector(`.alert-item[data-id="${alert.id}"]`);
-      if (item) {
-        item.setAttribute("data-severity", alert.severity);
-        item.className = `alert-item alert-item--${alert.severity}`;
-        const badge = item.querySelector(".alert-badge");
-        const icon = item.querySelector(".alert-item__icon");
-        const metaImpact = item.querySelector(".alert-item__meta span:nth-child(2)");
-
-        if (badge) {
-          badge.textContent = alert.severityLabel;
-          badge.className = `alert-badge alert-badge--${alert.severity}`;
-        }
-
-        if (icon) {
-          icon.className = `alert-item__icon alert-item__icon--${alert.severity}`;
-        }
-
-        if (metaImpact) {
-          metaImpact.innerHTML = `<i class="bi bi-wallet2"></i> Impacto estimado: ${formatBRL(alert.impact)}`;
-        }
-      }
-
-      closeModal("simulateModal");
-      updateUI();
-    });
-
-    document.getElementById("saveSettingsBtn").addEventListener("click", () => {
-      state.sensitivity = document.getElementById("sensitivitySelect").value;
-      state.budgetAlerts = document.getElementById("toggleBudgetAlerts").checked;
-      state.categoryAlerts = document.getElementById("toggleCategoryAlerts").checked;
-      closeModal("settingsModalPred");
-      updateUI();
-    });
-
-    document.getElementById("closeDetailsModal").addEventListener("click", () => closeModal("detailsModal"));
-    document.getElementById("closeSimulateModal").addEventListener("click", () => closeModal("simulateModal"));
-    document.getElementById("cancelSimulateModal").addEventListener("click", () => closeModal("simulateModal"));
-    document.getElementById("closeSettingsModalPred").addEventListener("click", () => closeModal("settingsModalPred"));
-    document.getElementById("cancelSettingsModalPred").addEventListener("click", () => closeModal("settingsModalPred"));
-
-    document.querySelectorAll(".alert-modal-overlay").forEach((overlay) => {
-      overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) {
-          overlay.classList.remove("active");
-          unlockBody();
-        }
-      });
-    });
-
-    document.getElementById("openNotificationsPanel").addEventListener("click", openNotifications);
-    document.getElementById("closeNotificationsPanel").addEventListener("click", closeNotifications);
-    document.getElementById("notifOverlay").addEventListener("click", closeNotifications);
-
-    document.getElementById("openAiModal").addEventListener("click", openAiModal);
-    document.getElementById("closeAiModal").addEventListener("click", closeAiModal);
-
-    document.getElementById("aiModal").addEventListener("click", (e) => {
-      if (e.target.id === "aiModal") closeAiModal();
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        closeModal("detailsModal");
-        closeModal("simulateModal");
-        closeModal("settingsModalPred");
-        closeNotifications();
-        closeAiModal();
-      }
-    });
-
-    updateUI();
+    })();
   </script>
 
 </body>
