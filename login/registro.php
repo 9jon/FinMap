@@ -1,3 +1,59 @@
+<?php
+// login/registro.php
+session_start();
+include '../config/conn.php';
+
+$erro = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nome = trim($_POST['nome'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $senha = $_POST['senha'] ?? '';
+    $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+
+    if ($nome === '' || $email === '' || $senha === '' || $confirmarSenha === '') {
+        $erro = 'Preencha todos os campos.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $erro = 'Digite um e-mail válido.';
+    } elseif (strlen($senha) < 6) {
+        $erro = 'A senha precisa ter pelo menos 6 caracteres.';
+    } elseif ($senha !== $confirmarSenha) {
+        $erro = 'As senhas não coincidem.';
+    } else {
+        // Verifica se o e-mail já está cadastrado
+        $stmt = $conn->prepare("SELECT id FROM usuarios WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $existente = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($existente) {
+            $erro = 'Já existe uma conta com esse e-mail.';
+        } else {
+            // Gera iniciais automaticamente (ex: "João Dias" -> "JD")
+            $partesNome = explode(' ', $nome);
+            $iniciais = strtoupper(substr($partesNome[0], 0, 1) . substr(end($partesNome), 0, 1));
+
+            $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
+
+            $stmt = $conn->prepare("INSERT INTO usuarios (nome, email, senha_hash, avatar_iniciais) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $nome, $email, $senhaHash, $iniciais);
+
+            if ($stmt->execute()) {
+                $_SESSION['usuario_id'] = $stmt->insert_id;
+                $stmt->close();
+                $conn->close();
+                header('Location: ../pages/config-renda.php');
+                exit;
+            } else {
+                $erro = 'Erro ao criar a conta. Tente novamente.';
+            }
+
+            $stmt->close();
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -21,22 +77,28 @@
 <h3 class="mb-2">Crie sua conta</h3>
 </div>
 
-<form id="registroForm">
+<?php if ($erro): ?>
+  <div class="alert alert-danger py-2 px-3" style="font-size: 0.9rem;">
+    <?= htmlspecialchars($erro) ?>
+  </div>
+<?php endif; ?>
+
+<form id="registroForm" method="POST" action="registro.php">
 
 <div class="mb-3">
 <label class="form-label">Nome completo</label>
-<input type="text" class="form-control" placeholder="Seu nome completo">
+<input type="text" name="nome" class="form-control" placeholder="Seu nome completo" value="<?= htmlspecialchars($_POST['nome'] ?? '') ?>" required>
 </div>
 
 <div class="mb-3">
 <label class="form-label">Email</label>
-<input type="email" class="form-control" placeholder="seu@email.com">
+<input type="email" name="email" class="form-control" placeholder="seu@email.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
 </div>
 
 <div class="mb-3">
 <label class="form-label">Senha</label>
 <div class="input-group">
-<input type="password" class="form-control" id="senha" placeholder="Digite sua senha">
+<input type="password" name="senha" class="form-control" id="senha" placeholder="Digite sua senha" required>
 
 <span class="input-group-text eye-btn" onclick="toggleSenha()" style="cursor:pointer;">
 <i id="iconeSenha" class="bi bi-eye-slash"></i>
@@ -49,7 +111,7 @@
 <label class="form-label">Confirmar senha</label>
 
 <div class="input-group">
-<input type="password" class="form-control" id="confirmarSenha" placeholder="Confirme sua senha">
+<input type="password" name="confirmar_senha" class="form-control" id="confirmarSenha" placeholder="Confirme sua senha" required>
 
 <span class="input-group-text eye-btn" onclick="toggleConfirmar()" style="cursor:pointer;">
 <i id="iconeConfirmar" class="bi bi-eye-slash"></i>
@@ -131,15 +193,9 @@ icone.classList.replace("bi-eye","bi-eye-slash");
 }
 }
 
-/* redirecionamento após clicar em criar conta */
-
-document.getElementById("registroForm").addEventListener("submit", function(e){
-
-e.preventDefault();
-
-window.location.href = "../pages/config-renda.php";
-
-});
+/* O formulário agora envia de verdade pro servidor (method="POST"),
+   então não precisamos mais interceptar o submit com JavaScript
+   nem redirecionar manualmente — o PHP lá em cima cuida disso. */
 
 </script>
 
