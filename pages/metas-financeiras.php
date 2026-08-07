@@ -1,3 +1,173 @@
+<?php
+session_start();
+require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+
+// ==========================================================
+// TEMPORÁRIO: login ainda não está conectado ao banco.
+// Enquanto isso, usamos automaticamente o usuário de exemplo
+// (João Dias) já inserido no seed, só pra dar pra testar essa
+// tela sem passar pelo login.
+//
+// QUANDO O LOGIN ESTIVER PRONTO: apague o bloco "if" abaixo e
+// deixe só a checagem normal de sessão (redirecionar pra
+// login.php se não tiver $_SESSION['usuario_id']).
+// ==========================================================
+if (!isset($_SESSION['usuario_id'])) {
+    $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
+    $resultadoTeste = $conn->query($sqlTeste);
+    $usuarioTeste = $resultadoTeste ? $resultadoTeste->fetch_assoc() : null;
+
+    if ($usuarioTeste) {
+        $_SESSION['usuario_id'] = (int)$usuarioTeste['id'];
+    } else {
+        die('Nenhum usuário de teste encontrado na tabela usuarios. Rode o INSERT do usuário de exemplo (joao@email.com) do schema antes de testar esta tela.');
+    }
+}
+
+$usuario_id = (int)$_SESSION['usuario_id'];
+
+$coresValidas = ['green', 'blue', 'orange', 'purple'];
+$iconesValidos = ['shield-check', 'airplane', 'car-front', 'house-door', 'mortarboard', 'heart-pulse', 'gift', 'stars'];
+
+// -----------------------------------------------------------------
+// PROCESSAMENTO DAS AÇÕES (POST) — tudo via formulário normal,
+// sem AJAX. Depois de cada ação, redirecionamos pra própria página
+// (padrão Post/Redirect/Get).
+// -----------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
+
+    $acao = $_POST['acao'];
+
+    if ($acao === 'criar_meta' || $acao === 'editar_meta') {
+        $nome = trim($_POST['nome'] ?? '');
+        $valorMeta = (float)str_replace(',', '.', $_POST['valor_meta'] ?? 0);
+        $valorGuardado = (float)str_replace(',', '.', $_POST['valor_guardado'] ?? 0);
+        $icone = $_POST['icone'] ?? 'shield-check';
+        $cor = $_POST['cor'] ?? 'green';
+
+        if (!in_array($icone, $iconesValidos, true)) $icone = 'shield-check';
+        if (!in_array($cor, $coresValidas, true)) $cor = 'green';
+
+        // Não deixa guardar mais do que o valor total da meta
+        if ($valorGuardado > $valorMeta) {
+            $valorGuardado = $valorMeta;
+        }
+
+        if ($nome !== '' && $valorMeta > 0 && $valorGuardado >= 0) {
+
+            if ($acao === 'criar_meta') {
+                $sql = "INSERT INTO metas_financeiras (usuario_id, nome, valor_meta, valor_guardado, icone, cor)
+                        VALUES (?, ?, ?, ?, ?, ?)";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("isddss", $usuario_id, $nome, $valorMeta, $valorGuardado, $icone, $cor);
+                $stmt->execute();
+                $stmt->close();
+            } else {
+                $metaId = (int)($_POST['meta_id'] ?? 0);
+
+                $sql = "UPDATE metas_financeiras
+                        SET nome = ?, valor_meta = ?, valor_guardado = ?, icone = ?, cor = ?
+                        WHERE id = ? AND usuario_id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("sddssii", $nome, $valorMeta, $valorGuardado, $icone, $cor, $metaId, $usuario_id);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+    }
+
+    if ($acao === 'excluir_meta') {
+        $metaId = (int)($_POST['meta_id'] ?? 0);
+
+        if ($metaId > 0) {
+            $sql = "DELETE FROM metas_financeiras WHERE id = ? AND usuario_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $metaId, $usuario_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
+    if ($acao === 'adicionar_valor') {
+        $metaId = (int)($_POST['meta_id'] ?? 0);
+        $valorAdicionar = (float)str_replace(',', '.', $_POST['valor_adicionar'] ?? 0);
+
+        if ($metaId > 0 && $valorAdicionar > 0) {
+            // Confirma que a meta é do usuário logado e pega os valores atuais
+            $sqlBusca = "SELECT valor_meta, valor_guardado FROM metas_financeiras WHERE id = ? AND usuario_id = ?";
+            $stmtBusca = $conn->prepare($sqlBusca);
+            $stmtBusca->bind_param("ii", $metaId, $usuario_id);
+            $stmtBusca->execute();
+            $meta = $stmtBusca->get_result()->fetch_assoc();
+            $stmtBusca->close();
+
+            if ($meta) {
+                $valorMetaAtual = (float)$meta['valor_meta'];
+                $valorGuardadoAtual = (float)$meta['valor_guardado'];
+
+                $novoValorGuardado = min($valorGuardadoAtual + $valorAdicionar, $valorMetaAtual);
+                $valorRealmenteAdicionado = $novoValorGuardado - $valorGuardadoAtual;
+
+                $sqlUpdate = "UPDATE metas_financeiras SET valor_guardado = ? WHERE id = ? AND usuario_id = ?";
+                $stmtUpdate = $conn->prepare($sqlUpdate);
+                $stmtUpdate->bind_param("dii", $novoValorGuardado, $metaId, $usuario_id);
+                $stmtUpdate->execute();
+                $stmtUpdate->close();
+
+                // Registra o aporte no histórico (metas_progresso)
+                if ($valorRealmenteAdicionado > 0) {
+                    $sqlHistorico = "INSERT INTO metas_progresso (meta_id, valor_adicionado) VALUES (?, ?)";
+                    $stmtHistorico = $conn->prepare($sqlHistorico);
+                    $stmtHistorico->bind_param("id", $metaId, $valorRealmenteAdicionado);
+                    $stmtHistorico->execute();
+                    $stmtHistorico->close();
+                }
+            }
+        }
+    }
+
+    header('Location: metas-financeiras.php');
+    exit;
+}
+
+// -----------------------------------------------------------------
+// Busca as metas do usuário
+// -----------------------------------------------------------------
+$sql = "SELECT id, nome, valor_meta, valor_guardado, icone, cor
+        FROM metas_financeiras
+        WHERE usuario_id = ?
+        ORDER BY criado_em ASC";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$resultado = $stmt->get_result();
+
+$metas = [];
+while ($linha = $resultado->fetch_assoc()) {
+    $metas[] = $linha;
+}
+$stmt->close();
+
+// -----------------------------------------------------------------
+// Resumo (total de metas, total guardado, progresso médio)
+// -----------------------------------------------------------------
+function calcularPercentual(float $guardado, float $meta): float
+{
+    if ($meta <= 0) return 0;
+    return min(($guardado / $meta) * 100, 100);
+}
+
+$totalMetas = count($metas);
+$totalGuardado = array_sum(array_map(fn($m) => (float)$m['valor_guardado'], $metas));
+$progressoMedio = $totalMetas > 0
+    ? round(array_sum(array_map(fn($m) => calcularPercentual((float)$m['valor_guardado'], (float)$m['valor_meta']), $metas)) / $totalMetas)
+    : 0;
+
+function brl(float $valor): string
+{
+    return 'R$ ' . number_format($valor, 2, ',', '.');
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -40,7 +210,7 @@
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
-        JD
+        <?= htmlspecialchars($_SESSION['avatar_iniciais'] ?? 'JD') ?>
       </button>
     </div>
   </header>
@@ -75,7 +245,7 @@
           </div>
           <div class="summary-card__content">
             <span>Total de metas</span>
-            <strong id="totalGoalsCount">0</strong>
+            <strong id="totalGoalsCount"><?= $totalMetas ?></strong>
             <p>Quantidade de objetivos cadastrados no momento.</p>
           </div>
         </article>
@@ -86,7 +256,7 @@
           </div>
           <div class="summary-card__content">
             <span>Total já guardado</span>
-            <strong id="totalSavedValue">R$ 0,00</strong>
+            <strong id="totalSavedValue"><?= brl($totalGuardado) ?></strong>
             <p>Soma acumulada entre todas as metas ativas.</p>
           </div>
         </article>
@@ -97,7 +267,7 @@
           </div>
           <div class="summary-card__content">
             <span>Progresso médio</span>
-            <strong id="averageProgressValue">0%</strong>
+            <strong id="averageProgressValue"><?= $progressoMedio ?>%</strong>
             <p>Média geral de avanço das metas cadastradas.</p>
           </div>
         </article>
@@ -115,7 +285,82 @@
           </button>
         </div>
 
-        <div class="goals-list" id="goalsList"></div>
+        <div class="goals-list" id="goalsList">
+          <?php if (empty($metas)): ?>
+            <div class="empty-goals-state">
+              <div class="empty-goals-state__icon">
+                <i class="bi bi-bullseye"></i>
+              </div>
+              <h4>Nenhuma meta criada ainda</h4>
+              <p>Crie sua primeira meta financeira para começar a acompanhar seu progresso.</p>
+            </div>
+          <?php endif; ?>
+
+          <?php foreach ($metas as $meta):
+            $percentual = calcularPercentual((float)$meta['valor_guardado'], (float)$meta['valor_meta']);
+            $faltam = max((float)$meta['valor_meta'] - (float)$meta['valor_guardado'], 0);
+          ?>
+            <article class="goal-card" data-id="<?= (int)$meta['id'] ?>">
+              <div class="goal-card__top">
+                <div class="goal-card__left">
+                  <div class="goal-card__icon goal-card__icon--<?= htmlspecialchars($meta['cor']) ?>">
+                    <i class="bi bi-<?= htmlspecialchars($meta['icone']) ?>"></i>
+                  </div>
+
+                  <div class="goal-card__info">
+                    <h4><?= htmlspecialchars($meta['nome']) ?></h4>
+                    <p><?= brl((float)$meta['valor_guardado']) ?> de <?= brl((float)$meta['valor_meta']) ?></p>
+                  </div>
+                </div>
+
+                <span class="goal-card__badge"><?= round($percentual) ?>%</span>
+              </div>
+
+              <div class="goal-card__progress">
+                <div class="goal-card__progress-fill goal-card__progress-fill--<?= htmlspecialchars($meta['cor']) ?>" style="width: <?= $percentual ?>%;"></div>
+              </div>
+
+              <div class="goal-card__bottom">
+                <span><?= round($percentual) ?>% concluído</span>
+                <span>Faltam <?= brl($faltam) ?></span>
+              </div>
+
+              <div class="goal-card__actions">
+                <button
+                  class="goal-action-btn goal-action-btn--green"
+                  type="button"
+                  data-add-progress="<?= (int)$meta['id'] ?>"
+                >
+                  <i class="bi bi-plus-circle"></i>
+                  Adicionar valor
+                </button>
+
+                <button
+                  class="goal-action-btn goal-action-btn--blue"
+                  type="button"
+                  data-edit-goal="<?= (int)$meta['id'] ?>"
+                  data-nome="<?= htmlspecialchars($meta['nome']) ?>"
+                  data-valor-meta="<?= (float)$meta['valor_meta'] ?>"
+                  data-valor-guardado="<?= (float)$meta['valor_guardado'] ?>"
+                  data-cor="<?= htmlspecialchars($meta['cor']) ?>"
+                  data-icone="<?= htmlspecialchars($meta['icone']) ?>"
+                >
+                  <i class="bi bi-pencil-square"></i>
+                  Editar
+                </button>
+
+                <form method="post" action="metas-financeiras.php" style="display:inline;" onsubmit="return confirm('Excluir esta meta? Essa ação não pode ser desfeita.');">
+                  <input type="hidden" name="acao" value="excluir_meta">
+                  <input type="hidden" name="meta_id" value="<?= (int)$meta['id'] ?>">
+                  <button class="goal-action-btn goal-action-btn--red" type="submit">
+                    <i class="bi bi-trash3"></i>
+                    Excluir
+                  </button>
+                </form>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        </div>
 
         <button class="new-goal-btn" id="openCreateGoalModalBottom" type="button">
           <i class="bi bi-plus-lg"></i>
@@ -125,7 +370,7 @@
     </section>
   </main>
 
-  <!-- MODAL CRIAR/EDITAR META -->
+  <!-- MODAL CRIAR/EDITAR META: um único form, o campo "acao" muda via JS -->
   <div class="goal-modal-overlay" id="goalModal">
     <div class="goal-modal">
       <div class="goal-modal__header">
@@ -145,61 +390,66 @@
         </button>
       </div>
 
-      <div class="goal-modal__body">
-        <div class="goal-form-grid">
-          <label class="goal-field">
-            <span>Nome da meta</span>
-            <input type="text" id="goalNameInput" placeholder="Ex: Reserva de Emergência">
-          </label>
+      <form method="post" action="metas-financeiras.php" id="goalForm">
+        <input type="hidden" name="acao" id="goalAcaoInput" value="criar_meta">
+        <input type="hidden" name="meta_id" id="goalIdInput" value="">
 
-          <label class="goal-field">
-            <span>Valor total da meta</span>
-            <input type="number" id="goalTargetInput" min="0" step="0.01" placeholder="15000">
-          </label>
+        <div class="goal-modal__body">
+          <div class="goal-form-grid">
+            <label class="goal-field">
+              <span>Nome da meta</span>
+              <input type="text" name="nome" id="goalNameInput" placeholder="Ex: Reserva de Emergência" required>
+            </label>
 
-          <label class="goal-field">
-            <span>Valor já guardado</span>
-            <input type="number" id="goalSavedInput" min="0" step="0.01" placeholder="8750">
-          </label>
+            <label class="goal-field">
+              <span>Valor total da meta</span>
+              <input type="number" name="valor_meta" id="goalTargetInput" min="0.01" step="0.01" placeholder="15000" required>
+            </label>
 
-          <label class="goal-field">
-            <span>Ícone</span>
-            <select id="goalIconInput">
-              <option value="shield-check">Reserva</option>
-              <option value="airplane">Viagem</option>
-              <option value="car-front">Carro</option>
-              <option value="house-door">Casa</option>
-              <option value="mortarboard">Estudos</option>
-              <option value="heart-pulse">Saúde</option>
-              <option value="gift">Presente</option>
-              <option value="stars">Objetivo geral</option>
-            </select>
-          </label>
+            <label class="goal-field">
+              <span>Valor já guardado</span>
+              <input type="number" name="valor_guardado" id="goalSavedInput" min="0" step="0.01" placeholder="8750">
+            </label>
 
-          <label class="goal-field">
-            <span>Cor</span>
-            <select id="goalColorInput">
-              <option value="green">Verde</option>
-              <option value="blue">Azul</option>
-              <option value="orange">Laranja</option>
-              <option value="purple">Roxo</option>
-            </select>
-          </label>
+            <label class="goal-field">
+              <span>Ícone</span>
+              <select name="icone" id="goalIconInput">
+                <option value="shield-check">Reserva</option>
+                <option value="airplane">Viagem</option>
+                <option value="car-front">Carro</option>
+                <option value="house-door">Casa</option>
+                <option value="mortarboard">Estudos</option>
+                <option value="heart-pulse">Saúde</option>
+                <option value="gift">Presente</option>
+                <option value="stars">Objetivo geral</option>
+              </select>
+            </label>
+
+            <label class="goal-field">
+              <span>Cor</span>
+              <select name="cor" id="goalColorInput">
+                <option value="green">Verde</option>
+                <option value="blue">Azul</option>
+                <option value="orange">Laranja</option>
+                <option value="purple">Roxo</option>
+              </select>
+            </label>
+          </div>
         </div>
-      </div>
 
-      <div class="goal-modal__footer">
-        <button class="goal-footer-btn goal-footer-btn--secondary" id="cancelGoalModal" type="button">
-          Cancelar
-        </button>
-        <button class="goal-footer-btn goal-footer-btn--primary" id="saveGoalBtn" type="button">
-          Salvar meta
-        </button>
-      </div>
+        <div class="goal-modal__footer">
+          <button class="goal-footer-btn goal-footer-btn--secondary" id="cancelGoalModal" type="button">
+            Cancelar
+          </button>
+          <button class="goal-footer-btn goal-footer-btn--primary" type="submit">
+            Salvar meta
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- MODAL ADICIONAR VALOR -->
+  <!-- MODAL ADICIONAR VALOR: form próprio -->
   <div class="goal-modal-overlay" id="progressModal">
     <div class="goal-modal goal-modal--small">
       <div class="goal-modal__header">
@@ -219,21 +469,26 @@
         </button>
       </div>
 
-      <div class="goal-modal__body">
-        <label class="goal-field">
-          <span>Valor a adicionar</span>
-          <input type="number" id="progressAmountInput" min="0" step="0.01" placeholder="500">
-        </label>
-      </div>
+      <form method="post" action="metas-financeiras.php">
+        <input type="hidden" name="acao" value="adicionar_valor">
+        <input type="hidden" name="meta_id" id="progressMetaIdInput" value="">
 
-      <div class="goal-modal__footer">
-        <button class="goal-footer-btn goal-footer-btn--secondary" id="cancelProgressModal" type="button">
-          Cancelar
-        </button>
-        <button class="goal-footer-btn goal-footer-btn--primary" id="saveProgressBtn" type="button">
-          Adicionar valor
-        </button>
-      </div>
+        <div class="goal-modal__body">
+          <label class="goal-field">
+            <span>Valor a adicionar</span>
+            <input type="number" name="valor_adicionar" id="progressAmountInput" min="0.01" step="0.01" placeholder="500" required>
+          </label>
+        </div>
+
+        <div class="goal-modal__footer">
+          <button class="goal-footer-btn goal-footer-btn--secondary" id="cancelProgressModal" type="button">
+            Cancelar
+          </button>
+          <button class="goal-footer-btn goal-footer-btn--primary" type="submit">
+            Adicionar valor
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -339,18 +594,6 @@
                 Posso te ajudar a organizar suas metas por prioridade, prazo ou impacto financeiro.
               </div>
             </div>
-
-            <div class="ai-message ai-message--user">
-              <div class="ai-message__bubble">
-                Qual meta faz mais sentido priorizar agora?
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Em geral, a reserva de emergência costuma ser a meta mais estratégica para fortalecer sua segurança financeira primeiro.
-              </div>
-            </div>
           </div>
 
           <form class="ai-chat-area__input">
@@ -371,261 +614,6 @@
 
   <script>
     const body = document.body;
-    const GOALS_STORAGE_KEY = "finmap_goals";
-    const DEFAULT_GOALS = [
-      {
-        id: 1,
-        name: "Reserva de Emergência",
-        target: 15000,
-        saved: 8750,
-        color: "green",
-        icon: "shield-check"
-      },
-      {
-        id: 2,
-        name: "Viagem para Europa",
-        target: 8000,
-        saved: 3200,
-        color: "blue",
-        icon: "airplane"
-      },
-      {
-        id: 3,
-        name: "Novo carro",
-        target: 45000,
-        saved: 12000,
-        color: "orange",
-        icon: "car-front"
-      }
-    ];
-
-    let goals = loadGoals();
-    let editingGoalId = null;
-    let progressGoalId = null;
-
-    function loadGoals() {
-      const saved = localStorage.getItem(GOALS_STORAGE_KEY);
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (error) {
-          return DEFAULT_GOALS;
-        }
-      }
-      localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(DEFAULT_GOALS));
-      return DEFAULT_GOALS;
-    }
-
-    function saveGoals() {
-      localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
-    }
-
-    function formatBRL(value) {
-      return value.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL"
-      });
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function getColorClass(color) {
-      return {
-        green: "green",
-        blue: "blue",
-        orange: "orange",
-        purple: "purple"
-      }[color] || "green";
-    }
-
-    function calculatePercent(saved, target) {
-      if (!target || target <= 0) return 0;
-      return Math.min((saved / target) * 100, 100);
-    }
-
-    function renderGoals() {
-      const list = document.getElementById("goalsList");
-      if (!list) return;
-
-      if (!goals.length) {
-        list.innerHTML = `
-          <div class="empty-goals-state">
-            <div class="empty-goals-state__icon">
-              <i class="bi bi-bullseye"></i>
-            </div>
-            <h4>Nenhuma meta criada ainda</h4>
-            <p>Crie sua primeira meta financeira para começar a acompanhar seu progresso.</p>
-          </div>
-        `;
-        renderSummary();
-        return;
-      }
-
-      list.innerHTML = goals.map((goal) => {
-        const percent = calculatePercent(goal.saved, goal.target);
-        const remaining = Math.max(goal.target - goal.saved, 0);
-        const color = getColorClass(goal.color);
-
-        return `
-          <article class="goal-card" data-id="${goal.id}">
-            <div class="goal-card__top">
-              <div class="goal-card__left">
-                <div class="goal-card__icon goal-card__icon--${color}">
-                  <i class="bi bi-${goal.icon}"></i>
-                </div>
-
-                <div class="goal-card__info">
-                  <h4>${escapeHtml(goal.name)}</h4>
-                  <p>${formatBRL(goal.saved)} de ${formatBRL(goal.target)}</p>
-                </div>
-              </div>
-
-              <span class="goal-card__badge">${Math.round(percent)}%</span>
-            </div>
-
-            <div class="goal-card__progress">
-              <div class="goal-card__progress-fill goal-card__progress-fill--${color}" style="width: ${percent}%;"></div>
-            </div>
-
-            <div class="goal-card__bottom">
-              <span>${Math.round(percent)}% concluído</span>
-              <span>Faltam ${formatBRL(remaining)}</span>
-            </div>
-
-            <div class="goal-card__actions">
-              <button class="goal-action-btn goal-action-btn--green" type="button" data-add-progress="${goal.id}">
-                <i class="bi bi-plus-circle"></i>
-                Adicionar valor
-              </button>
-
-              <button class="goal-action-btn goal-action-btn--blue" type="button" data-edit-goal="${goal.id}">
-                <i class="bi bi-pencil-square"></i>
-                Editar
-              </button>
-
-              <button class="goal-action-btn goal-action-btn--red" type="button" data-delete-goal="${goal.id}">
-                <i class="bi bi-trash3"></i>
-                Excluir
-              </button>
-            </div>
-          </article>
-        `;
-      }).join("");
-
-      bindGoalActions();
-      renderSummary();
-    }
-
-    function renderSummary() {
-      const totalGoals = goals.length;
-      const totalSaved = goals.reduce((sum, goal) => sum + Number(goal.saved), 0);
-      const averageProgress = totalGoals
-        ? Math.round(goals.reduce((sum, goal) => sum + calculatePercent(goal.saved, goal.target), 0) / totalGoals)
-        : 0;
-
-      document.getElementById("totalGoalsCount").textContent = totalGoals;
-      document.getElementById("totalSavedValue").textContent = formatBRL(totalSaved);
-      document.getElementById("averageProgressValue").textContent = `${averageProgress}%`;
-    }
-
-    function bindGoalActions() {
-      document.querySelectorAll("[data-add-progress]").forEach((button) => {
-        button.addEventListener("click", () => {
-          progressGoalId = Number(button.getAttribute("data-add-progress"));
-          document.getElementById("progressAmountInput").value = "";
-          openModal("progressModal");
-        });
-      });
-
-      document.querySelectorAll("[data-edit-goal]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const id = Number(button.getAttribute("data-edit-goal"));
-          const goal = goals.find(item => item.id === id);
-          if (!goal) return;
-
-          editingGoalId = id;
-          document.getElementById("goalModalTitle").textContent = "Editar meta";
-          document.getElementById("goalNameInput").value = goal.name;
-          document.getElementById("goalTargetInput").value = goal.target;
-          document.getElementById("goalSavedInput").value = goal.saved;
-          document.getElementById("goalColorInput").value = goal.color;
-          document.getElementById("goalIconInput").value = goal.icon;
-
-          openModal("goalModal");
-        });
-      });
-
-      document.querySelectorAll("[data-delete-goal]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const id = Number(button.getAttribute("data-delete-goal"));
-          goals = goals.filter(goal => goal.id !== id);
-          saveGoals();
-          renderGoals();
-        });
-      });
-    }
-
-    function resetGoalForm() {
-      editingGoalId = null;
-      document.getElementById("goalModalTitle").textContent = "Nova meta";
-      document.getElementById("goalNameInput").value = "";
-      document.getElementById("goalTargetInput").value = "";
-      document.getElementById("goalSavedInput").value = "";
-      document.getElementById("goalColorInput").value = "green";
-      document.getElementById("goalIconInput").value = "shield-check";
-    }
-
-    function saveGoal() {
-      const name = document.getElementById("goalNameInput").value.trim();
-      const target = Number(document.getElementById("goalTargetInput").value);
-      const saved = Number(document.getElementById("goalSavedInput").value);
-      const color = document.getElementById("goalColorInput").value;
-      const icon = document.getElementById("goalIconInput").value;
-
-      if (!name || target <= 0 || saved < 0) return;
-
-      if (editingGoalId) {
-        const goal = goals.find(item => item.id === editingGoalId);
-        if (!goal) return;
-
-        goal.name = name;
-        goal.target = target;
-        goal.saved = Math.min(saved, target);
-        goal.color = color;
-        goal.icon = icon;
-      } else {
-        goals.push({
-          id: Date.now(),
-          name,
-          target,
-          saved: Math.min(saved, target),
-          color,
-          icon
-        });
-      }
-
-      saveGoals();
-      renderGoals();
-      closeModal("goalModal");
-      resetGoalForm();
-    }
-
-    function addProgressToGoal() {
-      const amount = Number(document.getElementById("progressAmountInput").value);
-      if (!progressGoalId || amount <= 0) return;
-
-      const goal = goals.find(item => item.id === progressGoalId);
-      if (!goal) return;
-
-      goal.saved = Math.min(goal.saved + amount, goal.target);
-      saveGoals();
-      renderGoals();
-      closeModal("progressModal");
-    }
 
     function hasClassSafe(element, className) {
       return element && element.classList.contains(className);
@@ -660,36 +648,36 @@
     }
 
     function openNotifications() {
-      const notifPanel = document.getElementById("notifPanel");
-      const notifOverlay = document.getElementById("notifOverlay");
-
-      if (!notifPanel || !notifOverlay) return;
-      notifPanel.classList.add("active");
-      notifOverlay.classList.add("active");
+      document.getElementById("notifPanel")?.classList.add("active");
+      document.getElementById("notifOverlay")?.classList.add("active");
       lockBody();
     }
 
     function closeNotifications() {
-      const notifPanel = document.getElementById("notifPanel");
-      const notifOverlay = document.getElementById("notifOverlay");
-
-      if (notifPanel) notifPanel.classList.remove("active");
-      if (notifOverlay) notifOverlay.classList.remove("active");
+      document.getElementById("notifPanel")?.classList.remove("active");
+      document.getElementById("notifOverlay")?.classList.remove("active");
       unlockBody();
     }
 
     function openAiModal() {
-      const aiModal = document.getElementById("aiModal");
-      if (!aiModal) return;
-      aiModal.classList.add("active");
+      document.getElementById("aiModal")?.classList.add("active");
       lockBody();
     }
 
     function closeAiModal() {
-      const aiModal = document.getElementById("aiModal");
-      if (!aiModal) return;
-      aiModal.classList.remove("active");
+      document.getElementById("aiModal")?.classList.remove("active");
       unlockBody();
+    }
+
+    function resetGoalForm() {
+      document.getElementById("goalModalTitle").textContent = "Nova meta";
+      document.getElementById("goalAcaoInput").value = "criar_meta";
+      document.getElementById("goalIdInput").value = "";
+      document.getElementById("goalNameInput").value = "";
+      document.getElementById("goalTargetInput").value = "";
+      document.getElementById("goalSavedInput").value = "";
+      document.getElementById("goalColorInput").value = "green";
+      document.getElementById("goalIconInput").value = "shield-check";
     }
 
     document.getElementById("openCreateGoalModal").addEventListener("click", () => {
@@ -702,8 +690,29 @@
       openModal("goalModal");
     });
 
-    document.getElementById("saveGoalBtn").addEventListener("click", saveGoal);
-    document.getElementById("saveProgressBtn").addEventListener("click", addProgressToGoal);
+    // Preenche o form de edição a partir dos data-* renderizados pelo PHP em cada card
+    document.querySelectorAll("[data-edit-goal]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.getElementById("goalModalTitle").textContent = "Editar meta";
+        document.getElementById("goalAcaoInput").value = "editar_meta";
+        document.getElementById("goalIdInput").value = button.getAttribute("data-edit-goal");
+        document.getElementById("goalNameInput").value = button.getAttribute("data-nome");
+        document.getElementById("goalTargetInput").value = button.getAttribute("data-valor-meta");
+        document.getElementById("goalSavedInput").value = button.getAttribute("data-valor-guardado");
+        document.getElementById("goalColorInput").value = button.getAttribute("data-cor");
+        document.getElementById("goalIconInput").value = button.getAttribute("data-icone");
+
+        openModal("goalModal");
+      });
+    });
+
+    document.querySelectorAll("[data-add-progress]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.getElementById("progressMetaIdInput").value = button.getAttribute("data-add-progress");
+        document.getElementById("progressAmountInput").value = "";
+        openModal("progressModal");
+      });
+    });
 
     document.getElementById("closeGoalModal").addEventListener("click", () => closeModal("goalModal"));
     document.getElementById("cancelGoalModal").addEventListener("click", () => closeModal("goalModal"));
@@ -738,8 +747,6 @@
         closeAiModal();
       }
     });
-
-    renderGoals();
   </script>
 
 </body>
