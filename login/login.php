@@ -102,9 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="social-login">
-          <button type="button" class="social-btn google">
-            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google">
-          </button>
+          <?php include '../config/oauth-google.php'; ?>
+<a class="social-btn google" href="https://accounts.google.com/o/oauth2/v2/auth?client_id=<?= urlencode(GOOGLE_CLIENT_ID) ?>&redirect_uri=<?= urlencode(GOOGLE_REDIRECT_URI) ?>&response_type=code&scope=email%20profile&access_type=online">
+  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google">
+</a>
 
           <button type="button" class="social-btn apple">
             <i class="bi bi-apple"></i>
