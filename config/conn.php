@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <?php 
 $host = "localhost";
 $usuario = "root";
@@ -12,4 +13,18 @@ if ($conn->connect_error) {
 
 // Garante acentuação correta
 $conn->set_charset("utf8mb4");
+=======
+<?php
+$conn = mysqli_connect(
+    "localhost",
+    "root",
+    "",
+    "Finmap"
+);
+// if (!$conn) {
+// die("Erro na conexão: " . mysqli_connect_error());
+// }
+
+// mysqli_set_charset($conn, "utf8");
+>>>>>>> Stashed changes
 ?>

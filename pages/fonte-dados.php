@@ -1,3 +1,22 @@
+
+<?php
+session_start();
+include(__DIR__ . "/../config/conn.php");
+
+if (!isset($conn)) {
+    die("Erro: o arquivo conn.php não criou a variável \$conn.");
+}
+
+if (!isset($_SESSION['id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$id_usuario = $_SESSION['id'];
+?>
+
+
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -181,3 +200,8 @@
 
 </body>
 </html>
+
+
+
+
+
