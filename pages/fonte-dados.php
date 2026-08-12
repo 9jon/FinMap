@@ -8,8 +8,8 @@ if (!isset($conn)) {
 }
 
 if (!isset($_SESSION['id'])) {
-    header("Location: login.php");
-    exit();
+  header("Location: ../login/login.php");
+  exit();
 }
 
 $id_usuario = $_SESSION['id'];
