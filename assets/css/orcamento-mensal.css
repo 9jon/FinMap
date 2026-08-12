@@ -319,12 +319,13 @@ body {
 
 .budget-ring {
   --percent: 56;
+  --ring-color: #24bb45; /* cor padrão (verde) caso a página não defina outra */
   width: 230px;
   height: 230px;
   border-radius: 50%;
   background:
     conic-gradient(
-      #24bb45 0 calc(var(--percent) * 1%),
+      var(--ring-color) 0 calc(var(--percent) * 1%),
       #e8efea calc(var(--percent) * 1%) 100%
     );
   display: flex;

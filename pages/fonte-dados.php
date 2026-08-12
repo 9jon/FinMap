@@ -13,6 +13,51 @@ if (!isset($_SESSION['id'])) {
 }
 
 $id_usuario = $_SESSION['id'];
+
+$erro = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    $fonteDados = $_POST['fonteDados'] ?? '';
+
+    if ($fonteDados === '') {
+
+        $erro = "Selecione uma opção para continuar.";
+
+    } else {
+
+        $sql = "SELECT id FROM fonte_dados WHERE id_usuario = ?";
+        $stmt = $conn->prepare($sql);
+
+        $stmt->bind_param("i", $id_usuario);
+        $stmt->execute();
+
+        $resultado = $stmt->get_result();
+
+        if ($resultado->num_rows > 0) {
+
+            $sql = "UPDATE fonte_dados 
+                    SET tipo = ? 
+                    WHERE id_usuario = ?";
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("si", $fonteDados, $id_usuario);
+            $stmt->execute();
+
+        } else {
+
+            $sql = "INSERT INTO fonte_dados (id_usuario, tipo)
+                    VALUES (?, ?)";
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("is", $id_usuario, $fonteDados);
+            $stmt->execute();
+        }
+
+        header("Location: dashboard.php");
+        exit();
+    }
+}
 ?>
 
 

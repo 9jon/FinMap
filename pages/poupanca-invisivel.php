@@ -1,3 +1,74 @@
+<?php
+// ============================================================
+// BLOCO PHP — busca configuração e oportunidades reais do usuário
+// ============================================================
+session_start();
+include '../config/conn.php';
+
+$usuario_id = $_SESSION['usuario_id'] ?? 1;
+
+// --- Dados do usuário (avatar) ---
+$stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$usuario = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$iniciais = $usuario['avatar_iniciais'] ?? 'US';
+
+// --- Configuração da Poupança Invisível (cenário + categorias ativas) ---
+$stmt = $conn->prepare("SELECT * FROM poupanca_configuracao WHERE usuario_id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$config = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// Se o usuário ainda não tem configuração salva, cria uma com os padrões
+if (!$config) {
+    $stmt = $conn->prepare("INSERT INTO poupanca_configuracao (usuario_id) VALUES (?)");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    $stmt->close();
+
+    $config = [
+        'considerar_cafe' => 1,
+        'considerar_impulso' => 1,
+        'considerar_assinatura' => 1,
+        'considerar_transporte' => 1,
+        'cenario_selecionado' => 'equilibrado'
+    ];
+}
+
+// --- Oportunidades de economia detectadas ---
+// TODO: por enquanto usamos valores padrão quando o usuário ainda não tem
+// nenhuma oportunidade calculada no banco. No futuro isso deve vir de uma
+// análise automática em cima das transações reais (tabela "transacoes").
+$valoresPadrao = [
+    'cafe' => 86.00,
+    'impulso' => 124.00,
+    'assinatura' => 148.00,
+    'transporte' => 70.00
+];
+
+$stmt = $conn->prepare("SELECT tipo, valor_potencial_mensal FROM poupanca_oportunidades WHERE usuario_id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$oportunidadesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+$valoresBanco = [];
+foreach ($oportunidadesResult as $op) {
+    $valoresBanco[$op['tipo']] = (float) $op['valor_potencial_mensal'];
+}
+
+// Mapeia os nomes do banco (cafe, impulso, assinatura, transporte) pros
+// nomes usados no JavaScript original (coffee, impulse, subscription, transport)
+$baseValues = [
+    'coffee'       => $valoresBanco['cafe'] ?? $valoresPadrao['cafe'],
+    'impulse'      => $valoresBanco['impulso'] ?? $valoresPadrao['impulso'],
+    'subscription' => $valoresBanco['assinatura'] ?? $valoresPadrao['assinatura'],
+    'transport'    => $valoresBanco['transporte'] ?? $valoresPadrao['transporte']
+];
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -40,7 +111,7 @@
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
-        JD
+        <?= htmlspecialchars($iniciais) ?>
       </button>
     </div>
   </header>
@@ -669,12 +740,10 @@
       openCategoriesModal: "categoriesModal"
     };
 
-    const baseValues = {
-      coffee: 86,
-      impulse: 124,
-      subscription: 148,
-      transport: 70
-    };
+    // ATENÇÃO: esses valores agora vêm do banco (via PHP), não são mais
+    // fixos no JavaScript. O PHP lá em cima monta esse objeto com
+    // json_encode() usando os dados reais da tabela poupanca_oportunidades.
+    const baseValues = <?= json_encode($baseValues) ?>;
 
     const scenarios = {
       conservador: {
@@ -700,13 +769,16 @@
       }
     };
 
+    // ATENÇÃO: o estado inicial (cenário e categorias ativas) também
+    // vem do banco agora, em vez de sempre começar em "equilibrado"
+    // com tudo ligado.
     const state = {
-      scenario: "equilibrado",
+      scenario: "<?= htmlspecialchars($config['cenario_selecionado']) ?>",
       enabled: {
-        coffee: true,
-        impulse: true,
-        subscription: true,
-        transport: true
+        coffee: <?= $config['considerar_cafe'] ? 'true' : 'false' ?>,
+        impulse: <?= $config['considerar_impulso'] ? 'true' : 'false' ?>,
+        subscription: <?= $config['considerar_assinatura'] ? 'true' : 'false' ?>,
+        transport: <?= $config['considerar_transporte'] ? 'true' : 'false' ?>
       }
     };
 
@@ -877,6 +949,28 @@
       updateToggles();
     }
 
+    // ATENÇÃO: essa função é NOVA — salva a configuração atual (cenário
+    // e categorias ativas) no banco, via AJAX, toda vez que o usuário
+    // muda alguma coisa. Assim, da próxima vez que ele abrir essa tela,
+    // continua do jeito que deixou.
+    async function salvarConfiguracao() {
+      try {
+        await fetch("atualizar-poupanca-config.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cenario_selecionado: state.scenario,
+            considerar_cafe: state.enabled.coffee,
+            considerar_impulso: state.enabled.impulse,
+            considerar_assinatura: state.enabled.subscription,
+            considerar_transporte: state.enabled.transport
+          })
+        });
+      } catch (error) {
+        console.error("Não foi possível salvar a configuração:", error);
+      }
+    }
+
     Object.entries(modalMap).forEach(([buttonId, modalId]) => {
       const button = document.getElementById(buttonId);
       if (!button) return;
@@ -906,27 +1000,32 @@
       option.addEventListener("click", () => {
         state.scenario = option.getAttribute("data-scenario");
         updateUI();
+        salvarConfiguracao();
       });
     });
 
     document.getElementById("toggleCoffee").addEventListener("change", (e) => {
       state.enabled.coffee = e.target.checked;
       updateUI();
+      salvarConfiguracao();
     });
 
     document.getElementById("toggleImpulse").addEventListener("change", (e) => {
       state.enabled.impulse = e.target.checked;
       updateUI();
+      salvarConfiguracao();
     });
 
     document.getElementById("toggleSubscription").addEventListener("change", (e) => {
       state.enabled.subscription = e.target.checked;
       updateUI();
+      salvarConfiguracao();
     });
 
     document.getElementById("toggleTransport").addEventListener("change", (e) => {
       state.enabled.transport = e.target.checked;
       updateUI();
+      salvarConfiguracao();
     });
 
     const openNotificationsPanel = document.getElementById("openNotificationsPanel");

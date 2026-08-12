@@ -67,6 +67,33 @@ $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $metas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+// --- Gastos por categoria (mês atual) ---
+$stmt = $conn->prepare("
+    SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
+    FROM transacoes t
+    INNER JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
+      AND MONTH(t.data_transacao) = MONTH(CURDATE()) AND YEAR(t.data_transacao) = YEAR(CURDATE())
+    GROUP BY c.id, c.nome, c.icone, c.cor
+    ORDER BY total DESC
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$gastosCategorias = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+$totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
+
+// --- Categorias do usuário (pra popular o form de nova transação manual) ---
+$stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$categoriasUsuario = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+$categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
+$categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -379,78 +406,40 @@ $stmt->close();
           </button>
         </div>
 
-        <div class="category-expenses-list">
-          <article class="category-expense-card">
-            <div class="category-expense-card__top">
-              <div class="category-expense-card__left">
-                <div class="category-expense-card__icon category-expense-card__icon--green">
-                  <i class="bi bi-basket2"></i>
+        <div class="category-expenses-list" id="categoryExpensesList">
+          <?php if (empty($gastosCategorias)): ?>
+            <p style="padding: 16px 0; color: #888;">Nenhum gasto registrado neste período ainda.</p>
+          <?php else: ?>
+            <?php foreach ($gastosCategorias as $g):
+              $percentualCat = $totalGastosCategorias > 0
+                  ? round(($g['total'] / $totalGastosCategorias) * 100)
+                  : 0;
+            ?>
+              <article class="category-expense-card">
+                <div class="category-expense-card__top">
+                  <div class="category-expense-card__left">
+                    <div class="category-expense-card__icon category-expense-card__icon--<?= htmlspecialchars($g['cor'] ?: 'green') ?>">
+                      <i class="bi bi-<?= htmlspecialchars($g['icone'] ?: 'tag') ?>"></i>
+                    </div>
+
+                    <div class="category-expense-card__info">
+                      <h4><?= htmlspecialchars($g['nome']) ?></h4>
+                      <p>Total de gastos nesta categoria no período</p>
+                    </div>
+                  </div>
+
+                  <div class="category-expense-card__right">
+                    <strong>R$ <?= number_format($g['total'], 2, ',', '.') ?></strong>
+                    <span><?= $percentualCat ?>%</span>
+                  </div>
                 </div>
 
-                <div class="category-expense-card__info">
-                  <h4>Alimentação</h4>
-                  <p>Maior gasto recorrente do período</p>
+                <div class="category-expense-card__bar">
+                  <div class="category-expense-card__fill category-expense-card__fill--<?= htmlspecialchars($g['cor'] ?: 'green') ?>" style="width: <?= $percentualCat ?>%;"></div>
                 </div>
-              </div>
-
-              <div class="category-expense-card__right">
-                <strong>R$ 850</strong>
-                <span>34%</span>
-              </div>
-            </div>
-
-            <div class="category-expense-card__bar">
-              <div class="category-expense-card__fill category-expense-card__fill--green" style="width: 34%;"></div>
-            </div>
-          </article>
-
-          <article class="category-expense-card">
-            <div class="category-expense-card__top">
-              <div class="category-expense-card__left">
-                <div class="category-expense-card__icon category-expense-card__icon--blue">
-                  <i class="bi bi-bus-front"></i>
-                </div>
-
-                <div class="category-expense-card__info">
-                  <h4>Transporte</h4>
-                  <p>Custos com mobilidade no mês atual</p>
-                </div>
-              </div>
-
-              <div class="category-expense-card__right">
-                <strong>R$ 450</strong>
-                <span>18%</span>
-              </div>
-            </div>
-
-            <div class="category-expense-card__bar">
-              <div class="category-expense-card__fill category-expense-card__fill--blue" style="width: 18%;"></div>
-            </div>
-          </article>
-
-          <article class="category-expense-card">
-            <div class="category-expense-card__top">
-              <div class="category-expense-card__left">
-                <div class="category-expense-card__icon category-expense-card__icon--purple">
-                  <i class="bi bi-house-door"></i>
-                </div>
-
-                <div class="category-expense-card__info">
-                  <h4>Moradia</h4>
-                  <p>Despesas fixas ligadas à residência</p>
-                </div>
-              </div>
-
-              <div class="category-expense-card__right">
-                <strong>R$ 1.200</strong>
-                <span>48%</span>
-              </div>
-            </div>
-
-            <div class="category-expense-card__bar">
-              <div class="category-expense-card__fill category-expense-card__fill--purple" style="width: 48%;"></div>
-            </div>
-          </article>
+              </article>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
       </section>
     </div>
@@ -681,7 +670,7 @@ $stmt->close();
       </div>
 
       <div class="transaction-modal__options">
-        <button class="transaction-option-card" type="button">
+        <button class="transaction-option-card" id="openManualTransactionOption" type="button">
           <div class="transaction-option-card__icon transaction-option-card__icon--green">
             <i class="bi bi-pencil-square"></i>
           </div>
@@ -730,6 +719,86 @@ $stmt->close();
             <p>Valide movimentações detectadas automaticamente para manter seus dados consistentes.</p>
           </div>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA TRANSAÇÃO MANUAL -->
+  <div class="dashboard-popout-overlay" id="manualTransactionModal">
+    <div class="dashboard-popout">
+      <div class="dashboard-popout__header">
+        <div class="dashboard-popout__title-group">
+          <div class="dashboard-popout__icon dashboard-popout__icon--green">
+            <i class="bi bi-pencil-square"></i>
+          </div>
+          <div>
+            <h3>Nova transação manual</h3>
+            <p>Registre uma receita ou despesa diretamente no FinMap.</p>
+          </div>
+        </div>
+
+        <button class="dashboard-popout__close" id="closeManualTransactionModal" type="button" aria-label="Fechar">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="dashboard-popout__body">
+        <form method="post" action="criar-transacao.php" id="manualTransactionForm">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tipo</label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="tipo" id="tipoDespesa" value="despesa" checked>
+                <label class="form-check-label" for="tipoDespesa">Despesa</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="tipo" id="tipoReceita" value="receita">
+                <label class="form-check-label" for="tipoReceita">Receita</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="manualDescricao" class="form-label fw-semibold">Descrição</label>
+            <input type="text" class="form-control" id="manualDescricao" name="descricao" placeholder="Ex: Supermercado" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="manualValor" class="form-label fw-semibold">Valor</label>
+            <input type="text" class="form-control finmap-money-input" id="manualValor" name="valor" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off" required>
+          </div>
+
+          <div class="mb-3" id="categoriaDespesaWrapper">
+            <label for="categoriaDespesaSelect" class="form-label fw-semibold">Categoria</label>
+            <select class="form-select" id="categoriaDespesaSelect" name="categoria_id">
+              <option value="">Sem categoria</option>
+              <?php foreach ($categoriasDespesa as $c): ?>
+                <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['nome']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="mb-3 d-none" id="categoriaReceitaWrapper">
+            <label for="categoriaReceitaSelect" class="form-label fw-semibold">Categoria</label>
+            <select class="form-select" id="categoriaReceitaSelect" name="categoria_id">
+              <option value="">Sem categoria</option>
+              <?php foreach ($categoriasReceita as $c): ?>
+                <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['nome']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label for="manualData" class="form-label fw-semibold">Data</label>
+            <input type="date" class="form-control" id="manualData" name="data_transacao" value="<?= date('Y-m-d') ?>" required>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="settings-footer-btn settings-footer-btn--secondary" id="cancelManualTransactionModal">Cancelar</button>
+            <button type="submit" class="settings-footer-btn settings-footer-btn--primary">Salvar transação</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1182,40 +1251,18 @@ $stmt->close();
   const dashboardGoalsList = document.getElementById("dashboardGoalsList");
   const categoryPeriodLabel = document.getElementById("categoryPeriodLabel");
 
-  const categoryData = {
-    "this-month": {
-      label: "Este mês",
-      items: [
-        { name: "Alimentação", desc: "Maior gasto recorrente do período", value: 850, percent: 34, color: "green", icon: "basket2" },
-        { name: "Transporte", desc: "Custos com mobilidade no mês atual", value: 450, percent: 18, color: "blue", icon: "bus-front" },
-        { name: "Moradia", desc: "Despesas fixas ligadas à residência", value: 1200, percent: 48, color: "purple", icon: "house-door" }
-      ]
-    },
-    "last-30": {
-      label: "Últimos 30 dias",
-      items: [
-        { name: "Alimentação", desc: "Consumo recorrente do período recente", value: 980, percent: 32, color: "green", icon: "basket2" },
-        { name: "Transporte", desc: "Custos de deslocamento acumulados", value: 620, percent: 20, color: "blue", icon: "bus-front" },
-        { name: "Moradia", desc: "Despesas fixas da casa", value: 1460, percent: 48, color: "purple", icon: "house-door" }
-      ]
-    },
-    "last-month": {
-      label: "Último mês",
-      items: [
-        { name: "Alimentação", desc: "Gasto médio do último mês fechado", value: 790, percent: 30, color: "green", icon: "basket2" },
-        { name: "Transporte", desc: "Mobilidade do mês anterior", value: 500, percent: 19, color: "blue", icon: "bus-front" },
-        { name: "Moradia", desc: "Custos fixos do último mês", value: 1320, percent: 51, color: "purple", icon: "house-door" }
-      ]
-    },
-    "last-3-months": {
-      label: "Últimos 3 meses",
-      items: [
-        { name: "Alimentação", desc: "Média acumulada do trimestre", value: 2410, percent: 31, color: "green", icon: "basket2" },
-        { name: "Transporte", desc: "Deslocamentos do trimestre", value: 1590, percent: 20, color: "blue", icon: "bus-front" },
-        { name: "Moradia", desc: "Despesas residenciais acumuladas", value: 3800, percent: 49, color: "purple", icon: "house-door" }
-      ]
-    }
-  };
+  const openManualTransactionOption = document.getElementById("openManualTransactionOption");
+  const closeManualTransactionModal = document.getElementById("closeManualTransactionModal");
+  const cancelManualTransactionModal = document.getElementById("cancelManualTransactionModal");
+  const manualTransactionModal = document.getElementById("manualTransactionModal");
+
+  const tipoDespesaRadio = document.getElementById("tipoDespesa");
+  const tipoReceitaRadio = document.getElementById("tipoReceita");
+  const categoriaDespesaWrapper = document.getElementById("categoriaDespesaWrapper");
+  const categoriaReceitaWrapper = document.getElementById("categoriaReceitaWrapper");
+  const categoriaReceitaSelect = document.getElementById("categoriaReceitaSelect");
+  const categoriaDespesaSelect = document.getElementById("categoriaDespesaSelect");
+  const manualValorInput = document.getElementById("manualValor");
 
   function hasClassSafe(element, className) {
     return element && element.classList.contains(className);
@@ -1234,7 +1281,8 @@ $stmt->close();
       hasClassSafe(settingsModal, "active") ||
       hasClassSafe(allTransactionsModal, "active") ||
       hasClassSafe(goalsMenuModal, "active") ||
-      hasClassSafe(categoryPeriodModal, "active");
+      hasClassSafe(categoryPeriodModal, "active") ||
+      hasClassSafe(manualTransactionModal, "active");
 
     body.style.overflow = hasOpenModal ? "hidden" : "";
   }
@@ -1395,37 +1443,52 @@ $stmt->close();
     }).join("");
   }
 
-  function renderCategoryExpenses(periodKey) {
-    const panelList = document.querySelector(".category-expenses-list");
-    const data = categoryData[periodKey];
-    if (!panelList || !data) return;
+  // ATENÇÃO: agora busca do banco via fetch(), não usa mais o objeto
+  // categoryData fixo. O endpoint buscar-gastos-categoria.php faz a
+  // consulta real filtrando pelo período escolhido.
+  async function renderCategoryExpenses(periodKey) {
+    const panelList = document.getElementById("categoryExpensesList");
+    if (!panelList) return;
 
-    categoryPeriodLabel.textContent = data.label;
+    try {
+      const response = await fetch(`buscar-gastos-categoria.php?periodo=${encodeURIComponent(periodKey)}`);
+      const resultado = await response.json();
 
-    panelList.innerHTML = data.items.map((item) => `
-      <article class="category-expense-card">
-        <div class="category-expense-card__top">
-          <div class="category-expense-card__left">
-            <div class="category-expense-card__icon category-expense-card__icon--${item.color}">
-              <i class="bi bi-${item.icon}"></i>
+      if (!resultado.sucesso) return;
+
+      categoryPeriodLabel.textContent = resultado.label;
+
+      if (!resultado.categorias.length) {
+        panelList.innerHTML = `<p style="padding: 16px 0; color: #888;">Nenhum gasto registrado neste período ainda.</p>`;
+      } else {
+        panelList.innerHTML = resultado.categorias.map((item) => `
+          <article class="category-expense-card">
+            <div class="category-expense-card__top">
+              <div class="category-expense-card__left">
+                <div class="category-expense-card__icon category-expense-card__icon--${item.cor}">
+                  <i class="bi bi-${item.icone}"></i>
+                </div>
+                <div class="category-expense-card__info">
+                  <h4>${item.nome}</h4>
+                  <p>Total de gastos nesta categoria no período</p>
+                </div>
+              </div>
+
+              <div class="category-expense-card__right">
+                <strong>${formatBRL(item.valor)}</strong>
+                <span>${item.percent}%</span>
+              </div>
             </div>
-            <div class="category-expense-card__info">
-              <h4>${item.name}</h4>
-              <p>${item.desc}</p>
+
+            <div class="category-expense-card__bar">
+              <div class="category-expense-card__fill category-expense-card__fill--${item.cor}" style="width: ${item.percent}%;"></div>
             </div>
-          </div>
-
-          <div class="category-expense-card__right">
-            <strong>${formatBRL(item.value)}</strong>
-            <span>${item.percent}%</span>
-          </div>
-        </div>
-
-        <div class="category-expense-card__bar">
-          <div class="category-expense-card__fill category-expense-card__fill--${item.color}" style="width: ${item.percent}%;"></div>
-        </div>
-      </article>
-    `).join("");
+          </article>
+        `).join("");
+      }
+    } catch (error) {
+      console.error("Não foi possível carregar os gastos por categoria:", error);
+    }
 
     document.querySelectorAll(".dashboard-period-option").forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-period") === periodKey);
@@ -1622,6 +1685,48 @@ $stmt->close();
     });
   });
 
+  if (openManualTransactionOption) {
+    openManualTransactionOption.addEventListener("click", () => {
+      closeModal(transactionModal);
+      openModal(manualTransactionModal);
+    });
+  }
+
+  if (closeManualTransactionModal) {
+    closeManualTransactionModal.addEventListener("click", () => closeModal(manualTransactionModal));
+  }
+
+  if (cancelManualTransactionModal) {
+    cancelManualTransactionModal.addEventListener("click", () => closeModal(manualTransactionModal));
+  }
+
+  if (manualTransactionModal) {
+    manualTransactionModal.addEventListener("click", (e) => {
+      if (e.target === manualTransactionModal) closeModal(manualTransactionModal);
+    });
+  }
+
+  // Alterna qual select de categoria aparece conforme o tipo escolhido
+  function toggleCategoriaWrapper() {
+    if (!tipoDespesaRadio || !categoriaDespesaWrapper || !categoriaReceitaWrapper) return;
+
+    const isDespesa = tipoDespesaRadio.checked;
+    categoriaDespesaWrapper.classList.toggle("d-none", !isDespesa);
+    categoriaReceitaWrapper.classList.toggle("d-none", isDespesa);
+
+    // zera o select escondido pra não mandar categoria_id de outro tipo
+    if (isDespesa) {
+      if (categoriaReceitaSelect) categoriaReceitaSelect.value = "";
+    } else {
+      if (categoriaDespesaSelect) categoriaDespesaSelect.value = "";
+    }
+  }
+
+  if (tipoDespesaRadio && tipoReceitaRadio) {
+    tipoDespesaRadio.addEventListener("change", toggleCategoriaWrapper);
+    tipoReceitaRadio.addEventListener("change", toggleCategoriaWrapper);
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeModal(transactionModal);
@@ -1631,6 +1736,7 @@ $stmt->close();
       closeModal(allTransactionsModal);
       closeModal(goalsMenuModal);
       closeModal(categoryPeriodModal);
+      closeModal(manualTransactionModal);
       closeNotifications();
     }
   });
@@ -1666,6 +1772,18 @@ $stmt->close();
 
     saldoEditInput.addEventListener("focus", () => {
       saldoEditInput.value = formatCurrencyBRL(saldoEditInput.value);
+    });
+  }
+
+  // Máscara de moeda no campo valor do form de nova transação manual
+  // (reaproveita a mesma função formatCurrencyBRL usada no saldo)
+  if (manualValorInput) {
+    manualValorInput.addEventListener("input", () => {
+      manualValorInput.value = formatCurrencyBRL(manualValorInput.value);
+    });
+
+    manualValorInput.addEventListener("focus", () => {
+      manualValorInput.value = formatCurrencyBRL(manualValorInput.value);
     });
   }
 
@@ -1736,10 +1854,14 @@ if (balanceForm) {
   });
 }
 
-  // renderDashboardGoals() e syncBalanceFromStorage() NÃO são mais
-  // chamadas automaticamente aqui, porque o PHP já renderizou o
-  // saldo e as metas reais do banco direto no HTML acima.
-  renderCategoryExpenses("this-month");
+  // renderDashboardGoals() e renderCategoryExpenses() NÃO são mais
+  // chamadas automaticamente aqui no carregamento, porque o PHP já
+  // renderizou o saldo, as metas e os gastos por categoria reais do
+  // banco direto no HTML acima. renderCategoryExpenses só roda quando
+  // o usuário troca o período no modal de filtro. O formulário de
+  // nova transação manual usa POST normal (action="criar-transacao.php"),
+  // então não precisa de JS pra enviar — só a máscara de moeda e o
+  // toggle de categoria por tipo.
 </script>
 
 
