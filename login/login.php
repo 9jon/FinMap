@@ -1,5 +1,4 @@
 <?php
-// login/login.php
 session_start();
 include '../config/conn.php';
 
