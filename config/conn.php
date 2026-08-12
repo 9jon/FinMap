@@ -10,6 +10,5 @@ if ($conn->connect_error) {
     die("Erro na conexão: " . $conn->connect_error);
 }
 
-// Garante acentuação correta
 $conn->set_charset("utf8mb4");
 ?>
