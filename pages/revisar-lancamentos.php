@@ -1,3 +1,97 @@
+<?php
+// ============================================================
+// BLOCO PHP — busca lançamentos pendentes/revisados e as regras
+// ============================================================
+session_start();
+include '../config/conn.php';
+
+$usuario_id = $_SESSION['usuario_id'] ?? 1;
+
+// --- Avatar do usuário ---
+$stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$usuario = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$iniciais = $usuario['avatar_iniciais'] ?? 'US';
+
+// --- Regras de revisão (cria com padrão se ainda não existir) ---
+$stmt = $conn->prepare("SELECT * FROM revisao_regras WHERE usuario_id = ?");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$regras = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$regras) {
+    $stmt = $conn->prepare("INSERT INTO revisao_regras (usuario_id) VALUES (?)");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    $stmt->close();
+
+    $regras = [
+        'priorizar_ocr_baixa_confianca' => 1,
+        'ocultar_aprovados' => 1,
+        'limite_confianca_percentual' => 80
+    ];
+}
+
+// --- Lançamentos capturados automaticamente (OCR, SMS, importação) ---
+// "manual" fica de fora dessa tela — é o que aparece direto no dashboard
+$stmt = $conn->prepare("
+    SELECT t.id, t.descricao, t.valor, t.origem, t.status, t.confianca_percentual,
+           t.observacao_captura, t.data_transacao, c.nome AS categoria_nome
+    FROM transacoes t
+    LEFT JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ? AND t.origem != 'manual'
+    ORDER BY t.data_transacao DESC
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$transacoesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+// Metadados visuais por origem (ícone, cor, rótulo)
+$sourceMeta = [
+    'ocr'        => ['label' => 'OCR', 'badge' => 'purple', 'icon' => 'receipt-cutoff', 'padrao' => 'Capturado de nota fiscal'],
+    'sms'        => ['label' => 'SMS', 'badge' => 'green', 'icon' => 'chat-square-text', 'padrao' => 'Mensagem bancária'],
+    'importacao' => ['label' => 'Importação', 'badge' => 'blue', 'icon' => 'file-earmark-arrow-up', 'padrao' => 'Arquivo importado']
+];
+
+// Mapeia status do banco (português) pro que o JS já usa (inglês)
+$statusMap = ['pendente' => 'pending', 'aprovado' => 'approved', 'rejeitado' => 'rejected'];
+
+$launches = [];
+foreach ($transacoesResult as $t) {
+    $launches[] = [
+        'id' => (int) $t['id'],
+        'description' => $t['descricao'],
+        'amount' => (float) $t['valor'],
+        'source' => $t['origem'],
+        'sourceLabel' => $sourceMeta[$t['origem']]['label'] ?? ucfirst($t['origem']),
+        'category' => $t['categoria_nome'] ?? 'Sem categoria',
+        'confidence' => $t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 0,
+        'status' => $statusMap[$t['status']] ?? 'pending',
+        'note' => $t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''),
+        'date' => date('d/m/Y', strtotime($t['data_transacao']))
+    ];
+}
+
+// --- Contadores de hoje (aprovados/rejeitados) ---
+$stmt = $conn->prepare("
+    SELECT
+        SUM(CASE WHEN status = 'aprovado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS aprovados_hoje,
+        SUM(CASE WHEN status = 'rejeitado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS rejeitados_hoje
+    FROM transacoes
+    WHERE usuario_id = ? AND origem != 'manual'
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$contadores = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$aprovadosHoje = (int) ($contadores['aprovados_hoje'] ?? 0);
+$rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -40,7 +134,7 @@
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
-        JD
+        <?= htmlspecialchars($iniciais) ?>
       </button>
     </div>
   </header>
@@ -89,485 +183,75 @@
         </div>
 
         <div class="review-list" id="reviewList">
-          <article class="review-item" data-id="1" data-source="ocr" data-status="pending" data-confidence="74">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
+          <?php if (empty($launches)): ?>
+            <p style="padding: 24px 0; color: #888;">
+              Nenhum lançamento automático (OCR, SMS ou importação) encontrado ainda.
+            </p>
+          <?php else: ?>
+            <?php foreach ($launches as $l):
+              $meta = $sourceMeta[$l['source']] ?? ['badge' => 'purple', 'icon' => 'receipt-cutoff'];
+            ?>
+              <article class="review-item" data-id="<?= $l['id'] ?>" data-source="<?= htmlspecialchars($l['source']) ?>" data-status="<?= htmlspecialchars($l['status']) ?>" data-confidence="<?= $l['confidence'] ?>">
+                <div class="review-item__select">
+                  <label class="review-check">
+                    <input type="checkbox" class="launch-checkbox">
+                    <span></span>
+                  </label>
+                </div>
 
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--purple">
-                    <i class="bi bi-receipt-cutoff"></i>
-                  </div>
+                <div class="review-item__main">
+                  <div class="review-item__top">
+                    <div class="review-item__left">
+                      <div class="review-item__icon review-item__icon--<?= $meta['badge'] ?>">
+                        <i class="bi bi-<?= $meta['icon'] ?>"></i>
+                      </div>
 
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Supermercado União</h4>
-                      <span class="review-badge review-badge--purple">OCR</span>
+                      <div class="review-item__info">
+                        <div class="review-item__title-row">
+                          <h4><?= htmlspecialchars($l['description']) ?></h4>
+                          <span class="review-badge review-badge--<?= $meta['badge'] ?>"><?= htmlspecialchars($l['sourceLabel']) ?></span>
+                        </div>
+                        <p><?= htmlspecialchars($l['note']) ?> • <?= htmlspecialchars($l['category']) ?> • <?= htmlspecialchars($l['date']) ?></p>
+                      </div>
                     </div>
-                    <p>Capturado de nota fiscal • Alimentação • 12 Mar</p>
-                  </div>
-                </div>
 
-                <div class="review-item__amount">
-                  <strong>R$ 84,90</strong>
-                  <span>Confiança: 74%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Alimentação</span>
-                <span><i class="bi bi-clock"></i> 12/03/2026 • 18:42</span>
-                <span><i class="bi bi-exclamation-circle"></i> Valor e descrição confirmáveis</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="1">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="1">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="1">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="1">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="2" data-source="sms" data-status="pending" data-confidence="91">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--green">
-                    <i class="bi bi-chat-square-text"></i>
-                  </div>
-
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Pix recebido</h4>
-                      <span class="review-badge review-badge--green">SMS</span>
+                    <div class="review-item__amount">
+                      <strong>R$ <?= number_format($l['amount'], 2, ',', '.') ?></strong>
+                      <span>Confiança: <?= $l['confidence'] ?>%</span>
                     </div>
-                    <p>Mensagem bancária • Receita • 13 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 250,00</strong>
-                  <span>Confiança: 91%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Receita extra</span>
-                <span><i class="bi bi-clock"></i> 13/03/2026 • 09:14</span>
-                <span><i class="bi bi-check2-circle"></i> Alta consistência</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="2">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="2">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="2">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="2">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="3" data-source="importacao" data-status="pending" data-confidence="88">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--blue">
-                    <i class="bi bi-file-earmark-arrow-up"></i>
                   </div>
 
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Netflix</h4>
-                      <span class="review-badge review-badge--blue">Importação</span>
-                    </div>
-                    <p>Arquivo CSV • Assinaturas • 13 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 39,90</strong>
-                  <span>Confiança: 88%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Assinaturas</span>
-                <span><i class="bi bi-clock"></i> 13/03/2026 • 10:21</span>
-                <span><i class="bi bi-arrow-repeat"></i> Registro importado automaticamente</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="3">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="3">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="3">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="3">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="4" data-source="ocr" data-status="pending" data-confidence="68">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--purple">
-                    <i class="bi bi-receipt-cutoff"></i>
+                  <div class="review-item__meta">
+                    <span><i class="bi bi-tag"></i> <?= htmlspecialchars($l['category']) ?></span>
+                    <span><i class="bi bi-clock"></i> <?= htmlspecialchars($l['date']) ?></span>
+                    <span><i class="bi bi-<?= $l['confidence'] >= 80 ? 'check2-circle' : 'exclamation-triangle' ?>"></i> <?= htmlspecialchars($l['note']) ?></span>
                   </div>
 
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Farmácia Central</h4>
-                      <span class="review-badge review-badge--purple">OCR</span>
-                    </div>
-                    <p>Capturado de nota fiscal • Saúde • 14 Mar</p>
+                  <div class="review-item__actions">
+                    <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="<?= $l['id'] ?>">
+                      <i class="bi bi-eye"></i>
+                      Ver detalhes
+                    </button>
+
+                    <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="<?= $l['id'] ?>">
+                      <i class="bi bi-pencil-square"></i>
+                      Editar
+                    </button>
+
+                    <button class="item-action-btn item-action-btn--danger" type="button" data-reject="<?= $l['id'] ?>">
+                      <i class="bi bi-x-circle"></i>
+                      Rejeitar
+                    </button>
+
+                    <button class="item-action-btn item-action-btn--success" type="button" data-approve="<?= $l['id'] ?>">
+                      <i class="bi bi-check-circle"></i>
+                      Aprovar
+                    </button>
                   </div>
                 </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 57,40</strong>
-                  <span>Confiança: 68%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Saúde</span>
-                <span><i class="bi bi-clock"></i> 14/03/2026 • 11:12</span>
-                <span><i class="bi bi-exclamation-triangle"></i> Descrição pode conter erro</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="4">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="4">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="4">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="4">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="5" data-source="sms" data-status="pending" data-confidence="84">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--green">
-                    <i class="bi bi-chat-square-text"></i>
-                  </div>
-
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Compra no cartão</h4>
-                      <span class="review-badge review-badge--green">SMS</span>
-                    </div>
-                    <p>Mensagem bancária • Transporte • 14 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 22,00</strong>
-                  <span>Confiança: 84%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Transporte</span>
-                <span><i class="bi bi-clock"></i> 14/03/2026 • 13:27</span>
-                <span><i class="bi bi-check2-circle"></i> Boa consistência geral</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="5">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="5">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="5">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="5">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="6" data-source="importacao" data-status="pending" data-confidence="86">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--blue">
-                    <i class="bi bi-file-earmark-arrow-up"></i>
-                  </div>
-
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Conta de luz</h4>
-                      <span class="review-badge review-badge--blue">Importação</span>
-                    </div>
-                    <p>Arquivo OFX • Utilidades • 15 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 180,30</strong>
-                  <span>Confiança: 86%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Utilidades</span>
-                <span><i class="bi bi-clock"></i> 15/03/2026 • 08:15</span>
-                <span><i class="bi bi-arrow-repeat"></i> Importado e categorizado automaticamente</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="6">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="6">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="6">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="6">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="7" data-source="ocr" data-status="pending" data-confidence="66">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--purple">
-                    <i class="bi bi-receipt-cutoff"></i>
-                  </div>
-
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Restaurante ?</h4>
-                      <span class="review-badge review-badge--purple">OCR</span>
-                    </div>
-                    <p>Capturado de cupom • Alimentação • 15 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 43,50</strong>
-                  <span>Confiança: 66%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Alimentação</span>
-                <span><i class="bi bi-clock"></i> 15/03/2026 • 12:02</span>
-                <span><i class="bi bi-exclamation-triangle"></i> Nome do estabelecimento incerto</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="7">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="7">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="7">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="7">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article class="review-item" data-id="8" data-source="sms" data-status="pending" data-confidence="89">
-            <div class="review-item__select">
-              <label class="review-check">
-                <input type="checkbox" class="launch-checkbox">
-                <span></span>
-              </label>
-            </div>
-
-            <div class="review-item__main">
-              <div class="review-item__top">
-                <div class="review-item__left">
-                  <div class="review-item__icon review-item__icon--green">
-                    <i class="bi bi-chat-square-text"></i>
-                  </div>
-
-                  <div class="review-item__info">
-                    <div class="review-item__title-row">
-                      <h4>Pix enviado</h4>
-                      <span class="review-badge review-badge--green">SMS</span>
-                    </div>
-                    <p>Mensagem bancária • Transferência • 15 Mar</p>
-                  </div>
-                </div>
-
-                <div class="review-item__amount">
-                  <strong>R$ 120,00</strong>
-                  <span>Confiança: 89%</span>
-                </div>
-              </div>
-
-              <div class="review-item__meta">
-                <span><i class="bi bi-tag"></i> Transferência</span>
-                <span><i class="bi bi-clock"></i> 15/03/2026 • 18:33</span>
-                <span><i class="bi bi-check2-circle"></i> Captura consistente</span>
-              </div>
-
-              <div class="review-item__actions">
-                <button class="item-action-btn item-action-btn--ghost" type="button" data-open-details="8">
-                  <i class="bi bi-eye"></i>
-                  Ver detalhes
-                </button>
-
-                <button class="item-action-btn item-action-btn--edit" type="button" data-open-edit="8">
-                  <i class="bi bi-pencil-square"></i>
-                  Editar
-                </button>
-
-                <button class="item-action-btn item-action-btn--danger" type="button" data-reject="8">
-                  <i class="bi bi-x-circle"></i>
-                  Rejeitar
-                </button>
-
-                <button class="item-action-btn item-action-btn--success" type="button" data-approve="8">
-                  <i class="bi bi-check-circle"></i>
-                  Aprovar
-                </button>
-              </div>
-            </div>
-          </article>
+              </article>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
       </section>
     </section>
@@ -666,7 +350,7 @@
 
           <label class="review-field">
             <span>Origem</span>
-            <input type="text" id="editSourceInput" placeholder="Origem">
+            <input type="text" id="editSourceInput" placeholder="Origem" disabled>
           </label>
 
           <button class="review-btn review-btn--primary review-btn--full" id="saveEditBtn" type="button">
@@ -704,7 +388,7 @@
               <p>Destaca capturas de OCR abaixo do limite ideal.</p>
             </div>
             <label class="switch switch--green">
-              <input type="checkbox" id="togglePrioritizeOCR" checked>
+              <input type="checkbox" id="togglePrioritizeOCR" <?= $regras['priorizar_ocr_baixa_confianca'] ? 'checked' : '' ?>>
               <span class="switch-slider"></span>
             </label>
           </div>
@@ -715,7 +399,7 @@
               <p>Remove automaticamente da fila os itens já validados.</p>
             </div>
             <label class="switch switch--green">
-              <input type="checkbox" id="toggleHideApproved" checked>
+              <input type="checkbox" id="toggleHideApproved" <?= $regras['ocultar_aprovados'] ? 'checked' : '' ?>>
               <span class="switch-slider"></span>
             </label>
           </div>
@@ -725,12 +409,12 @@
               <h4>Faixa de confiança ideal</h4>
               <p>Capturas abaixo desse valor ficam mais sensíveis para revisão.</p>
             </div>
-            <strong id="confidenceThresholdText">80%</strong>
+            <strong id="confidenceThresholdText"><?= (int) $regras['limite_confianca_percentual'] ?>%</strong>
           </div>
 
           <label class="review-field">
             <span>Limite de confiança (%)</span>
-            <input type="number" id="confidenceThresholdInput" min="1" max="100" value="80">
+            <input type="number" id="confidenceThresholdInput" min="1" max="100" value="<?= (int) $regras['limite_confianca_percentual'] ?>">
           </label>
 
           <button class="review-btn review-btn--primary review-btn--full" id="saveRulesBtn" type="button">
@@ -781,7 +465,7 @@
         </div>
         <div class="notif-card__content">
           <h4>Fila avançando bem</h4>
-          <p>Você já validou 12 lançamentos hoje com boa consistência.</p>
+          <p>Você já validou <?= $aprovadosHoje ?> lançamentos hoje.</p>
           <span>Hoje, 09:20</span>
         </div>
       </article>
@@ -898,25 +582,19 @@
   <script>
     const body = document.body;
 
+    // ATENÇÃO: os lançamentos agora vêm do banco (via PHP), não são
+    // mais fixos no JavaScript. O approvedToday/rejectedToday também
+    // vêm de uma contagem real no banco.
     const state = {
       filter: "all",
-      hideApproved: true,
-      prioritizeOCR: true,
-      confidenceThreshold: 80,
+      hideApproved: <?= $regras['ocultar_aprovados'] ? 'true' : 'false' ?>,
+      prioritizeOCR: <?= $regras['priorizar_ocr_baixa_confianca'] ? 'true' : 'false' ?>,
+      confidenceThreshold: <?= (int) $regras['limite_confianca_percentual'] ?>,
       selectedIds: [],
       currentEditId: null,
-      launches: [
-        { id: 1, description: "Supermercado União", amount: 84.90, source: "ocr", sourceLabel: "OCR", category: "Alimentação", confidence: 74, status: "pending" },
-        { id: 2, description: "Pix recebido", amount: 250.00, source: "sms", sourceLabel: "SMS", category: "Receita extra", confidence: 91, status: "pending" },
-        { id: 3, description: "Netflix", amount: 39.90, source: "importacao", sourceLabel: "Importação", category: "Assinaturas", confidence: 88, status: "pending" },
-        { id: 4, description: "Farmácia Central", amount: 57.40, source: "ocr", sourceLabel: "OCR", category: "Saúde", confidence: 68, status: "pending" },
-        { id: 5, description: "Compra no cartão", amount: 22.00, source: "sms", sourceLabel: "SMS", category: "Transporte", confidence: 84, status: "pending" },
-        { id: 6, description: "Conta de luz", amount: 180.30, source: "importacao", sourceLabel: "Importação", category: "Utilidades", confidence: 86, status: "pending" },
-        { id: 7, description: "Restaurante ?", amount: 43.50, source: "ocr", sourceLabel: "OCR", category: "Alimentação", confidence: 66, status: "pending" },
-        { id: 8, description: "Pix enviado", amount: 120.00, source: "sms", sourceLabel: "SMS", category: "Transferência", confidence: 89, status: "pending" }
-      ],
-      approvedToday: 12,
-      rejectedToday: 3
+      launches: <?= json_encode($launches) ?>,
+      approvedToday: <?= $aprovadosHoje ?>,
+      rejectedToday: <?= $rejeitadosHoje ?>
     };
 
     function formatBRL(value) {
@@ -1082,9 +760,32 @@
       openReviewModal("editModal");
     }
 
-    function approveLaunch(id) {
+    // ATENÇÃO: as 3 funções abaixo (approveLaunch, rejectLaunch,
+    // approveSelected) agora chamam o endpoint revisar-acao.php pra
+    // gravar a mudança de status no banco de verdade.
+    async function enviarAcao(payload) {
+      try {
+        const response = await fetch("revisar-acao.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error("Erro ao comunicar com o servidor:", error);
+        return { sucesso: false };
+      }
+    }
+
+    async function approveLaunch(id) {
       const launch = state.launches.find(item => item.id === id);
       if (!launch || launch.status !== "pending") return;
+
+      const resultado = await enviarAcao({ acao: "aprovar", id });
+      if (!resultado.sucesso) {
+        alert("Não foi possível aprovar esse lançamento.");
+        return;
+      }
 
       launch.status = "approved";
       state.approvedToday += 1;
@@ -1092,9 +793,15 @@
       updateUI();
     }
 
-    function rejectLaunch(id) {
+    async function rejectLaunch(id) {
       const launch = state.launches.find(item => item.id === id);
       if (!launch || launch.status !== "pending") return;
+
+      const resultado = await enviarAcao({ acao: "rejeitar", id });
+      if (!resultado.sucesso) {
+        alert("Não foi possível rejeitar esse lançamento.");
+        return;
+      }
 
       launch.status = "rejected";
       state.rejectedToday += 1;
@@ -1102,9 +809,11 @@
       updateUI();
     }
 
-    function approveSelected() {
+    async function approveSelected() {
       const idsToApprove = [...state.selectedIds];
-      idsToApprove.forEach((id) => approveLaunch(id));
+      for (const id of idsToApprove) {
+        await approveLaunch(id);
+      }
       state.selectedIds = [];
       updateUI();
     }
@@ -1184,25 +893,53 @@
       });
     });
 
+    // ATENÇÃO: salvar edição agora persiste no banco via revisar-acao.php
     const saveEditBtn = document.getElementById("saveEditBtn");
     if (saveEditBtn) {
-      saveEditBtn.addEventListener("click", () => {
+      saveEditBtn.addEventListener("click", async () => {
         const launch = state.launches.find(item => item.id === state.currentEditId);
         if (!launch) return;
 
-        launch.description = document.getElementById("editDescriptionInput").value.trim() || launch.description;
-        launch.amount = parseFloat(document.getElementById("editAmountInput").value) || launch.amount;
-        launch.category = document.getElementById("editCategoryInput").value.trim() || launch.category;
-        launch.sourceLabel = document.getElementById("editSourceInput").value.trim() || launch.sourceLabel;
+        const novaDescricao = document.getElementById("editDescriptionInput").value.trim() || launch.description;
+        const novoValor = parseFloat(document.getElementById("editAmountInput").value) || launch.amount;
+        const novaCategoria = document.getElementById("editCategoryInput").value.trim() || launch.category;
+
+        const resultado = await enviarAcao({
+          acao: "editar",
+          id: launch.id,
+          descricao: novaDescricao,
+          valor: novoValor,
+          categoria: novaCategoria
+        });
+
+        if (!resultado.sucesso) {
+          alert("Não foi possível salvar as alterações.");
+          return;
+        }
+
+        launch.description = novaDescricao;
+        launch.amount = novoValor;
+        launch.category = novaCategoria;
+
+        // Atualiza o card na tela também (o protótipo original não fazia isso)
+        const item = document.querySelector(`.review-item[data-id="${launch.id}"]`);
+        if (item) {
+          const titleEl = item.querySelector(".review-item__title-row h4");
+          const amountEl = item.querySelector(".review-item__amount strong");
+          if (titleEl) titleEl.textContent = novaDescricao;
+          if (amountEl) amountEl.textContent = formatBRL(novoValor);
+        }
 
         closeReviewModal("editModal");
         updateUI();
       });
     }
 
+    // ATENÇÃO: salvar regras agora persiste no banco via
+    // atualizar-regras-revisao.php
     const saveRulesBtn = document.getElementById("saveRulesBtn");
     if (saveRulesBtn) {
-      saveRulesBtn.addEventListener("click", () => {
+      saveRulesBtn.addEventListener("click", async () => {
         const thresholdInput = document.getElementById("confidenceThresholdInput");
         const threshold = parseInt(thresholdInput.value, 10);
 
@@ -1213,6 +950,20 @@
         state.prioritizeOCR = document.getElementById("togglePrioritizeOCR").checked;
         state.hideApproved = document.getElementById("toggleHideApproved").checked;
         document.getElementById("confidenceThresholdText").textContent = state.confidenceThreshold + "%";
+
+        try {
+          await fetch("atualizar-regras-revisao.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              priorizar_ocr_baixa_confianca: state.prioritizeOCR,
+              ocultar_aprovados: state.hideApproved,
+              limite_confianca_percentual: state.confidenceThreshold
+            })
+          });
+        } catch (error) {
+          console.error("Não foi possível salvar as regras:", error);
+        }
 
         closeReviewModal("rulesModal");
         updateUI();
