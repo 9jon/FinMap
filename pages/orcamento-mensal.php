@@ -23,9 +23,13 @@ $usuario_id = (int)$_SESSION['usuario_id'];
 
 function parseBRLParaFloat(string $valor): float
 {
-    $limpo = str_replace(['R$', ' '], '', $valor);
-    $limpo = str_replace('.', '', $limpo);
-    $limpo = str_replace(',', '.', $limpo);
+    // \s no PHP não pega espaço "não separável" (U+00A0), então
+    // removemos explicitamente qualquer caractere de espaço Unicode
+    // antes de continuar a limpeza normal.
+    $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor);
+    $limpo = str_replace('R$', '', $limpo);
+    $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
+    $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
     return (float) $limpo;
 }
 
@@ -34,6 +38,8 @@ $cenariosValidos = ['base', 'cauteloso', 'pressionado'];
 // -----------------------------------------------------------------
 // PROCESSAMENTO DAS AÇÕES (POST) — sem AJAX, tudo formulário normal
 // -----------------------------------------------------------------
+$erroRenda = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 
     $acao = $_POST['acao'];
@@ -41,10 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     if ($acao === 'atualizar_renda') {
         $novaRenda = parseBRLParaFloat($_POST['renda'] ?? '');
 
-        if ($novaRenda > 0) {
+        if ($novaRenda <= 0) {
+            $erroRenda = 'Valor de renda inválido: "' . htmlspecialchars($_POST['renda'] ?? '') . '" não foi reconhecido como um número.';
+        } else {
             // Só atualiza se já existir configuração de renda (criada em config-renda.php).
-            // Se não existir, não dá pra criar aqui porque faltam campos obrigatórios
-            // daquela tabela (tipo de vínculo, dia de recebimento, etc.).
             $sqlCheck = "SELECT id FROM configuracoes_renda WHERE usuario_id = ?";
             $stmtCheck = $conn->prepare($sqlCheck);
             $stmtCheck->bind_param("i", $usuario_id);
@@ -52,17 +58,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
             $existe = $stmtCheck->get_result()->fetch_assoc();
             $stmtCheck->close();
 
-            if ($existe) {
+            if (!$existe) {
+                $erroRenda = 'Você ainda não tem uma configuração de renda salva. Configure sua renda primeiro na tela "Configuração de Renda".';
+            } else {
                 $sqlUpdate = "UPDATE configuracoes_renda SET renda_mensal = ? WHERE usuario_id = ?";
                 $stmtUpdate = $conn->prepare($sqlUpdate);
                 $stmtUpdate->bind_param("di", $novaRenda, $usuario_id);
                 $stmtUpdate->execute();
+                $linhasAfetadas = $stmtUpdate->affected_rows;
                 $stmtUpdate->close();
+
+                if ($linhasAfetadas === 0) {
+                    // affected_rows = 0 pode significar "nenhuma linha bateu com o WHERE"
+                    // OU "bateu, mas o valor já era exatamente esse" (MySQL não conta
+                    // UPDATE que não muda nada). Não é necessariamente um erro.
+                    $erroRenda = 'Nenhuma linha foi alterada no banco (o valor já era esse, ou o usuario_id não bateu com nenhuma linha).';
+                } else {
+                    // Sucesso: segue o fluxo normal (redireciona)
+                    header('Location: orcamento-mensal.php');
+                    exit;
+                }
             }
         }
-    }
-
-    if ($acao === 'atualizar_limites') {
+    } elseif ($acao === 'atualizar_limites') {
         $faixaIdeal = (int)($_POST['faixa_ideal'] ?? 70);
         $faixaAlerta = (int)($_POST['faixa_alerta'] ?? 85);
 
@@ -115,8 +133,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         $stmtUpdate->close();
     }
 
-    header('Location: orcamento-mensal.php');
-    exit;
+    if ($erroRenda === '') {
+        header('Location: orcamento-mensal.php');
+        exit;
+    }
 }
 
 // -----------------------------------------------------------------
@@ -216,6 +236,7 @@ function statusOrcamento(float $percentual, int $faixaIdeal, int $faixaAlerta): 
             'texto' => 'Seu orçamento ainda mantém boa margem de segurança.',
             'leitura' => 'Orçamento saudável',
             'sugestao' => 'Preservar a folga atual e controlar lazer/extras',
+            'cor' => '#24bb45',
         ];
     }
     if ($percentual <= $faixaAlerta) {
@@ -224,6 +245,7 @@ function statusOrcamento(float $percentual, int $faixaIdeal, int $faixaAlerta): 
             'texto' => 'Seu orçamento entrou em uma faixa que exige mais controle.',
             'leitura' => 'Orçamento em atenção',
             'sugestao' => 'Evitar novos gastos variáveis e revisar categorias flexíveis',
+            'cor' => '#f59e0b',
         ];
     }
     return [
@@ -231,6 +253,7 @@ function statusOrcamento(float $percentual, int $faixaIdeal, int $faixaAlerta): 
         'texto' => 'Seu orçamento está em uma faixa arriscada para o restante do mês.',
         'leitura' => 'Orçamento pressionado',
         'sugestao' => 'Reduzir despesas flexíveis e revisar custos fixos imediatamente',
+        'cor' => '#ef4444',
     ];
 }
 
@@ -311,6 +334,12 @@ function brl(float $valor): string
     <section class="budget-dashboard">
       <section class="budget-dashboard__top">
         <article class="budget-hero-card">
+          <?php if ($erroRenda): ?>
+            <div class="alert alert-danger py-2 mb-3">
+              <?= $erroRenda /* já veio com htmlspecialchars aplicado onde necessário */ ?>
+            </div>
+          <?php endif; ?>
+
           <div class="budget-hero-card__badge">
             <i class="bi bi-calendar-check"></i>
             <span>Controle mensal atualizado</span>
@@ -374,7 +403,7 @@ function brl(float $valor): string
           </div>
 
           <div class="budget-ring-area">
-            <div class="budget-ring" id="budgetRing" style="--percent: <?= number_format($percentual, 1, '.', '') ?>;">
+            <div class="budget-ring" id="budgetRing" style="--percent: <?= number_format($percentual, 1, '.', '') ?>; --ring-color: <?= htmlspecialchars($status['cor']) ?>;">
               <div class="budget-ring__inner">
                 <span class="budget-ring__label">Comprometido</span>
                 <strong id="budgetPercent"><?= round($percentual) ?>%</strong>
@@ -920,12 +949,19 @@ function brl(float $valor): string
     });
 
     // Formatação de moeda no campo de renda (só visual — o valor é
-    // convertido de volta pro PHP no envio do form)
+    // convertido de volta pro PHP no envio do form).
+    // Usamos uma função manual em vez de toLocaleString porque o
+    // toLocaleString("pt-BR", {style:"currency"}) costuma inserir um
+    // espaço "não separável" (U+00A0) entre "R$" e o número, que o
+    // PHP não reconhece como espaço normal ao converter de volta.
     function formatCurrencyInput(value) {
       const digits = String(value || "").replace(/\D/g, "");
       if (!digits) return "R$ 0,00";
-      const number = Number(digits) / 100;
-      return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      let formatado = (Number(digits) / 100).toFixed(2);
+      formatado = formatado.replace(".", ",");
+      formatado = formatado.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return "R$ " + formatado;
     }
 
     const incomeInput = document.getElementById("incomeInput");
