@@ -2,6 +2,12 @@
 // pages/criar-transacao.php
 // Recebe o formulário de nova transação manual e grava no banco.
 // Padrão Post/Redirect/Get, igual às outras telas do sistema.
+//
+// VERSÃO COM DIAGNÓSTICO: em vez de sempre redirecionar com o mesmo
+// "erro=dados_invalidos" genérico (que não dizia QUAL validação
+// falhou), agora cada motivo de falha tem seu próprio código de erro
+// na URL. Isso é temporário pra descobrirmos exatamente onde está
+// travando — depois que resolvermos, dá pra simplificar de volta.
 
 session_start();
 require_once '../config/conn.php';
@@ -10,10 +16,18 @@ $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 function parseBRLParaFloat(string $valor): float
 {
-    $limpo = str_replace(['R$', ' '], '', $valor);
+    $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor); // remove espaço comum e não separável
+    $limpo = str_replace('R$', '', $limpo);
     $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
     $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
     return (float) $limpo;
+}
+
+function falhar(string $motivo, array $extra = []): void
+{
+    $query = array_merge(['erro' => $motivo], $extra);
+    header('Location: dashboard.php?' . http_build_query($query));
+    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -21,18 +35,40 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Se a conexão com o banco falhou lá no conn.php, não faz sentido seguir
+if (!isset($conn) || $conn->connect_error) {
+    error_log('criar-transacao.php: conexão com o banco indisponível');
+    falhar('erro_conexao');
+}
+
 $tiposValidos = ['despesa', 'receita'];
 
 $tipo = $_POST['tipo'] ?? '';
 $descricao = trim($_POST['descricao'] ?? '');
-$valor = parseBRLParaFloat($_POST['valor'] ?? '');
-$categoriaId = !empty($_POST['categoria_id']) ? (int) $_POST['categoria_id'] : null;
+$valorPost = $_POST['valor'] ?? '';
+$valor = parseBRLParaFloat($valorPost);
+
+$categoriaIdRaw = $tipo === 'receita'
+    ? ($_POST['categoria_id_receita'] ?? '')
+    : ($_POST['categoria_id_despesa'] ?? '');
+$categoriaId = ($categoriaIdRaw !== '' && $categoriaIdRaw !== null) ? (int) $categoriaIdRaw : null;
+
 $dataTransacao = $_POST['data_transacao'] ?? date('Y-m-d');
 
-// Validação server-side (a real, que vale de verdade)
-if (!in_array($tipo, $tiposValidos, true) || $descricao === '' || $valor <= 0) {
-    header('Location: dashboard.php?erro=dados_invalidos');
-    exit;
+// -----------------------------------------------------------------
+// Validações, uma por uma, cada uma com seu próprio motivo de erro
+// -----------------------------------------------------------------
+if (!in_array($tipo, $tiposValidos, true)) {
+    falhar('tipo_invalido');
+}
+
+if ($descricao === '') {
+    falhar('descricao_vazia');
+}
+
+if ($valor <= 0) {
+    // manda o valor bruto recebido (só pra debug, remova depois de resolver)
+    falhar('valor_invalido', ['valor_recebido' => $valorPost]);
 }
 
 // Valida se a data enviada é uma data real (evita string maliciosa/quebrada)
@@ -44,12 +80,18 @@ if (!$dataValidada || $dataValidada->format('Y-m-d') !== $dataTransacao) {
 // Se veio categoria_id, confirma que ela é do usuário e bate com o tipo escolhido
 if ($categoriaId !== null) {
     $stmtCheck = $conn->prepare("SELECT id FROM categorias WHERE id = ? AND usuario_id = ? AND tipo = ?");
+    if (!$stmtCheck) {
+        error_log('criar-transacao.php: erro ao preparar SELECT categorias -> ' . $conn->error);
+        falhar('erro_banco_categoria');
+    }
     $stmtCheck->bind_param("iis", $categoriaId, $usuario_id, $tipo);
     $stmtCheck->execute();
     $existe = $stmtCheck->get_result()->fetch_assoc();
     $stmtCheck->close();
 
     if (!$existe) {
+        // Categoria não pertence ao usuário ou não bate com o tipo -> só ignora a categoria,
+        // NÃO bloqueia a transação
         $categoriaId = null;
     }
 }
@@ -58,9 +100,22 @@ $stmt = $conn->prepare("
     INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria_id, data_transacao, origem, status)
     VALUES (?, ?, ?, ?, ?, ?, 'manual', 'aprovado')
 ");
+
+if (!$stmt) {
+    error_log('criar-transacao.php: erro ao preparar INSERT -> ' . $conn->error);
+    falhar('erro_banco_insert');
+}
+
 $stmt->bind_param("isdsis", $usuario_id, $descricao, $valor, $tipo, $categoriaId, $dataTransacao);
-$stmt->execute();
+$sucesso = $stmt->execute();
+
+if (!$sucesso) {
+    error_log('criar-transacao.php: erro ao executar INSERT -> ' . $stmt->error);
+    $stmt->close();
+    falhar('erro_execucao', ['detalhe' => $stmt->error]);
+}
+
 $stmt->close();
 
-header('Location: dashboard.php');
+header('Location: dashboard.php?sucesso=1');
 exit;
