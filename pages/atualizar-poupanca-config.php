@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['sucesso' => false, 'erro' => 'Método não permitido']);
     exit;
-}
+}   
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
