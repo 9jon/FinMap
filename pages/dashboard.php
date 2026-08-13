@@ -94,6 +94,25 @@ $stmt->close();
 
 $categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
 $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
+
+// -----------------------------------------------------------------
+// DIAGNÓSTICO: criar-transacao.php agora manda um motivo específico
+// em ?erro=... quando a transação não é salva, em vez de um genérico
+// "dados_invalidos" que não dizia o que realmente falhou. Isso é
+// temporário só pra identificarmos a causa raiz do problema atual.
+// -----------------------------------------------------------------
+$mensagensErroTransacao = [
+    'tipo_invalido'          => 'O tipo da transação (despesa/receita) não foi reconhecido.',
+    'descricao_vazia'        => 'A descrição não pode ficar em branco.',
+    'valor_invalido'         => 'O valor informado não foi reconhecido como um número válido. Valor recebido: "' . htmlspecialchars($_GET['valor_recebido'] ?? '') . '"',
+    'erro_conexao'           => 'Não foi possível conectar ao banco de dados.',
+    'erro_banco_categoria'   => 'Erro ao verificar a categoria no banco de dados.',
+    'erro_banco_insert'      => 'Erro ao preparar o salvamento da transação no banco de dados.',
+    'erro_execucao'          => 'Erro ao gravar a transação no banco de dados. Detalhe: ' . htmlspecialchars($_GET['detalhe'] ?? ''),
+    'dados_invalidos'        => 'Não foi possível salvar a transação. Verifique os dados e tente novamente.',
+];
+$erroTransacaoCodigo = $_GET['erro'] ?? '';
+$erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -147,6 +166,17 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
   </header>
 
   <section class="finance-overview">
+    <?php if ($erroTransacaoMsg): ?>
+      <div class="alert alert-danger" style="margin: 0 24px 16px;">
+        <strong>Falha ao salvar transação</strong> (<?= htmlspecialchars($erroTransacaoCodigo) ?>): <?= $erroTransacaoMsg ?>
+      </div>
+    <?php endif; ?>
+    <?php if (($_GET['sucesso'] ?? '') === '1'): ?>
+      <div class="alert alert-success" style="margin: 0 24px 16px;">
+        Transação salva com sucesso!
+      </div>
+    <?php endif; ?>
+
     <div class="overview-header">
       <div class="overview-title-group">
         <h2>Olá, <?= htmlspecialchars($primeiroNome) ?>!</h2>
@@ -769,9 +799,19 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
             <input type="text" class="form-control finmap-money-input" id="manualValor" name="valor" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off" required>
           </div>
 
+          <!--
+            CORRIGIDO: antes os dois selects usavam o mesmo
+            name="categoria_id". O d-none só esconde visualmente —
+            os dois campos continuavam sendo enviados no POST, e o
+            PHP ficava com o valor do último (o de receita, que vem
+            depois no HTML), sobrescrevendo a categoria escolhida
+            quando o tipo era despesa. Agora cada select tem um name
+            próprio, e o PHP (criar-transacao.php) escolhe o certo
+            com base no tipo enviado.
+          -->
           <div class="mb-3" id="categoriaDespesaWrapper">
             <label for="categoriaDespesaSelect" class="form-label fw-semibold">Categoria</label>
-            <select class="form-select" id="categoriaDespesaSelect" name="categoria_id">
+            <select class="form-select" id="categoriaDespesaSelect" name="categoria_id_despesa">
               <option value="">Sem categoria</option>
               <?php foreach ($categoriasDespesa as $c): ?>
                 <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['nome']) ?></option>
@@ -781,7 +821,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
 
           <div class="mb-3 d-none" id="categoriaReceitaWrapper">
             <label for="categoriaReceitaSelect" class="form-label fw-semibold">Categoria</label>
-            <select class="form-select" id="categoriaReceitaSelect" name="categoria_id">
+            <select class="form-select" id="categoriaReceitaSelect" name="categoria_id_receita">
               <option value="">Sem categoria</option>
               <?php foreach ($categoriasReceita as $c): ?>
                 <option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars($c['nome']) ?></option>
@@ -1756,13 +1796,30 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     return String(value || "").replace(/\D/g, "");
   }
 
+  // -----------------------------------------------------------------
+  // CORRIGIDO: antes essa função usava toLocaleString("pt-BR",
+  // {style:"currency"}), que em vários navegadores insere um espaço
+  // "não separável" (U+00A0) entre "R$" e o número, em vez de um
+  // espaço comum. Esse valor era enviado assim pro formulário de
+  // nova transação manual (method="post" normal, sem fetch), e o
+  // parseBRLParaFloat() do lado PHP (criar-transacao.php) não
+  // removia esse caractere — então o valor sempre virava 0, a
+  // validação de servidor barrava (`$valor <= 0`) e a transação
+  // nunca era realmente salva, sem nenhum aviso na tela.
+  //
+  // Agora a formatação é feita manualmente (mesma técnica já usada
+  // em orcamento-mensal.php e config-renda.php), sem depender do
+  // toLocaleString, então o valor enviado ao PHP é sempre um "R$"
+  // seguido de espaço comum — que o parseBRLParaFloat() já sabe
+  // tratar corretamente.
+  // -----------------------------------------------------------------
   function formatCurrencyBRL(value) {
     const digits = getDigitsOnly(value);
     const amount = digits ? Number(digits) / 100 : 0;
-    return amount.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
+
+    let formatado = amount.toFixed(2).replace(".", ",");
+    formatado = formatado.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return "R$ " + formatado;
   }
 
   if (saldoEditInput) {
