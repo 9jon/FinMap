@@ -5,7 +5,7 @@
 session_start();
 include '../config/conn.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json'); 
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 $periodo = $_GET['periodo'] ?? 'this-month';
