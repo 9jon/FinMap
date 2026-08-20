@@ -5,8 +5,12 @@ include '../config/conn.php';
 require_once __DIR__ . '/../config/categorias-padrao.php';
 
 // Por enquanto fixo, até o login gravar isso na sessão de verdade
+
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 garantirCategoriasPadrao($conn, (int) $usuario_id);
+
+$usuario_id = 1;
+// $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 // --- Dados do usuário (nome, iniciais, saldo) ---
 $stmt = $conn->prepare("SELECT nome, email, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
@@ -20,8 +24,7 @@ $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = $usuario['saldo_total'] ?? 0;
 
 // --- Receitas do mês atual ---
-$stmt = $conn->prepare("
-    SELECT COALESCE(SUM(valor), 0) AS total
+$stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
     WHERE usuario_id = ? AND tipo = 'receita' AND status IN ('pendente', 'aprovado')
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
@@ -32,8 +35,7 @@ $receitasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
 // --- Despesas do mês atual ---
-$stmt = $conn->prepare("
-    SELECT COALESCE(SUM(valor), 0) AS total
+$stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
     WHERE usuario_id = ? AND tipo = 'despesa' AND status IN ('pendente', 'aprovado')
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
@@ -44,8 +46,7 @@ $despesasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
 // --- Últimas 5 transações pendentes ou aprovadas ---
-$stmt = $conn->prepare("
-    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+$stmt = $conn->prepare("SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.status IN ('pendente', 'aprovado')
@@ -58,8 +59,7 @@ $transacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // --- Até 3 metas mais recentes ---
-$stmt = $conn->prepare("
-    SELECT id, nome, valor_meta, valor_guardado, icone, cor
+$stmt = $conn->prepare("SELECT id, nome, valor_meta, valor_guardado, icone, cor
     FROM metas_financeiras
     WHERE usuario_id = ?
     ORDER BY criado_em DESC
@@ -71,8 +71,7 @@ $metas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // --- Gastos por categoria (mês atual) ---
-$stmt = $conn->prepare("
-    SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
+$stmt = $conn->prepare("SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
     INNER JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status IN ('pendente', 'aprovado')
@@ -88,14 +87,29 @@ $stmt->close();
 $totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
 
 // --- Categorias do usuário (pra popular o form de nova transação manual) ---
-$stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
+// --- Categorias do usuário (pra popular o form de nova transação manual) ---
+$stmt = $conn->prepare("SELECT id, nome, tipo
+    FROM categorias
+    WHERE usuario_id = ?
+    ORDER BY tipo, nome
+");
+
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
+
 $categoriasUsuario = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 $stmt->close();
 
-$categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
-$categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
+$categoriasDespesa = array_filter(
+    $categoriasUsuario,
+    fn($c) => $c['tipo'] === 'despesa'
+);
+
+$categoriasReceita = array_filter(
+    $categoriasUsuario,
+    fn($c) => $c['tipo'] === 'receita'
+);
 
 // -----------------------------------------------------------------
 // DIAGNÓSTICO: criar-transacao.php agora manda um motivo específico
@@ -103,11 +117,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
 // "dados_invalidos" que não dizia o que realmente falhou. Isso é
 // temporário só pra identificarmos a causa raiz do problema atual.
 // -----------------------------------------------------------------
-$mensagensErroTransacao = [
-    'tipo_invalido'          => 'O tipo da transação (despesa/receita) não foi reconhecido.',
-    'descricao_vazia'        => 'A descrição não pode ficar em branco.',
-    'valor_invalido'         => 'O valor informado não foi reconhecido como um número válido. Valor recebido: "' . htmlspecialchars($_GET['valor_recebido'] ?? '') . '"',
-    'erro_conexao'           => 'Não foi possível conectar ao banco de dados.',
+$mensagensErroTransacao = ['tipo_invalido'          => 'O tipo da transação (despesa/receita) não foi reconhecido.','descricao_vazia'        => 'A descrição não pode ficar em branco.','valor_invalido'         => 'O valor informado não foi reconhecido como um número válido. Valor recebido: "' . htmlspecialchars($_GET['valor_recebido'] ?? '') . '"','erro_conexao'           => 'Não foi possível conectar ao banco de dados.',
     'erro_banco_categoria'   => 'Erro ao verificar a categoria no banco de dados.',
     'erro_banco_insert'      => 'Erro ao preparar o salvamento da transação no banco de dados.',
     'erro_execucao'          => 'Erro ao gravar a transação no banco de dados. Detalhe: ' . htmlspecialchars($_GET['detalhe'] ?? ''),
