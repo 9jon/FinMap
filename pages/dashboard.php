@@ -4,8 +4,8 @@ session_start();
 include '../config/conn.php';
 
 // Por enquanto fixo, até o login gravar isso na sessão de verdade
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
-
+$usuario_id = 1;
+// $usuario_id = $_SESSION['usuario_id'] ?? 1;
 // --- Dados do usuário (nome, iniciais, saldo) ---
 $stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
@@ -86,14 +86,30 @@ $stmt->close();
 $totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
 
 // --- Categorias do usuário (pra popular o form de nova transação manual) ---
-$stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
+// --- Categorias do usuário (pra popular o form de nova transação manual) ---
+$stmt = $conn->prepare("
+    SELECT id, nome, tipo
+    FROM categorias
+    WHERE usuario_id = ?
+    ORDER BY tipo, nome
+");
+
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
+
 $categoriasUsuario = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 $stmt->close();
 
-$categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
-$categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
+$categoriasDespesa = array_filter(
+    $categoriasUsuario,
+    fn($c) => $c['tipo'] === 'despesa'
+);
+
+$categoriasReceita = array_filter(
+    $categoriasUsuario,
+    fn($c) => $c['tipo'] === 'receita'
+);
 
 // -----------------------------------------------------------------
 // DIAGNÓSTICO: criar-transacao.php agora manda um motivo específico
