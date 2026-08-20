@@ -36,7 +36,7 @@ $sql = "
     SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
     INNER JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
+    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status IN ('pendente', 'aprovado')
       AND $condicaoData
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC

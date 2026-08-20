@@ -35,14 +35,13 @@ if (!$regras) {
     ];
 }
 
-// --- Lançamentos capturados automaticamente (OCR, SMS, importação) ---
-// "manual" fica de fora dessa tela — é o que aparece direto no dashboard
+// --- Todos os lançamentos aguardando revisão, inclusive os manuais ---
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.origem, t.status, t.confianca_percentual,
            t.observacao_captura, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.origem != 'manual'
+    WHERE t.usuario_id = ?
     ORDER BY t.data_transacao DESC
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -52,6 +51,7 @@ $stmt->close();
 
 // Metadados visuais por origem (ícone, cor, rótulo)
 $sourceMeta = [
+    'manual'     => ['label' => 'Manual', 'badge' => 'green', 'icon' => 'pencil-square', 'padrao' => 'Lançamento informado manualmente'],
     'ocr'        => ['label' => 'OCR', 'badge' => 'purple', 'icon' => 'receipt-cutoff', 'padrao' => 'Capturado de nota fiscal'],
     'sms'        => ['label' => 'SMS', 'badge' => 'green', 'icon' => 'chat-square-text', 'padrao' => 'Mensagem bancária'],
     'importacao' => ['label' => 'Importação', 'badge' => 'blue', 'icon' => 'file-earmark-arrow-up', 'padrao' => 'Arquivo importado']
@@ -69,7 +69,7 @@ foreach ($transacoesResult as $t) {
         'source' => $t['origem'],
         'sourceLabel' => $sourceMeta[$t['origem']]['label'] ?? ucfirst($t['origem']),
         'category' => $t['categoria_nome'] ?? 'Sem categoria',
-        'confidence' => $t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 0,
+        'confidence' => $t['origem'] === 'manual' ? 100 : ($t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 0),
         'status' => $statusMap[$t['status']] ?? 'pending',
         'note' => $t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''),
         'date' => date('d/m/Y', strtotime($t['data_transacao']))
@@ -82,7 +82,7 @@ $stmt = $conn->prepare("
         SUM(CASE WHEN status = 'aprovado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS aprovados_hoje,
         SUM(CASE WHEN status = 'rejeitado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS rejeitados_hoje
     FROM transacoes
-    WHERE usuario_id = ? AND origem != 'manual'
+    WHERE usuario_id = ?
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -178,6 +178,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
             <button class="filter-chip active" type="button" data-filter="all">Todos</button>
             <button class="filter-chip" type="button" data-filter="ocr">OCR</button>
             <button class="filter-chip" type="button" data-filter="sms">SMS</button>
+            <button class="filter-chip" type="button" data-filter="manual">Manual</button>
             <button class="filter-chip" type="button" data-filter="importacao">Importação</button>
           </div>
         </div>
@@ -185,7 +186,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         <div class="review-list" id="reviewList">
           <?php if (empty($launches)): ?>
             <p style="padding: 24px 0; color: #888;">
-              Nenhum lançamento automático (OCR, SMS ou importação) encontrado ainda.
+              Nenhum lançamento para revisar encontrado ainda.
             </p>
           <?php else: ?>
             <?php foreach ($launches as $l):

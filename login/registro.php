@@ -2,6 +2,7 @@
 // login/registro.php
 session_start();
 include '../config/conn.php';
+require_once '../config/categorias-padrao.php';
 
 $erro = '';
 
@@ -40,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param("ssss", $nome, $email, $senhaHash, $iniciais);
 
             if ($stmt->execute()) {
-                $_SESSION['usuario_id'] = $stmt->insert_id;
+                $novoUsuarioId = (int) $stmt->insert_id;
+                garantirCategoriasPadrao($conn, $novoUsuarioId);
+                $_SESSION['usuario_id'] = $novoUsuarioId;
                 $stmt->close();
                 $conn->close();
                 header('Location: ../pages/config-renda.php');

@@ -2,12 +2,14 @@
 
 session_start();
 include '../config/conn.php';
+require_once __DIR__ . '/../config/categorias-padrao.php';
 
 // Por enquanto fixo, até o login gravar isso na sessão de verdade
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
+garantirCategoriasPadrao($conn, (int) $usuario_id);
 
 // --- Dados do usuário (nome, iniciais, saldo) ---
-$stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
+$stmt = $conn->prepare("SELECT nome, email, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $usuario = $stmt->get_result()->fetch_assoc();
@@ -21,7 +23,7 @@ $saldoTotal = $usuario['saldo_total'] ?? 0;
 $stmt = $conn->prepare("
     SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'receita' AND status = 'aprovado'
+    WHERE usuario_id = ? AND tipo = 'receita' AND status IN ('pendente', 'aprovado')
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -33,7 +35,7 @@ $stmt->close();
 $stmt = $conn->prepare("
     SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'despesa' AND status = 'aprovado'
+    WHERE usuario_id = ? AND tipo = 'despesa' AND status IN ('pendente', 'aprovado')
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -41,12 +43,12 @@ $stmt->execute();
 $despesasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
-// --- Últimas 5 transações aprovadas ---
+// --- Últimas 5 transações pendentes ou aprovadas ---
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.status = 'aprovado'
+    WHERE t.usuario_id = ? AND t.status IN ('pendente', 'aprovado')
     ORDER BY t.data_transacao DESC
     LIMIT 5
 ");
@@ -73,7 +75,7 @@ $stmt = $conn->prepare("
     SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
     INNER JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
+    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status IN ('pendente', 'aprovado')
       AND MONTH(t.data_transacao) = MONTH(CURDATE()) AND YEAR(t.data_transacao) = YEAR(CURDATE())
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
@@ -171,12 +173,6 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
         <strong>Falha ao salvar transação</strong> (<?= htmlspecialchars($erroTransacaoCodigo) ?>): <?= $erroTransacaoMsg ?>
       </div>
     <?php endif; ?>
-    <?php if (($_GET['sucesso'] ?? '') === '1'): ?>
-      <div class="alert alert-success" style="margin: 0 24px 16px;">
-        Transação salva com sucesso!
-      </div>
-    <?php endif; ?>
-
     <div class="overview-header">
       <div class="overview-title-group">
         <h2>Olá, <?= htmlspecialchars($primeiroNome) ?>!</h2>
@@ -1562,8 +1558,10 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 
   if (refreshGoalsDashboardBtn) {
     refreshGoalsDashboardBtn.addEventListener("click", () => {
-      renderDashboardGoals();
-      closeModal(goalsMenuModal);
+      // As metas exibidas no dashboard sao carregadas do banco pelo PHP.
+      // Recarregar a pagina evita que o prototipo antigo do localStorage
+      // substitua os dados reais por metas estaticas.
+      window.location.reload();
     });
   }
 
@@ -1783,7 +1781,8 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 
   window.addEventListener("storage", (e) => {
     if (e.key === "finmap_goals") {
-      renderDashboardGoals();
+      // Mantem o dashboard sincronizado com as metas persistidas no banco.
+      window.location.reload();
     }
   });
 

@@ -11,8 +11,10 @@
 
 session_start();
 require_once '../config/conn.php';
+require_once __DIR__ . '/../config/categorias-padrao.php';
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
+garantirCategoriasPadrao($conn, (int) $usuario_id);
 
 function parseBRLParaFloat(string $valor): float
 {
@@ -98,7 +100,7 @@ if ($categoriaId !== null) {
 
 $stmt = $conn->prepare("
     INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria_id, data_transacao, origem, status)
-    VALUES (?, ?, ?, ?, ?, ?, 'manual', 'aprovado')
+    VALUES (?, ?, ?, ?, ?, ?, 'manual', 'pendente')
 ");
 
 if (!$stmt) {
@@ -117,5 +119,5 @@ if (!$sucesso) {
 
 $stmt->close();
 
-header('Location: dashboard.php?sucesso=1');
+header('Location: dashboard.php');
 exit;
