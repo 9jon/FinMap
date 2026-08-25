@@ -1,19 +1,13 @@
 <?php
-
+  
 session_start();
 include '../config/conn.php';
-require_once __DIR__ . '/../config/categorias-padrao.php';
 
 // Por enquanto fixo, até o login gravar isso na sessão de verdade
-
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
-garantirCategoriasPadrao($conn, (int) $usuario_id);
-
-$usuario_id = 1;
-// $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 // --- Dados do usuário (nome, iniciais, saldo) ---
-$stmt = $conn->prepare("SELECT nome, email, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
+$stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $usuario = $stmt->get_result()->fetch_assoc();
@@ -24,9 +18,10 @@ $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = $usuario['saldo_total'] ?? 0;
 
 // --- Receitas do mês atual ---
-$stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) AS total
+$stmt = $conn->prepare("
+    SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'receita' AND status IN ('pendente', 'aprovado')
+    WHERE usuario_id = ? AND tipo = 'receita' AND status = 'aprovado'
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -35,9 +30,10 @@ $receitasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
 // --- Despesas do mês atual ---
-$stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) AS total
+$stmt = $conn->prepare("
+    SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'despesa' AND status IN ('pendente', 'aprovado')
+    WHERE usuario_id = ? AND tipo = 'despesa' AND status = 'aprovado'
       AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -45,12 +41,15 @@ $stmt->execute();
 $despesasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
-// --- Últimas 5 transações pendentes ou aprovadas ---
-$stmt = $conn->prepare("SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+// --- Últimas 5 transações aprovadas ---
+// ORDER BY data DESC + id DESC garante que, entre transações com a
+// mesma data, a mais recentemente cadastrada aparece primeiro.
+$stmt = $conn->prepare("
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.status IN ('pendente', 'aprovado')
-    ORDER BY t.data_transacao DESC
+    WHERE t.usuario_id = ? AND t.status = 'aprovado'
+    ORDER BY t.data_transacao DESC, t.id DESC
     LIMIT 5
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -58,8 +57,24 @@ $stmt->execute();
 $transacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+// --- Todas as transações aprovadas (para o modal "Ver todas") ---
+// Sem LIMIT aqui de propósito: esse array alimenta o modal "Ver todas",
+// que precisa mostrar o histórico completo, com scroll.
+$stmt = $conn->prepare("
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+    FROM transacoes t
+    LEFT JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ? AND t.status = 'aprovado'
+    ORDER BY t.data_transacao DESC, t.id DESC
+");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$todasTransacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
 // --- Até 3 metas mais recentes ---
-$stmt = $conn->prepare("SELECT id, nome, valor_meta, valor_guardado, icone, cor
+$stmt = $conn->prepare("
+    SELECT id, nome, valor_meta, valor_guardado, icone, cor
     FROM metas_financeiras
     WHERE usuario_id = ?
     ORDER BY criado_em DESC
@@ -71,10 +86,11 @@ $metas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // --- Gastos por categoria (mês atual) ---
-$stmt = $conn->prepare("SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
+$stmt = $conn->prepare("
+    SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
     INNER JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status IN ('pendente', 'aprovado')
+    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
       AND MONTH(t.data_transacao) = MONTH(CURDATE()) AND YEAR(t.data_transacao) = YEAR(CURDATE())
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
@@ -87,44 +103,15 @@ $stmt->close();
 $totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
 
 // --- Categorias do usuário (pra popular o form de nova transação manual) ---
-// --- Categorias do usuário (pra popular o form de nova transação manual) ---
-$stmt = $conn->prepare("SELECT id, nome, tipo
-    FROM categorias
-    WHERE usuario_id = ?
-    ORDER BY tipo, nome
-");
-
+$stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
-
 $categoriasUsuario = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
 $stmt->close();
 
-$categoriasDespesa = array_filter(
-    $categoriasUsuario,
-    fn($c) => $c['tipo'] === 'despesa'
-);
+$categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
+$categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
 
-$categoriasReceita = array_filter(
-    $categoriasUsuario,
-    fn($c) => $c['tipo'] === 'receita'
-);
-
-// -----------------------------------------------------------------
-// DIAGNÓSTICO: criar-transacao.php agora manda um motivo específico
-// em ?erro=... quando a transação não é salva, em vez de um genérico
-// "dados_invalidos" que não dizia o que realmente falhou. Isso é
-// temporário só pra identificarmos a causa raiz do problema atual.
-// -----------------------------------------------------------------
-$mensagensErroTransacao = ['tipo_invalido'          => 'O tipo da transação (despesa/receita) não foi reconhecido.','descricao_vazia'        => 'A descrição não pode ficar em branco.','valor_invalido'         => 'O valor informado não foi reconhecido como um número válido. Valor recebido: "' . htmlspecialchars($_GET['valor_recebido'] ?? '') . '"','erro_conexao'           => 'Não foi possível conectar ao banco de dados.',
-    'erro_banco_categoria'   => 'Erro ao verificar a categoria no banco de dados.',
-    'erro_banco_insert'      => 'Erro ao preparar o salvamento da transação no banco de dados.',
-    'erro_execucao'          => 'Erro ao gravar a transação no banco de dados. Detalhe: ' . htmlspecialchars($_GET['detalhe'] ?? ''),
-    'dados_invalidos'        => 'Não foi possível salvar a transação. Verifique os dados e tente novamente.',
-];
-$erroTransacaoCodigo = $_GET['erro'] ?? '';
-$erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -178,11 +165,6 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
   </header>
 
   <section class="finance-overview">
-    <?php if ($erroTransacaoMsg): ?>
-      <div class="alert alert-danger" style="margin: 0 24px 16px;">
-        <strong>Falha ao salvar transação</strong> (<?= htmlspecialchars($erroTransacaoCodigo) ?>): <?= $erroTransacaoMsg ?>
-      </div>
-    <?php endif; ?>
     <div class="overview-header">
       <div class="overview-title-group">
         <h2>Olá, <?= htmlspecialchars($primeiroNome) ?>!</h2>
@@ -1135,8 +1117,8 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
           <i class="bi bi-clock-history"></i>
         </div>
         <div>
-          <h3>Todas as transações recentes</h3>
-          <p>Veja o histórico consolidado das últimas movimentações do FinMap.</p>
+          <h3>Todas as transações</h3>
+          <p>Histórico completo das movimentações do FinMap, da mais recente à mais antiga.</p>
         </div>
       </div>
 
@@ -1145,12 +1127,18 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
       </button>
     </div>
 
-    <div class="dashboard-popout__body">
-      <div class="all-transactions-list">
-        <?php if (empty($transacoes)): ?>
+    <div class="dashboard-popout__body" style="max-height: 70vh; overflow: hidden;">
+      <!--
+        CORRIGIDO: esse modal usava a mesma lista de só 5 itens do
+        dashboard ($transacoes). Agora usa $todasTransacoes (sem LIMIT
+        no banco) e tem scroll próprio (max-height + overflow-y: auto),
+        já que não dependemos do CSS externo pra garantir isso.
+      -->
+      <div class="all-transactions-list" style="max-height: 100%; overflow-y: auto; padding-right: 4px;">
+        <?php if (empty($todasTransacoes)): ?>
           <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
         <?php else: ?>
-          <?php foreach ($transacoes as $t): ?>
+          <?php foreach ($todasTransacoes as $t): ?>
             <?php $isReceita = $t['tipo'] === 'receita'; ?>
             <article class="transaction-item">
               <div class="transaction-item__left">
@@ -1568,10 +1556,8 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 
   if (refreshGoalsDashboardBtn) {
     refreshGoalsDashboardBtn.addEventListener("click", () => {
-      // As metas exibidas no dashboard sao carregadas do banco pelo PHP.
-      // Recarregar a pagina evita que o prototipo antigo do localStorage
-      // substitua os dados reais por metas estaticas.
-      window.location.reload();
+      renderDashboardGoals();
+      closeModal(goalsMenuModal);
     });
   }
 
@@ -1791,8 +1777,7 @@ $erroTransacaoMsg = $mensagensErroTransacao[$erroTransacaoCodigo] ?? null;
 
   window.addEventListener("storage", (e) => {
     if (e.key === "finmap_goals") {
-      // Mantem o dashboard sincronizado com as metas persistidas no banco.
-      window.location.reload();
+      renderDashboardGoals();
     }
   });
 
