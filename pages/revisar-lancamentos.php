@@ -54,6 +54,20 @@ $stmt->execute();
 $transacoesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+// -----------------------------------------------------------------
+// DEBUG TEMPORÁRIO: mostra na tela quantas linhas a consulta trouxe
+// e qual usuario_id foi usado, pra descobrirmos se é um problema de
+// usuario_id diferente entre páginas ou algo na consulta em si.
+// Remover depois de resolver.
+// -----------------------------------------------------------------
+$debugInfoRevisar = [
+    'usuario_id_usado' => $usuario_id,
+    'sessao_tem_usuario_id' => isset($_SESSION['usuario_id']) ? 'sim (' . $_SESSION['usuario_id'] . ')' : 'não (usando fallback 1)',
+    'linhas_retornadas_da_query' => count($transacoesResult),
+    'exemplo_primeira_linha' => $transacoesResult[0] ?? null,
+];
+
+
 // Metadados visuais por origem (ícone, cor, rótulo)
 // Adicionado "manual" à lista, já que agora ele aparece na fila também.
 $sourceMeta = [
@@ -147,6 +161,11 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
   </header>
 
   <main class="review-page">
+    <div style="margin: 16px; padding: 16px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap;">
+<strong>MODO DEBUG (temporário) — revisar-lancamentos.php</strong>
+<?= htmlspecialchars(print_r($debugInfoRevisar, true)) ?>
+    </div>
+
     <div class="back-navigation">
       <a href="dashboard.php" class="back-btn">
         <i class="bi bi-chevron-left"></i>
@@ -684,11 +703,20 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       unlockBody();
     }
 
+    // -----------------------------------------------------------------
+    // CORRIGIDO: "ocultar_aprovados" estava escondendo TODOS os itens
+    // com status "approved" — incluindo os manuais, que sempre entram
+    // já aprovados por definição (não passam por fila de validação).
+    // Resultado: assim que a página carregava, a regra (ativada por
+    // padrão) escondia todo cadastro manual, deixando a fila vazia.
+    // Agora essa regra só se aplica a itens que não são manuais — os
+    // manuais aparecem sempre, independente dessa configuração.
+    // -----------------------------------------------------------------
     function getFilteredLaunches() {
-      let launches = state.launches.filter(item => item.status === "pending" || !state.hideApproved);
+      let launches = state.launches;
 
       if (state.hideApproved) {
-        launches = launches.filter(item => item.status === "pending");
+        launches = launches.filter(item => item.status === "pending" || item.source === "manual");
       }
 
       if (state.filter !== "all") {
