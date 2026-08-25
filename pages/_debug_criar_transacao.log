@@ -58,3 +58,26 @@
 [2026-08-25 02:22:15] Valores lidos: tipo=receita | descricao='freelance' | valor_bruto='R$ 600,00' | valor_convertido=600 | categoriaIdRaw='7' | categoriaId=7 | data=2026-08-25
 [2026-08-25 02:22:15] Categoria 7 confirmada para usuário 2 e tipo 'receita'.
 [2026-08-25 02:22:15] SUCESSO: transação inserida com id 22 (tipo=receita, categoria_id=7)
+[2026-08-25 02:42:14] --- nova requisição ---
+  'tipo' => 'despesa',
+  'descricao' => 'bermuda',
+  'valor' => 'R$ 30,00',
+  'categoria_id_despesa' => '17',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:42:14] Valores lidos: tipo=despesa | descricao='bermuda' | valor_bruto='R$ 30,00' | valor_convertido=30 | categoriaIdRaw='17' | categoriaId=17 | data=2026-08-25
+[2026-08-25 02:42:14] Categoria 17 confirmada para usuário 5 e tipo 'despesa'.
+[2026-08-25 02:42:14] SUCESSO: transação inserida com id 7 (tipo=despesa, categoria_id=17)
+[2026-08-25 02:50:22] --- nova requisição ---
+[2026-08-25 02:50:22] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'camisa',
+  'valor' => 'R$ 40,00',
+  'categoria_id_despesa' => '17',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:50:22] Valores lidos: tipo=despesa | descricao='camisa' | valor_bruto='R$ 40,00' | valor_convertido=40 | categoriaIdRaw='17' | categoriaId=17 | data=2026-08-25
+[2026-08-25 02:50:22] Categoria 17 confirmada para usuário 5 e tipo 'despesa'.
+[2026-08-25 02:50:22] SUCESSO: transação inserida com id 8 (tipo=despesa, categoria_id=17)
