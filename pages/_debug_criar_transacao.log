@@ -1,0 +1,60 @@
+[2026-08-25 02:13:54] --- nova requisição ---
+[2026-08-25 02:13:54] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'nvidia 2060 Ti',
+  'valor' => 'R$ 1.800,00',
+  'categoria_id_despesa' => '12',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:13:54] Valores lidos: tipo=despesa | descricao='nvidia 2060 Ti' | valor_bruto='R$ 1.800,00' | valor_convertido=1800 | categoriaIdRaw='12' | categoriaId=12 | data=2026-08-25
+[2026-08-25 02:13:54] Categoria 12 confirmada para usuário 2 e tipo 'despesa'.
+[2026-08-25 02:13:54] SUCESSO: transação inserida com id 18 (tipo=despesa, categoria_id=12)
+[2026-08-25 02:14:56] --- nova requisição ---
+[2026-08-25 02:14:56] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'freelance',
+  'valor' => 'R$ 1.000,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '7',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:14:56] Valores lidos: tipo=receita | descricao='freelance' | valor_bruto='R$ 1.000,00' | valor_convertido=1000 | categoriaIdRaw='7' | categoriaId=7 | data=2026-08-25
+[2026-08-25 02:14:56] Categoria 7 confirmada para usuário 2 e tipo 'receita'.
+[2026-08-25 02:14:56] SUCESSO: transação inserida com id 19 (tipo=receita, categoria_id=7)
+[2026-08-25 02:18:00] --- nova requisição ---
+[2026-08-25 02:18:00] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'nike air force',
+  'valor' => 'R$ 700,00',
+  'categoria_id_despesa' => '12',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:18:00] Valores lidos: tipo=despesa | descricao='nike air force' | valor_bruto='R$ 700,00' | valor_convertido=700 | categoriaIdRaw='12' | categoriaId=12 | data=2026-08-25
+[2026-08-25 02:18:00] Categoria 12 confirmada para usuário 2 e tipo 'despesa'.
+[2026-08-25 02:18:00] SUCESSO: transação inserida com id 20 (tipo=despesa, categoria_id=12)
+[2026-08-25 02:22:01] --- nova requisição ---
+[2026-08-25 02:22:01] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'camisa polo',
+  'valor' => 'R$ 500,00',
+  'categoria_id_despesa' => '12',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:22:01] Valores lidos: tipo=despesa | descricao='camisa polo' | valor_bruto='R$ 500,00' | valor_convertido=500 | categoriaIdRaw='12' | categoriaId=12 | data=2026-08-25
+[2026-08-25 02:22:01] Categoria 12 confirmada para usuário 2 e tipo 'despesa'.
+[2026-08-25 02:22:01] SUCESSO: transação inserida com id 21 (tipo=despesa, categoria_id=12)
+[2026-08-25 02:22:15] --- nova requisição ---
+[2026-08-25 02:22:15] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'freelance',
+  'valor' => 'R$ 600,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '7',
+  'data_transacao' => '2026-08-25',
+)
+[2026-08-25 02:22:15] Valores lidos: tipo=receita | descricao='freelance' | valor_bruto='R$ 600,00' | valor_convertido=600 | categoriaIdRaw='7' | categoriaId=7 | data=2026-08-25
+[2026-08-25 02:22:15] Categoria 7 confirmada para usuário 2 e tipo 'receita'.
+[2026-08-25 02:22:15] SUCESSO: transação inserida com id 22 (tipo=receita, categoria_id=7)
