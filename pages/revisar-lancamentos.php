@@ -35,14 +35,19 @@ if (!$regras) {
     ];
 }
 
-// --- Todos os lançamentos aguardando revisão, inclusive os manuais ---
+// --- Lançamentos capturados/cadastrados ---
+// CORRIGIDO: antes essa consulta tinha "AND t.origem != 'manual'",
+// deixando de fora tudo que era cadastrado manualmente pelo dashboard.
+// O usuário pediu explicitamente que os cadastros manuais também
+// apareçam aqui, então removemos esse filtro — agora a fila mostra
+// TODAS as origens (manual, ocr, sms, importação).
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.origem, t.status, t.confianca_percentual,
            t.observacao_captura, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ?
-    ORDER BY t.data_transacao DESC
+    ORDER BY t.data_transacao DESC, t.id DESC
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -50,8 +55,9 @@ $transacoesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 // Metadados visuais por origem (ícone, cor, rótulo)
+// Adicionado "manual" à lista, já que agora ele aparece na fila também.
 $sourceMeta = [
-    'manual'     => ['label' => 'Manual', 'badge' => 'green', 'icon' => 'pencil-square', 'padrao' => 'Lançamento informado manualmente'],
+    'manual'     => ['label' => 'Manual', 'badge' => 'green', 'icon' => 'pencil-square', 'padrao' => 'Cadastrado manualmente'],
     'ocr'        => ['label' => 'OCR', 'badge' => 'purple', 'icon' => 'receipt-cutoff', 'padrao' => 'Capturado de nota fiscal'],
     'sms'        => ['label' => 'SMS', 'badge' => 'green', 'icon' => 'chat-square-text', 'padrao' => 'Mensagem bancária'],
     'importacao' => ['label' => 'Importação', 'badge' => 'blue', 'icon' => 'file-earmark-arrow-up', 'padrao' => 'Arquivo importado']
@@ -69,7 +75,7 @@ foreach ($transacoesResult as $t) {
         'source' => $t['origem'],
         'sourceLabel' => $sourceMeta[$t['origem']]['label'] ?? ucfirst($t['origem']),
         'category' => $t['categoria_nome'] ?? 'Sem categoria',
-        'confidence' => $t['origem'] === 'manual' ? 100 : ($t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 0),
+        'confidence' => $t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 100,
         'status' => $statusMap[$t['status']] ?? 'pending',
         'note' => $t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''),
         'date' => date('d/m/Y', strtotime($t['data_transacao']))
@@ -77,6 +83,7 @@ foreach ($transacoesResult as $t) {
 }
 
 // --- Contadores de hoje (aprovados/rejeitados) ---
+// Também sem o filtro de origem, pra contar tudo.
 $stmt = $conn->prepare("
     SELECT
         SUM(CASE WHEN status = 'aprovado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS aprovados_hoje,
@@ -151,7 +158,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       <section class="review-header-minimal">
         <div class="review-header-minimal__content">
           <h2>Revisar lançamentos</h2>
-          <p>Valide capturas automáticas vindas de OCR, SMS ou importação.</p>
+          <p>Valide cadastros manuais e capturas automáticas vindas de OCR, SMS ou importação.</p>
         </div>
 
         <div class="review-header-minimal__actions">
@@ -171,14 +178,14 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         <div class="review-panel__header">
           <div>
             <h3>Fila de revisão</h3>
-            <p>Valide, edite ou descarte cada lançamento detectado pelo sistema.</p>
+            <p>Valide, edite ou descarte cada lançamento registrado no FinMap.</p>
           </div>
 
           <div class="review-panel__actions">
             <button class="filter-chip active" type="button" data-filter="all">Todos</button>
+            <button class="filter-chip" type="button" data-filter="manual">Manual</button>
             <button class="filter-chip" type="button" data-filter="ocr">OCR</button>
             <button class="filter-chip" type="button" data-filter="sms">SMS</button>
-            <button class="filter-chip" type="button" data-filter="manual">Manual</button>
             <button class="filter-chip" type="button" data-filter="importacao">Importação</button>
           </div>
         </div>
@@ -186,7 +193,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         <div class="review-list" id="reviewList">
           <?php if (empty($launches)): ?>
             <p style="padding: 24px 0; color: #888;">
-              Nenhum lançamento para revisar encontrado ainda.
+              Nenhum lançamento encontrado ainda.
             </p>
           <?php else: ?>
             <?php foreach ($launches as $l):
@@ -239,15 +246,21 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
                       Editar
                     </button>
 
-                    <button class="item-action-btn item-action-btn--danger" type="button" data-reject="<?= $l['id'] ?>">
-                      <i class="bi bi-x-circle"></i>
-                      Rejeitar
-                    </button>
+                    <?php if ($l['status'] === 'pending'): ?>
+                      <button class="item-action-btn item-action-btn--danger" type="button" data-reject="<?= $l['id'] ?>">
+                        <i class="bi bi-x-circle"></i>
+                        Rejeitar
+                      </button>
 
-                    <button class="item-action-btn item-action-btn--success" type="button" data-approve="<?= $l['id'] ?>">
-                      <i class="bi bi-check-circle"></i>
-                      Aprovar
-                    </button>
+                      <button class="item-action-btn item-action-btn--success" type="button" data-approve="<?= $l['id'] ?>">
+                        <i class="bi bi-check-circle"></i>
+                        Aprovar
+                      </button>
+                    <?php else: ?>
+                      <span class="review-badge review-badge--<?= $l['status'] === 'approved' ? 'green' : 'red' ?>">
+                        <?= $l['status'] === 'approved' ? 'Já aprovado' : 'Rejeitado' ?>
+                      </span>
+                    <?php endif; ?>
                   </div>
                 </div>
               </article>
@@ -761,9 +774,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       openReviewModal("editModal");
     }
 
-    // ATENÇÃO: as 3 funções abaixo (approveLaunch, rejectLaunch,
-    // approveSelected) agora chamam o endpoint revisar-acao.php pra
-    // gravar a mudança de status no banco de verdade.
     async function enviarAcao(payload) {
       try {
         const response = await fetch("revisar-acao.php", {
@@ -894,7 +904,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       });
     });
 
-    // ATENÇÃO: salvar edição agora persiste no banco via revisar-acao.php
     const saveEditBtn = document.getElementById("saveEditBtn");
     if (saveEditBtn) {
       saveEditBtn.addEventListener("click", async () => {
@@ -922,7 +931,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         launch.amount = novoValor;
         launch.category = novaCategoria;
 
-        // Atualiza o card na tela também (o protótipo original não fazia isso)
         const item = document.querySelector(`.review-item[data-id="${launch.id}"]`);
         if (item) {
           const titleEl = item.querySelector(".review-item__title-row h4");
@@ -936,8 +944,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       });
     }
 
-    // ATENÇÃO: salvar regras agora persiste no banco via
-    // atualizar-regras-revisao.php
     const saveRulesBtn = document.getElementById("saveRulesBtn");
     if (saveRulesBtn) {
       saveRulesBtn.addEventListener("click", async () => {
