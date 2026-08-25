@@ -59,6 +59,7 @@
 [2026-08-25 02:22:15] Categoria 7 confirmada para usuário 2 e tipo 'receita'.
 [2026-08-25 02:22:15] SUCESSO: transação inserida com id 22 (tipo=receita, categoria_id=7)
 [2026-08-25 02:42:14] --- nova requisição ---
+[2026-08-25 02:42:14] POST bruto: array (
   'tipo' => 'despesa',
   'descricao' => 'bermuda',
   'valor' => 'R$ 30,00',
