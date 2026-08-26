@@ -1,12 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
-
-// ==========================================================
-// TEMPORÁRIO: login ainda não está conectado ao banco.
-// QUANDO O LOGIN ESTIVER PRONTO: apague o bloco "if" abaixo e
-// deixe só a checagem normal de sessão.
-// ==========================================================
+require_once __DIR__ . '/../config/conn.php'; 
 if (!isset($_SESSION['usuario_id'])) {
     $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
     $resultadoTeste = $conn->query($sqlTeste);
@@ -23,21 +17,17 @@ $usuario_id = (int)$_SESSION['usuario_id'];
 
 function parseBRLParaFloat(string $valor): float
 {
-    // \s no PHP não pega espaço "não separável" (U+00A0), então
-    // removemos explicitamente qualquer caractere de espaço Unicode
-    // antes de continuar a limpeza normal.
+   
     $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor);
     $limpo = str_replace('R$', '', $limpo);
-    $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
-    $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
+    $limpo = str_replace('.', '', $limpo);   
+    $limpo = str_replace(',', '.', $limpo); 
     return (float) $limpo;
 }
 
 $cenariosValidos = ['base', 'cauteloso', 'pressionado'];
 
-// -----------------------------------------------------------------
-// PROCESSAMENTO DAS AÇÕES (POST) — sem AJAX, tudo formulário normal
-// -----------------------------------------------------------------
+
 $erroRenda = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
@@ -50,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         if ($novaRenda <= 0) {
             $erroRenda = 'Valor de renda inválido: "' . htmlspecialchars($_POST['renda'] ?? '') . '" não foi reconhecido como um número.';
         } else {
-            // Só atualiza se já existir configuração de renda (criada em config-renda.php).
+            
             $sqlCheck = "SELECT id FROM configuracoes_renda WHERE usuario_id = ?";
             $stmtCheck = $conn->prepare($sqlCheck);
             $stmtCheck->bind_param("i", $usuario_id);
@@ -69,12 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
                 $stmtUpdate->close();
 
                 if ($linhasAfetadas === 0) {
-                    // affected_rows = 0 pode significar "nenhuma linha bateu com o WHERE"
-                    // OU "bateu, mas o valor já era exatamente esse" (MySQL não conta
-                    // UPDATE que não muda nada). Não é necessariamente um erro.
+                    
                     $erroRenda = 'Nenhuma linha foi alterada no banco (o valor já era esse, ou o usuario_id não bateu com nenhuma linha).';
                 } else {
-                    // Sucesso: segue o fluxo normal (redireciona)
                     header('Location: orcamento-mensal.php');
                     exit;
                 }
@@ -112,8 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     }
 
     if ($acao === 'atualizar_categorias') {
-        $categoriasAtivas = $_POST['categoria_ativa'] ?? []; // array de ids marcados
-
+        $categoriasAtivas = $_POST['categoria_ativa'] ?? []; 
         $sqlTodas = "SELECT id FROM categorias WHERE usuario_id = ? AND tipo = 'despesa'";
         $stmtTodas = $conn->prepare($sqlTodas);
         $stmtTodas->bind_param("i", $usuario_id);
@@ -139,9 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     }
 }
 
-// -----------------------------------------------------------------
-// Busca renda mensal
-// -----------------------------------------------------------------
+
 $sqlRenda = "SELECT renda_mensal FROM configuracoes_renda WHERE usuario_id = ?";
 $stmtRenda = $conn->prepare($sqlRenda);
 $stmtRenda->bind_param("i", $usuario_id);
@@ -150,9 +134,7 @@ $rendaRow = $stmtRenda->get_result()->fetch_assoc();
 $stmtRenda->close();
 $renda = $rendaRow ? (float)$rendaRow['renda_mensal'] : 0.0;
 
-// -----------------------------------------------------------------
-// Busca configuração do orçamento (faixas e cenário)
-// -----------------------------------------------------------------
+
 $sqlConfig = "SELECT faixa_ideal_percentual, faixa_alerta_percentual, cenario_selecionado
               FROM orcamento_configuracao WHERE usuario_id = ?";
 $stmtConfig = $conn->prepare($sqlConfig);
@@ -165,9 +147,7 @@ $faixaIdeal = $config['faixa_ideal_percentual'] ?? 70;
 $faixaAlerta = $config['faixa_alerta_percentual'] ?? 85;
 $cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
-// -----------------------------------------------------------------
-// Busca categorias de despesa
-// -----------------------------------------------------------------
+
 $sqlCategorias = "SELECT id, nome, icone, cor, ativo_no_orcamento, valor_base_orcamento
                   FROM categorias
                   WHERE usuario_id = ? AND tipo = 'despesa'
@@ -178,11 +158,7 @@ $stmtCategorias->execute();
 $categorias = $stmtCategorias->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmtCategorias->close();
 
-// -----------------------------------------------------------------
-// Multiplicadores por cenário (mesma lógica do protótipo original,
-// mapeada pelo NOME da categoria já que o schema não guarda um
-// multiplicador por categoria/cenário)
-// -----------------------------------------------------------------
+
 $mapaCategoriaParaChave = [
     'Moradia'              => 'housing',
     'Alimentação'          => 'food',
@@ -336,7 +312,7 @@ function brl(float $valor): string
         <article class="budget-hero-card">
           <?php if ($erroRenda): ?>
             <div class="alert alert-danger py-2 mb-3">
-              <?= $erroRenda /* já veio com htmlspecialchars aplicado onde necessário */ ?>
+              <?= $erroRenda  ?>
             </div>
           <?php endif; ?>
 
@@ -948,12 +924,7 @@ function brl(float $valor): string
       });
     });
 
-    // Formatação de moeda no campo de renda (só visual — o valor é
-    // convertido de volta pro PHP no envio do form).
-    // Usamos uma função manual em vez de toLocaleString porque o
-    // toLocaleString("pt-BR", {style:"currency"}) costuma inserir um
-    // espaço "não separável" (U+00A0) entre "R$" e o número, que o
-    // PHP não reconhece como espaço normal ao converter de volta.
+    
     function formatCurrencyInput(value) {
       const digits = String(value || "").replace(/\D/g, "");
       if (!digits) return "R$ 0,00";

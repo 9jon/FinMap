@@ -9,12 +9,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $usuario_id = (int)$_SESSION['usuario_id'];
 
-// -----------------------------------------------------------------
-// PROCESSAMENTO DAS AÇÕES (POST)
-// Em vez de AJAX, cada botão manda um <form method="post"> pra essa
-// mesma página. Depois de processar, redirecionamos pra ela mesma
-// (padrão Post/Redirect/Get) pra evitar reenvio ao atualizar a página.
-// -----------------------------------------------------------------
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 
     $acao = $_POST['acao'];
@@ -89,9 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     exit;
 }
 
-// -----------------------------------------------------------------
-// Funções auxiliares (ENUM do banco -> classes CSS/JS do protótipo)
-// -----------------------------------------------------------------
 function severidadeParaClasse(string $severidade): string
 {
     return match ($severidade) {
@@ -112,9 +104,7 @@ function severidadeParaLabel(string $severidade): string
     };
 }
 
-// -----------------------------------------------------------------
-// Busca os alertas do usuário
-// -----------------------------------------------------------------
+
 $sql = "SELECT id, titulo, descricao, severidade, impacto_estimado, horizonte, lido, criado_em
         FROM alertas_preditivos
         WHERE usuario_id = ?
@@ -131,9 +121,7 @@ while ($linha = $resultado->fetch_assoc()) {
 }
 $stmt->close();
 
-// -----------------------------------------------------------------
-// Busca a configuração de sensibilidade do usuário
-// -----------------------------------------------------------------
+
 $sqlConfig = "SELECT alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade
               FROM alertas_configuracao WHERE usuario_id = ?";
 $stmtConfig = $conn->prepare($sqlConfig);
@@ -146,11 +134,6 @@ $sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
 $alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
 $alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
 
-// -----------------------------------------------------------------
-// Array pro JS usar só pra exibição (detalhes, cálculo de resumo,
-// preview da simulação). Nenhuma ação grava usando esse array —
-// quem grava é sempre o PHP no topo da página, via POST normal.
-// -----------------------------------------------------------------
 $alertasParaJs = array_map(function ($a) {
     return [
         'id'            => (int)$a['id'],
@@ -503,7 +486,7 @@ $alertasParaJs = array_map(function ($a) {
     </div>
   </div>
 
-  <!-- MODAL CONFIGURAÇÕES: também um <form method="post"> normal -->
+  <!-- MODAL CONFIGURAÇÕES: também um <form method="post"> normal (por enquanto) -->
   <div class="alert-modal-overlay" id="settingsModalPred">
     <div class="alert-modal alert-modal--medium">
       <div class="alert-modal__header">
@@ -664,9 +647,6 @@ $alertasParaJs = array_map(function ($a) {
   <script>
     const body = document.body;
 
-    // Só pra exibição: detalhes do modal e cálculo de resumo/preview.
-    // Nenhuma ação de gravação passa por aqui — isso é feito pelos
-    // <form method="post"> que já existem no HTML acima.
     const alerts = <?= json_encode($alertasParaJs, JSON_UNESCAPED_UNICODE) ?>;
 
     function formatBRL(value) {
@@ -725,7 +705,6 @@ $alertasParaJs = array_map(function ($a) {
       unlockBody();
     }
 
-    // Filtro visual (só esconde/mostra cards já renderizados pelo PHP)
     document.querySelectorAll(".filter-chip").forEach((button) => {
       button.addEventListener("click", () => {
         const filtro = button.getAttribute("data-filter");
@@ -830,7 +809,6 @@ $alertasParaJs = array_map(function ($a) {
       }
     });
 
-    // Resumo (Risco atual, Não vistos, Leitura rápida, Sensibilidade)
     (function atualizarResumo() {
       const unread = alerts.filter(a => !a.read).length;
       const highRisk = alerts.filter(a => a.severity === "high").length;

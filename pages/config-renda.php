@@ -1,17 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
-
-// ==========================================================
-// TEMPORÁRIO: login ainda não está conectado ao banco.
-// Enquanto isso, usamos automaticamente o usuário de exemplo
-// (João Dias) já inserido no seed, só pra dar pra testar essa
-// tela sem passar pelo login.
-//
-// QUANDO O LOGIN ESTIVER PRONTO: apague o bloco "if" logo
-// abaixo e deixe só a checagem normal de sessão (redirecionar
-// pra login.php se não tiver $_SESSION['usuario_id']).
-// ==========================================================
+require_once __DIR__ . '/../config/conn.php'; 
 if (!isset($_SESSION['usuario_id'])) {
     $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
     $resultadoTeste = $conn->query($sqlTeste);
@@ -27,14 +16,11 @@ if (!isset($_SESSION['usuario_id'])) {
 $usuario_id = (int)$_SESSION['usuario_id'];
 $erro = '';
 
-// -----------------------------------------------------------------
-// Converte "R$ 1.234,56" -> 1234.56 (mesma lógica do parseBRL do JS)
-// -----------------------------------------------------------------
 function parseBRLParaFloat(string $valor): float
 {
     $limpo = str_replace(['R$', ' '], '', $valor);
-    $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
-    $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
+    $limpo = str_replace('.', '', $limpo);   
+    $limpo = str_replace(',', '.', $limpo); 
     return (float) $limpo;
 }
 
@@ -42,9 +28,7 @@ $tiposVinculoValidos = ['clt', 'pj', 'autonomo', 'freelancer', 'empresario', 'se
 $tiposRecebimentoValidos = ['fixa', 'variavel'];
 $origensExtraValidas = ['freelance', 'comissoes', 'investimentos', 'vendas', 'aluguel', 'prestacao-servico', 'outro'];
 
-// -----------------------------------------------------------------
-// PROCESSAMENTO DO FORMULÁRIO (POST)
-// -----------------------------------------------------------------
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $rendaMensal = parseBRLParaFloat($_POST['rendaMensal'] ?? '');
@@ -56,7 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $valorRendaExtra = parseBRLParaFloat($_POST['valorExtra'] ?? '');
     $origemRendaExtra = $_POST['origemExtra'] ?? '';
 
-    // Validação server-side (a do JS é só conforto, essa é a que vale)
     if ($rendaMensal <= 0) {
         $erro = 'Informe sua renda principal mensal.';
     } elseif (!in_array($tipoVinculo, $tiposVinculoValidos, true)) {
@@ -107,13 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         $stmt->close();
 
-        // -----------------------------------------------------------------
-        // CORRIGIDO: o "saldo que você tem na conta neste momento" era
-        // salvo só em configuracoes_renda.saldo_inicial, mas o dashboard
-        // exibe o saldo de usuarios.saldo_total — colunas diferentes que
-        // nunca se comunicavam. Por isso o saldo total nunca mudava
-        // depois de configurar a renda. Agora sincronizamos os dois.
-        // -----------------------------------------------------------------
         $stmtSaldo = $conn->prepare("UPDATE usuarios SET saldo_total = ? WHERE id = ?");
         $stmtSaldo->bind_param("di", $saldoInicial, $usuario_id);
         $stmtSaldo->execute();
@@ -124,11 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// -----------------------------------------------------------------
-// Busca configuração já salva (pra preencher o formulário)
-// Se veio de um POST com erro, usamos o que a pessoa acabou de
-// digitar em vez do que já está no banco.
-// -----------------------------------------------------------------
+
 $configuracaoExistente = null;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -146,8 +118,7 @@ function formatarBRL(?float $valor): string
     return 'R$ ' . number_format($valor, 2, ',', '.');
 }
 
-// Valores para preencher o formulário: prioriza o que veio no POST
-// com erro, senão usa o que já está salvo no banco, senão vazio.
+
 $vRendaMensal      = $_POST['rendaMensal']      ?? formatarBRL(isset($configuracaoExistente['renda_mensal']) ? (float)$configuracaoExistente['renda_mensal'] : null);
 $vTipoVinculo      = $_POST['tipoRenda']         ?? ($configuracaoExistente['tipo_vinculo'] ?? '');
 $vTipoRecebimento  = $_POST['tipoRecebimento']   ?? ($configuracaoExistente['tipo_recebimento'] ?? '');
@@ -157,7 +128,7 @@ $vRendaExtra       = $_POST['rendaExtra']         ?? (isset($configuracaoExisten
 $vValorExtra       = $_POST['valorExtra']         ?? formatarBRL(isset($configuracaoExistente['valor_renda_extra']) ? (float)$configuracaoExistente['valor_renda_extra'] : null);
 $vOrigemExtra      = $_POST['origemExtra']        ?? ($configuracaoExistente['origem_renda_extra'] ?? '');
 
-// Rótulos de exibição pros dropdowns customizados
+
 $labelsVinculo = [
     'clt' => 'CLT', 'pj' => 'PJ', 'autonomo' => 'Autônomo', 'freelancer' => 'Freelancer',
     'empresario' => 'Empresário', 'servidor-publico' => 'Servidor público', 'outro' => 'Outro',
@@ -427,12 +398,6 @@ $labelsOrigemExtra = [
       });
     });
 
-    // -----------------------------------------------------------
-    // Validação client-side (só conforto pro usuário — quem garante
-    // os dados de verdade é a validação em PHP no topo da página).
-    // Repare que NÃO fazemos e.preventDefault() no caso de sucesso:
-    // deixamos o navegador enviar o formulário normalmente via POST.
-    // -----------------------------------------------------------
     document.getElementById("rendaForm").addEventListener("submit", function (e) {
       const rendaMensal = document.getElementById("rendaMensal").value.trim();
       const tipoRenda = document.getElementById("tipoRenda").value.trim();
@@ -494,8 +459,7 @@ $labelsOrigemExtra = [
         }
       }
 
-      // Se chegou até aqui, está tudo certo: o form segue seu envio
-      // normal (POST) sem precisarmos fazer mais nada aqui.
+     
     });
   </script>
 

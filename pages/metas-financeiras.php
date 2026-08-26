@@ -1,17 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
-
-// ==========================================================
-// TEMPORÁRIO: login ainda não está conectado ao banco.
-// Enquanto isso, usamos automaticamente o usuário de exemplo
-// (João Dias) já inserido no seed, só pra dar pra testar essa
-// tela sem passar pelo login.
-//
-// QUANDO O LOGIN ESTIVER PRONTO: apague o bloco "if" abaixo e
-// deixe só a checagem normal de sessão (redirecionar pra
-// login.php se não tiver $_SESSION['usuario_id']).
-// ==========================================================
+require_once __DIR__ . '/../config/conn.php'; 
 if (!isset($_SESSION['usuario_id'])) {
     $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
     $resultadoTeste = $conn->query($sqlTeste);
@@ -29,11 +18,7 @@ $usuario_id = (int)$_SESSION['usuario_id'];
 $coresValidas = ['green', 'blue', 'orange', 'purple'];
 $iconesValidos = ['shield-check', 'airplane', 'car-front', 'house-door', 'mortarboard', 'heart-pulse', 'gift', 'stars'];
 
-// -----------------------------------------------------------------
-// PROCESSAMENTO DAS AÇÕES (POST) — tudo via formulário normal,
-// sem AJAX. Depois de cada ação, redirecionamos pra própria página
-// (padrão Post/Redirect/Get).
-// -----------------------------------------------------------------
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 
     $acao = $_POST['acao'];
@@ -48,7 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         if (!in_array($icone, $iconesValidos, true)) $icone = 'shield-check';
         if (!in_array($cor, $coresValidas, true)) $cor = 'green';
 
-        // Não deixa guardar mais do que o valor total da meta
         if ($valorGuardado > $valorMeta) {
             $valorGuardado = $valorMeta;
         }
@@ -93,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         $valorAdicionar = (float)str_replace(',', '.', $_POST['valor_adicionar'] ?? 0);
 
         if ($metaId > 0 && $valorAdicionar > 0) {
-            // Confirma que a meta é do usuário logado e pega os valores atuais
             $sqlBusca = "SELECT valor_meta, valor_guardado FROM metas_financeiras WHERE id = ? AND usuario_id = ?";
             $stmtBusca = $conn->prepare($sqlBusca);
             $stmtBusca->bind_param("ii", $metaId, $usuario_id);
@@ -114,7 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
                 $stmtUpdate->execute();
                 $stmtUpdate->close();
 
-                // Registra o aporte no histórico (metas_progresso)
                 if ($valorRealmenteAdicionado > 0) {
                     $sqlHistorico = "INSERT INTO metas_progresso (meta_id, valor_adicionado) VALUES (?, ?)";
                     $stmtHistorico = $conn->prepare($sqlHistorico);
@@ -130,9 +112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     exit;
 }
 
-// -----------------------------------------------------------------
-// Busca as metas do usuário
-// -----------------------------------------------------------------
 $sql = "SELECT id, nome, valor_meta, valor_guardado, icone, cor
         FROM metas_financeiras
         WHERE usuario_id = ?
@@ -148,9 +127,7 @@ while ($linha = $resultado->fetch_assoc()) {
 }
 $stmt->close();
 
-// -----------------------------------------------------------------
-// Resumo (total de metas, total guardado, progresso médio)
-// -----------------------------------------------------------------
+
 function calcularPercentual(float $guardado, float $meta): float
 {
     if ($meta <= 0) return 0;
@@ -370,7 +347,6 @@ function brl(float $valor): string
     </section>
   </main>
 
-  <!-- MODAL CRIAR/EDITAR META: um único form, o campo "acao" muda via JS -->
   <div class="goal-modal-overlay" id="goalModal">
     <div class="goal-modal">
       <div class="goal-modal__header">
@@ -449,7 +425,6 @@ function brl(float $valor): string
     </div>
   </div>
 
-  <!-- MODAL ADICIONAR VALOR: form próprio -->
   <div class="goal-modal-overlay" id="progressModal">
     <div class="goal-modal goal-modal--small">
       <div class="goal-modal__header">
@@ -690,7 +665,6 @@ function brl(float $valor): string
       openModal("goalModal");
     });
 
-    // Preenche o form de edição a partir dos data-* renderizados pelo PHP em cada card
     document.querySelectorAll("[data-edit-goal]").forEach((button) => {
       button.addEventListener("click", () => {
         document.getElementById("goalModalTitle").textContent = "Editar meta";

@@ -1,6 +1,4 @@
 <?php
-// pages/atualizar-regras-revisao.php
-// Salva as regras de revisão (priorizar OCR, ocultar aprovados, limite de confiança)
 
 session_start();
 include '../config/conn.php';

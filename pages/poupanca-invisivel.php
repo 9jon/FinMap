@@ -740,9 +740,7 @@ $baseValues = [
       openCategoriesModal: "categoriesModal"
     };
 
-    // ATENÇÃO: esses valores agora vêm do banco (via PHP), não são mais
-    // fixos no JavaScript. O PHP lá em cima monta esse objeto com
-    // json_encode() usando os dados reais da tabela poupanca_oportunidades.
+
     const baseValues = <?= json_encode($baseValues) ?>;
 
     const scenarios = {
@@ -769,9 +767,6 @@ $baseValues = [
       }
     };
 
-    // ATENÇÃO: o estado inicial (cenário e categorias ativas) também
-    // vem do banco agora, em vez de sempre começar em "equilibrado"
-    // com tudo ligado.
     const state = {
       scenario: "<?= htmlspecialchars($config['cenario_selecionado']) ?>",
       enabled: {
@@ -949,10 +944,6 @@ $baseValues = [
       updateToggles();
     }
 
-    // ATENÇÃO: essa função é NOVA — salva a configuração atual (cenário
-    // e categorias ativas) no banco, via AJAX, toda vez que o usuário
-    // muda alguma coisa. Assim, da próxima vez que ele abrir essa tela,
-    // continua do jeito que deixou.
     async function salvarConfiguracao() {
       try {
         await fetch("atualizar-poupanca-config.php", {

@@ -1,6 +1,5 @@
 <?php
-// pages/buscar-gastos-categoria.php
-// Retorna via GET os gastos agrupados por categoria, filtrados por período.
+
 
 session_start();
 include '../config/conn.php';
@@ -26,7 +25,7 @@ switch ($periodo) {
     case 'last-3-months':
         $condicaoData = "t.data_transacao >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)";
         break;
-    default: // this-month
+    default: 
         $condicaoData = "MONTH(t.data_transacao) = MONTH(CURDATE())
                           AND YEAR(t.data_transacao) = YEAR(CURDATE())";
         break;

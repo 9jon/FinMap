@@ -1,6 +1,5 @@
 <?php
-// pages/atualizar-poupanca-config.php
-// Recebe o cenário e as categorias ativas via fetch() e salva no banco.
+
 
 session_start();
 include '../config/conn.php';
@@ -31,8 +30,6 @@ $considerarImpulso = !empty($dados['considerar_impulso']) ? 1 : 0;
 $considerarAssinatura = !empty($dados['considerar_assinatura']) ? 1 : 0;
 $considerarTransporte = !empty($dados['considerar_transporte']) ? 1 : 0;
 
-// Como usuario_id é UNIQUE em poupanca_configuracao, usamos
-// "ON DUPLICATE KEY UPDATE" pra criar se não existir, ou atualizar se já existir.
 $stmt = $conn->prepare("
     INSERT INTO poupanca_configuracao
         (usuario_id, considerar_cafe, considerar_impulso, considerar_assinatura, considerar_transporte, cenario_selecionado)

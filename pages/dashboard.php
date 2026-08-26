@@ -3,10 +3,10 @@
 session_start();
 include '../config/conn.php';
 
-// Por enquanto fixo, até o login gravar isso na sessão de verdade
+
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
-// --- Dados do usuário (nome, iniciais, saldo) ---
+
 $stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -17,7 +17,7 @@ $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = $usuario['saldo_total'] ?? 0;
 
-// --- Receitas do mês atual ---
+
 $stmt = $conn->prepare("
     SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
@@ -29,7 +29,7 @@ $stmt->execute();
 $receitasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
-// --- Despesas do mês atual ---
+
 $stmt = $conn->prepare("
     SELECT COALESCE(SUM(valor), 0) AS total
     FROM transacoes
@@ -41,9 +41,7 @@ $stmt->execute();
 $despesasMes = $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
-// --- Últimas 5 transações aprovadas ---
-// ORDER BY data DESC + id DESC garante que, entre transações com a
-// mesma data, a mais recentemente cadastrada aparece primeiro.
+
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
@@ -57,9 +55,7 @@ $stmt->execute();
 $transacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// --- Todas as transações aprovadas (para o modal "Ver todas") ---
-// Sem LIMIT aqui de propósito: esse array alimenta o modal "Ver todas",
-// que precisa mostrar o histórico completo, com scroll.
+
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
@@ -72,7 +68,7 @@ $stmt->execute();
 $todasTransacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// --- Até 3 metas mais recentes ---
+
 $stmt = $conn->prepare("
     SELECT id, nome, valor_meta, valor_guardado, icone, cor
     FROM metas_financeiras
@@ -85,7 +81,7 @@ $stmt->execute();
 $metas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// --- Gastos por categoria (mês atual) ---
+
 $stmt = $conn->prepare("
     SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
@@ -102,7 +98,6 @@ $stmt->close();
 
 $totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
 
-// --- Categorias do usuário (pra popular o form de nova transação manual) ---
 $stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -787,16 +782,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
             <input type="text" class="form-control finmap-money-input" id="manualValor" name="valor" inputmode="numeric" placeholder="R$ 0,00" autocomplete="off" required>
           </div>
 
-          <!--
-            CORRIGIDO: antes os dois selects usavam o mesmo
-            name="categoria_id". O d-none só esconde visualmente —
-            os dois campos continuavam sendo enviados no POST, e o
-            PHP ficava com o valor do último (o de receita, que vem
-            depois no HTML), sobrescrevendo a categoria escolhida
-            quando o tipo era despesa. Agora cada select tem um name
-            próprio, e o PHP (criar-transacao.php) escolhe o certo
-            com base no tipo enviado.
-          -->
+          
           <div class="mb-3" id="categoriaDespesaWrapper">
             <label for="categoriaDespesaSelect" class="form-label fw-semibold">Categoria</label>
             <select class="form-select" id="categoriaDespesaSelect" name="categoria_id_despesa">
@@ -1128,12 +1114,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     </div>
 
     <div class="dashboard-popout__body" style="max-height: 70vh; overflow: hidden;">
-      <!--
-        CORRIGIDO: esse modal usava a mesma lista de só 5 itens do
-        dashboard ($transacoes). Agora usa $todasTransacoes (sem LIMIT
-        no banco) e tem scroll próprio (max-height + overflow-y: auto),
-        já que não dependemos do CSS externo pra garantir isso.
-      -->
+      
       <div class="all-transactions-list" style="max-height: 100%; overflow-y: auto; padding-right: 4px;">
         <?php if (empty($todasTransacoes)): ?>
           <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
@@ -1399,14 +1380,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     }[color] || "green";
   }
 
-  // ATENÇÃO: esta função ainda lê metas do localStorage (era assim no
-  // protótipo estático). Como agora o bloco PHP já renderiza as metas
-  // reais do banco direto no HTML, NÃO chamamos mais essa função
-  // automaticamente ao carregar a página (veja o final do script).
-  // Ela fica aqui só para não quebrar o botão "Atualizar metas no
-  // dashboard" do menu de metas — quando vocês migrarem a tela
-  // metas-financeiras.php para o banco também, essa função deve ser
-  // reescrita para buscar as metas via fetch() em vez de localStorage.
+
   function renderDashboardGoals() {
     if (!dashboardGoalsList) return;
 
@@ -1477,9 +1451,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     }).join("");
   }
 
-  // ATENÇÃO: agora busca do banco via fetch(), não usa mais o objeto
-  // categoryData fixo. O endpoint buscar-gastos-categoria.php faz a
-  // consulta real filtrando pelo período escolhido.
+
   async function renderCategoryExpenses(periodKey) {
     const panelList = document.getElementById("categoryExpensesList");
     if (!panelList) return;
@@ -1740,7 +1712,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     });
   }
 
-  // Alterna qual select de categoria aparece conforme o tipo escolhido
+
   function toggleCategoriaWrapper() {
     if (!tipoDespesaRadio || !categoriaDespesaWrapper || !categoriaReceitaWrapper) return;
 
@@ -1748,7 +1720,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     categoriaDespesaWrapper.classList.toggle("d-none", !isDespesa);
     categoriaReceitaWrapper.classList.toggle("d-none", isDespesa);
 
-    // zera o select escondido pra não mandar categoria_id de outro tipo
+
     if (isDespesa) {
       if (categoriaReceitaSelect) categoriaReceitaSelect.value = "";
     } else {
@@ -1790,23 +1762,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     return String(value || "").replace(/\D/g, "");
   }
 
-  // -----------------------------------------------------------------
-  // CORRIGIDO: antes essa função usava toLocaleString("pt-BR",
-  // {style:"currency"}), que em vários navegadores insere um espaço
-  // "não separável" (U+00A0) entre "R$" e o número, em vez de um
-  // espaço comum. Esse valor era enviado assim pro formulário de
-  // nova transação manual (method="post" normal, sem fetch), e o
-  // parseBRLParaFloat() do lado PHP (criar-transacao.php) não
-  // removia esse caractere — então o valor sempre virava 0, a
-  // validação de servidor barrava (`$valor <= 0`) e a transação
-  // nunca era realmente salva, sem nenhum aviso na tela.
-  //
-  // Agora a formatação é feita manualmente (mesma técnica já usada
-  // em orcamento-mensal.php e config-renda.php), sem depender do
-  // toLocaleString, então o valor enviado ao PHP é sempre um "R$"
-  // seguido de espaço comum — que o parseBRLParaFloat() já sabe
-  // tratar corretamente.
-  // -----------------------------------------------------------------
+  
   function formatCurrencyBRL(value) {
     const digits = getDigitsOnly(value);
     const amount = digits ? Number(digits) / 100 : 0;
@@ -1826,8 +1782,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     });
   }
 
-  // Máscara de moeda no campo valor do form de nova transação manual
-  // (reaproveita a mesma função formatCurrencyBRL usada no saldo)
+
   if (manualValorInput) {
     manualValorInput.addEventListener("input", () => {
       manualValorInput.value = formatCurrencyBRL(manualValorInput.value);
@@ -1855,11 +1810,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     });
   }
 
-  // ATENÇÃO: por enquanto o formulário só atualiza o valor NA TELA
-  // (não grava no banco ainda). O próximo passo é criar um endpoint
-  // PHP (ex: atualizar-saldo.php) que recebe esse valor via fetch()
-  // e faz um UPDATE na tabela usuarios. Sem isso, o saldo volta ao
-  // valor do banco toda vez que a página é recarregada.
+
   function parseCurrencyToNumber(value) {
   const digits = getDigitsOnly(value);
   return digits ? Number(digits) / 100 : 0;
@@ -1905,14 +1856,6 @@ if (balanceForm) {
   });
 }
 
-  // renderDashboardGoals() e renderCategoryExpenses() NÃO são mais
-  // chamadas automaticamente aqui no carregamento, porque o PHP já
-  // renderizou o saldo, as metas e os gastos por categoria reais do
-  // banco direto no HTML acima. renderCategoryExpenses só roda quando
-  // o usuário troca o período no modal de filtro. O formulário de
-  // nova transação manual usa POST normal (action="criar-transacao.php"),
-  // então não precisa de JS pra enviar — só a máscara de moeda e o
-  // toggle de categoria por tipo.
 </script>
 
 

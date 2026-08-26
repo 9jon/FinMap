@@ -1,17 +1,4 @@
 <?php
-// pages/criar-transacao.php
-// Recebe o formulário de nova transação manual e grava no banco.
-// Padrão Post/Redirect/Get.
-//
-// MODO DIAGNÓSTICO TEMPORÁRIO: além do error_log() normal, agora
-// também grava um arquivo _debug_criar_transacao.log na mesma pasta
-// (pages/), com cada passo do processamento. Isso é só pra descobrir
-// de vez por que "despesa" está salvando sem categoria e "receita"
-// não está salvando nada — depois que resolvermos, a gente tira esse
-// bloco de log e o arquivo .log.
-//
-// Pra ver o log: abra http://localhost/FinMap-main/FinMap/pages/_debug_criar_transacao.log
-// no navegador (é um arquivo de texto puro).
 
 session_start();
 require_once '../config/conn.php';
@@ -33,8 +20,8 @@ function parseBRLParaFloat(string $valor): float
 {
     $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor);
     $limpo = str_replace('R$', '', $limpo);
-    $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
-    $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
+    $limpo = str_replace('.', '', $limpo);  
+    $limpo = str_replace(',', '.', $limpo);  
     return (float) $limpo;
 }
 
@@ -69,7 +56,7 @@ debugLog($logPath, "Valores lidos: tipo={$tipo} | descricao=" . var_export($desc
     . " | categoriaIdRaw=" . var_export($categoriaIdRaw, true) . " | categoriaId=" . var_export($categoriaId, true)
     . " | data={$dataTransacao}");
 
-// Validação server-side
+
 if (!in_array($tipo, $tiposValidos, true)) {
     debugLog($logPath, "FALHOU: tipo inválido -> '{$tipo}'");
     header('Location: dashboard.php');
@@ -86,14 +73,14 @@ if ($valor <= 0) {
     exit;
 }
 
-// Valida se a data enviada é uma data real (evita string maliciosa/quebrada)
+
 $dataValidada = DateTime::createFromFormat('Y-m-d', $dataTransacao);
 if (!$dataValidada || $dataValidada->format('Y-m-d') !== $dataTransacao) {
     debugLog($logPath, "Data '{$dataTransacao}' inválida, usando hoje.");
     $dataTransacao = date('Y-m-d');
 }
 
-// Se veio categoria_id, confirma que ela é do usuário e bate com o tipo escolhido
+
 if ($categoriaId !== null) {
     $stmtCheck = $conn->prepare("SELECT id FROM categorias WHERE id = ? AND usuario_id = ? AND tipo = ?");
     if ($stmtCheck) {
