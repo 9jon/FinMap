@@ -107,6 +107,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         $stmt->close();
 
+        // -----------------------------------------------------------------
+        // CORRIGIDO: o "saldo que você tem na conta neste momento" era
+        // salvo só em configuracoes_renda.saldo_inicial, mas o dashboard
+        // exibe o saldo de usuarios.saldo_total — colunas diferentes que
+        // nunca se comunicavam. Por isso o saldo total nunca mudava
+        // depois de configurar a renda. Agora sincronizamos os dois.
+        // -----------------------------------------------------------------
+        $stmtSaldo = $conn->prepare("UPDATE usuarios SET saldo_total = ? WHERE id = ?");
+        $stmtSaldo->bind_param("di", $saldoInicial, $usuario_id);
+        $stmtSaldo->execute();
+        $stmtSaldo->close();
+
         header('Location: fonte-dados.php');
         exit;
     }
