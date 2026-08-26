@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 include(__DIR__ . "/../config/conn.php");
@@ -7,12 +6,12 @@ if (!isset($conn)) {
     die("Erro: o arquivo conn.php não criou a variável \$conn.");
 }
 
-if (!isset($_SESSION['id'])) {
+if (!isset($_SESSION['usuario_id'])) {
   header("Location: ../login/login.php");
   exit();
 }
 
-$id_usuario = $_SESSION['id'];
+$id_usuario = $_SESSION['usuario_id'];
 
 $erro = "";
 
@@ -26,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     } else {
 
-        $sql = "SELECT id FROM fonte_dados WHERE id_usuario = ?";
+        $sql = "SELECT id FROM fonte_dados WHERE usuario_id = ?";
         $stmt = $conn->prepare($sql);
 
         $stmt->bind_param("i", $id_usuario);
@@ -36,9 +35,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if ($resultado->num_rows > 0) {
 
-            $sql = "UPDATE fonte_dados 
-                    SET tipo = ? 
-                    WHERE id_usuario = ?";
+            $sql = "UPDATE fonte_dados
+                    SET tipo_fonte = ?
+                    WHERE usuario_id = ?";
 
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("si", $fonteDados, $id_usuario);
@@ -46,7 +45,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } else {
 
-            $sql = "INSERT INTO fonte_dados (id_usuario, tipo)
+            // CORRIGIDO: usava $usuario_id (variável que não existe nesta
+            // página) em vez de $id_usuario (a variável certa, definida
+            // a partir da sessão logo no topo do arquivo).
+            $sql = "INSERT INTO fonte_dados (usuario_id, tipo_fonte)
                     VALUES (?, ?)";
 
             $stmt = $conn->prepare($sql);
@@ -105,7 +107,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           </p>
         </div>
 
-        <form id="fonteDadosForm">
+        <?php if ($erro): ?>
+          <div class="alert alert-danger py-2">
+            <?= htmlspecialchars($erro) ?>
+          </div>
+        <?php endif; ?>
+
+        <form id="fonteDadosForm" method="post" action="fonte-dados.php">
           <div class="row g-4 cards-grid">
 
             <div class="col-12 col-lg-4">
@@ -230,23 +238,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     });
 
     document.getElementById("fonteDadosForm").addEventListener("submit", function (e) {
-      e.preventDefault();
-
       const selected = document.querySelector('input[name="fonteDados"]:checked');
 
       if (!selected) {
+        e.preventDefault();
         alert("Selecione uma opção para continuar.");
         return;
       }
-
-      window.location.href = "dashboard.php";
     });
   </script>
 
 </body>
 </html>
-
-
-
-
-
