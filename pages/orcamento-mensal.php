@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/conn.php'; 
+require_once __DIR__ . '/../config/conn.php';
 if (!isset($_SESSION['usuario_id'])) {
     $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
     $resultadoTeste = $conn->query($sqlTeste);
@@ -17,11 +17,11 @@ $usuario_id = (int)$_SESSION['usuario_id'];
 
 function parseBRLParaFloat(string $valor): float
 {
-   
+
     $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor);
     $limpo = str_replace('R$', '', $limpo);
-    $limpo = str_replace('.', '', $limpo);   
-    $limpo = str_replace(',', '.', $limpo); 
+    $limpo = str_replace('.', '', $limpo);
+    $limpo = str_replace(',', '.', $limpo);
     return (float) $limpo;
 }
 
@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
         if ($novaRenda <= 0) {
             $erroRenda = 'Valor de renda inválido: "' . htmlspecialchars($_POST['renda'] ?? '') . '" não foi reconhecido como um número.';
         } else {
-            
+
             $sqlCheck = "SELECT id FROM configuracoes_renda WHERE usuario_id = ?";
             $stmtCheck = $conn->prepare($sqlCheck);
             $stmtCheck->bind_param("i", $usuario_id);
@@ -58,13 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
                 $linhasAfetadas = $stmtUpdate->affected_rows;
                 $stmtUpdate->close();
 
-                if ($linhasAfetadas === 0) {
-                    
-                    $erroRenda = 'Nenhuma linha foi alterada no banco (o valor já era esse, ou o usuario_id não bateu com nenhuma linha).';
-                } else {
-                    header('Location: orcamento-mensal.php');
-                    exit;
-                }
             }
         }
     } elseif ($acao === 'atualizar_limites') {
@@ -99,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
     }
 
     if ($acao === 'atualizar_categorias') {
-        $categoriasAtivas = $_POST['categoria_ativa'] ?? []; 
+        $categoriasAtivas = $_POST['categoria_ativa'] ?? [];
         $sqlTodas = "SELECT id FROM categorias WHERE usuario_id = ? AND tipo = 'despesa'";
         $stmtTodas = $conn->prepare($sqlTodas);
         $stmtTodas->bind_param("i", $usuario_id);
@@ -148,10 +141,32 @@ $faixaAlerta = $config['faixa_alerta_percentual'] ?? 85;
 $cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
 
-$sqlCategorias = "SELECT id, nome, icone, cor, ativo_no_orcamento, valor_base_orcamento
-                  FROM categorias
-                  WHERE usuario_id = ? AND tipo = 'despesa'
-                  ORDER BY valor_base_orcamento DESC";
+// -----------------------------------------------------------------
+// CORRIGIDO: antes o "Comprometido" vinha de categorias.valor_base_orcamento,
+// uma coluna estática que nunca é preenchida por nenhuma tela do sistema
+// (sempre fica 0). Por isso "Ajustar renda" nunca mudava o comprometido,
+// o círculo de % e o "Livre no mês" — esses números nunca dependeram de
+// renda nem de gasto real, só de uma coluna sempre zerada.
+//
+// Agora buscamos o gasto REAL de cada categoria de despesa no mês atual,
+// direto da tabela transacoes (mesma fonte usada no dashboard), via
+// LEFT JOIN — assim toda categoria aparece mesmo sem gasto ainda.
+// -----------------------------------------------------------------
+$sqlCategorias = "
+    SELECT c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento,
+           COALESCE(SUM(t.valor), 0) AS gasto_real
+    FROM categorias c
+    LEFT JOIN transacoes t
+        ON t.categoria_id = c.id
+       AND t.usuario_id = c.usuario_id
+       AND t.tipo = 'despesa'
+       AND t.status = 'aprovado'
+       AND MONTH(t.data_transacao) = MONTH(CURDATE())
+       AND YEAR(t.data_transacao) = YEAR(CURDATE())
+    WHERE c.usuario_id = ? AND c.tipo = 'despesa'
+    GROUP BY c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento
+    ORDER BY gasto_real DESC
+";
 $stmtCategorias = $conn->prepare($sqlCategorias);
 $stmtCategorias->bind_param("i", $usuario_id);
 $stmtCategorias->execute();
@@ -180,7 +195,9 @@ $categoriasAtivasCount = 0;
 foreach ($categorias as $cat) {
     $chave = $mapaCategoriaParaChave[$cat['nome']] ?? null;
     $multiplicador = $chave ? $multiplicadores[$cenarioAtual][$chave] : 1;
-    $valorBase = (float)($cat['valor_base_orcamento'] ?? 0);
+    // CORRIGIDO: valor_base agora é o gasto real do mês (gasto_real),
+    // não mais a coluna estática valor_base_orcamento.
+    $valorBase = (float)($cat['gasto_real'] ?? 0);
     $ativo = (bool)$cat['ativo_no_orcamento'];
 
     $valorCalculado = $ativo ? round($valorBase * $multiplicador, 2) : 0.0;
@@ -699,7 +716,7 @@ function brl(float $valor): string
               <div class="budget-config-row">
                 <div>
                   <h4><?= htmlspecialchars($c['nome']) ?></h4>
-                  <p>Valor de referência: <?= brl($c['valor_base']) ?></p>
+                  <p>Gasto real neste mês: <?= brl($c['valor_base']) ?></p>
                 </div>
                 <label class="switch switch--green">
                   <input type="checkbox" name="categoria_ativa[]" value="<?= $c['id'] ?>" <?= $c['ativo'] ? 'checked' : '' ?>>
@@ -924,7 +941,7 @@ function brl(float $valor): string
       });
     });
 
-    
+
     function formatCurrencyInput(value) {
       const digits = String(value || "").replace(/\D/g, "");
       if (!digits) return "R$ 0,00";
