@@ -1528,8 +1528,8 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
 
   if (refreshGoalsDashboardBtn) {
     refreshGoalsDashboardBtn.addEventListener("click", () => {
-      renderDashboardGoals();
-      closeModal(goalsMenuModal);
+      // Recarrega a página para buscar novamente as metas gravadas no banco.
+      window.location.reload();
     });
   }
 

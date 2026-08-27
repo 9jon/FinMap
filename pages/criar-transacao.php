@@ -113,12 +113,38 @@ if (!$stmt) {
 }
 
 $stmt->bind_param("isdsis", $usuario_id, $descricao, $valor, $tipo, $categoriaId, $dataTransacao);
+$conn->begin_transaction();
 $sucesso = $stmt->execute();
+
+// Mantém o saldo total sincronizado com lançamentos aprovados.
+if ($sucesso) {
+    $variacaoSaldo = $tipo === 'receita' ? $valor : -$valor;
+    $stmtSaldo = $conn->prepare(
+        "UPDATE usuarios
+         SET saldo_total = COALESCE(saldo_total, 0) + ?
+         WHERE id = ?"
+    );
+
+    if ($stmtSaldo) {
+        $stmtSaldo->bind_param("di", $variacaoSaldo, $usuario_id);
+        $sucesso = $stmtSaldo->execute();
+        $stmtSaldo->close();
+    } else {
+        $sucesso = false;
+        debugLog($logPath, 'ERRO ao preparar atualizacao do saldo -> ' . $conn->error);
+    }
+}
 
 if ($sucesso) {
     debugLog($logPath, "SUCESSO: transação inserida com id " . $stmt->insert_id . " (tipo={$tipo}, categoria_id=" . var_export($categoriaId, true) . ")");
 } else {
     debugLog($logPath, 'ERRO ao executar INSERT -> ' . $stmt->error);
+}
+
+if ($sucesso) {
+    $conn->commit();
+} else {
+    $conn->rollback();
 }
 
 $stmt->close();
