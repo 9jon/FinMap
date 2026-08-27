@@ -15,31 +15,82 @@ $stmt->close();
 
 $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
-$saldoTotal = $usuario['saldo_total'] ?? 0;
+$saldoTotal = (float) ($usuario['saldo_total'] ?? 0);
 
 
 $stmt = $conn->prepare("
-    SELECT COALESCE(SUM(valor), 0) AS total
+    SELECT
+        COALESCE(SUM(CASE
+            WHEN tipo = 'receita'
+             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            THEN valor ELSE 0 END), 0) AS receitas_atual,
+        COALESCE(SUM(CASE
+            WHEN tipo = 'despesa'
+             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            THEN valor ELSE 0 END), 0) AS despesas_atual,
+        COALESCE(SUM(CASE
+            WHEN tipo = 'receita'
+             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            THEN valor ELSE 0 END), 0) AS receitas_anterior,
+        COALESCE(SUM(CASE
+            WHEN tipo = 'despesa'
+             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            THEN valor ELSE 0 END), 0) AS despesas_anterior,
+        SUM(CASE
+            WHEN data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            THEN 1 ELSE 0 END) AS lancamentos_anterior
     FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'receita' AND status = 'aprovado'
-      AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
+    WHERE usuario_id = ?
+      AND status = 'aprovado'
+      AND data_transacao >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
-$receitasMes = $stmt->get_result()->fetch_assoc()['total'];
+$comparativoMensal = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
+$receitasMes = (float) $comparativoMensal['receitas_atual'];
+$despesasMes = (float) $comparativoMensal['despesas_atual'];
+$receitasMesAnterior = (float) $comparativoMensal['receitas_anterior'];
+$despesasMesAnterior = (float) $comparativoMensal['despesas_anterior'];
+$temRegistroMesAnterior = (int) $comparativoMensal['lancamentos_anterior'] > 0;
 
-$stmt = $conn->prepare("
-    SELECT COALESCE(SUM(valor), 0) AS total
-    FROM transacoes
-    WHERE usuario_id = ? AND tipo = 'despesa' AND status = 'aprovado'
-      AND MONTH(data_transacao) = MONTH(CURDATE()) AND YEAR(data_transacao) = YEAR(CURDATE())
-");
-$stmt->bind_param("i", $usuario_id);
-$stmt->execute();
-$despesasMes = $stmt->get_result()->fetch_assoc()['total'];
-$stmt->close();
+function calcularVariacaoMensal(float $valorAtual, float $valorAnterior, bool $temRegistroAnterior): float
+{
+    if (!$temRegistroAnterior || abs($valorAnterior) < 0.00001) {
+        return 0.0;
+    }
+
+    return (($valorAtual - $valorAnterior) / abs($valorAnterior)) * 100;
+}
+
+function textoVariacaoMensal(float $variacao): string
+{
+    $sinal = $variacao > 0 ? '+' : '';
+    return $sinal . number_format($variacao, 1, ',', '.') . '% vs mês anterior';
+}
+
+function iconeVariacaoMensal(float $variacao): string
+{
+    if ($variacao > 0) {
+        return 'arrow-up-right';
+    }
+
+    if ($variacao < 0) {
+        return 'arrow-down-right';
+    }
+
+    return 'dash-lg';
+}
+
+$saldoMesAnterior = $saldoTotal - ($receitasMes - $despesasMes);
+$variacaoSaldo = calcularVariacaoMensal($saldoTotal, $saldoMesAnterior, $temRegistroMesAnterior);
+$variacaoReceitas = calcularVariacaoMensal($receitasMes, $receitasMesAnterior, $temRegistroMesAnterior);
+$variacaoDespesas = calcularVariacaoMensal($despesasMes, $despesasMesAnterior, $temRegistroMesAnterior);
+
+$classeVariacaoReceitas = $variacaoReceitas < 0 ? 'negative' : 'positive';
+$classeVariacaoDespesas = $variacaoDespesas > 0 ? 'negative' : 'positive';
 
 
 $stmt = $conn->prepare("
@@ -194,8 +245,8 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
 
         <div class="finance-card__bottom">
           <span class="finance-card__trend finance-card__trend--light">
-            <i class="bi bi-arrow-up-right"></i>
-            +12,5% este mês
+            <i class="bi bi-<?= iconeVariacaoMensal($variacaoSaldo) ?>"></i>
+            <?= textoVariacaoMensal($variacaoSaldo) ?>
           </span>
         </div>
       </article>
@@ -213,9 +264,9 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
         </div>
 
         <div class="finance-card__bottom">
-          <span class="finance-card__trend finance-card__trend--positive">
-            <i class="bi bi-graph-up-arrow"></i>
-            +8,2% vs mês anterior
+          <span class="finance-card__trend finance-card__trend--<?= $classeVariacaoReceitas ?>">
+            <i class="bi bi-<?= iconeVariacaoMensal($variacaoReceitas) ?>"></i>
+            <?= textoVariacaoMensal($variacaoReceitas) ?>
           </span>
         </div>
       </article>
@@ -233,9 +284,9 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
         </div>
 
         <div class="finance-card__bottom">
-          <span class="finance-card__trend finance-card__trend--negative">
-            <i class="bi bi-graph-down-arrow"></i>
-            -3,5% vs mês anterior
+          <span class="finance-card__trend finance-card__trend--<?= $classeVariacaoDespesas ?>">
+            <i class="bi bi-<?= iconeVariacaoMensal($variacaoDespesas) ?>"></i>
+            <?= textoVariacaoMensal($variacaoDespesas) ?>
           </span>
         </div>
       </article>
