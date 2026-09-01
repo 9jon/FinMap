@@ -1,17 +1,4 @@
 <?php
-// pages/criar-transacao.php
-// Recebe o formulário de nova transação manual e grava no banco.
-// Padrão Post/Redirect/Get.
-//
-// MODO DIAGNÓSTICO TEMPORÁRIO: além do error_log() normal, agora
-// também grava um arquivo _debug_criar_transacao.log na mesma pasta
-// (pages/), com cada passo do processamento. Isso é só pra descobrir
-// de vez por que "despesa" está salvando sem categoria e "receita"
-// não está salvando nada — depois que resolvermos, a gente tira esse
-// bloco de log e o arquivo .log.
-//
-// Pra ver o log: abra http://localhost/FinMap-main/FinMap/pages/_debug_criar_transacao.log
-// no navegador (é um arquivo de texto puro).
 
 session_start();
 require_once '../config/conn.php';
@@ -33,8 +20,8 @@ function parseBRLParaFloat(string $valor): float
 {
     $limpo = preg_replace('/[\s\x{00A0}]/u', '', $valor);
     $limpo = str_replace('R$', '', $limpo);
-    $limpo = str_replace('.', '', $limpo);   // remove separador de milhar
-    $limpo = str_replace(',', '.', $limpo);  // vírgula decimal -> ponto
+    $limpo = str_replace('.', '', $limpo);  
+    $limpo = str_replace(',', '.', $limpo);  
     return (float) $limpo;
 }
 
@@ -69,7 +56,7 @@ debugLog($logPath, "Valores lidos: tipo={$tipo} | descricao=" . var_export($desc
     . " | categoriaIdRaw=" . var_export($categoriaIdRaw, true) . " | categoriaId=" . var_export($categoriaId, true)
     . " | data={$dataTransacao}");
 
-// Validação server-side
+
 if (!in_array($tipo, $tiposValidos, true)) {
     debugLog($logPath, "FALHOU: tipo inválido -> '{$tipo}'");
     header('Location: dashboard.php');
@@ -86,14 +73,14 @@ if ($valor <= 0) {
     exit;
 }
 
-// Valida se a data enviada é uma data real (evita string maliciosa/quebrada)
+
 $dataValidada = DateTime::createFromFormat('Y-m-d', $dataTransacao);
 if (!$dataValidada || $dataValidada->format('Y-m-d') !== $dataTransacao) {
     debugLog($logPath, "Data '{$dataTransacao}' inválida, usando hoje.");
     $dataTransacao = date('Y-m-d');
 }
 
-// Se veio categoria_id, confirma que ela é do usuário e bate com o tipo escolhido
+
 if ($categoriaId !== null) {
     $stmtCheck = $conn->prepare("SELECT id FROM categorias WHERE id = ? AND usuario_id = ? AND tipo = ?");
     if ($stmtCheck) {
@@ -126,12 +113,38 @@ if (!$stmt) {
 }
 
 $stmt->bind_param("isdsis", $usuario_id, $descricao, $valor, $tipo, $categoriaId, $dataTransacao);
+$conn->begin_transaction();
 $sucesso = $stmt->execute();
+
+// Mantém o saldo total sincronizado com lançamentos aprovados.
+if ($sucesso) {
+    $variacaoSaldo = $tipo === 'receita' ? $valor : -$valor;
+    $stmtSaldo = $conn->prepare(
+        "UPDATE usuarios
+         SET saldo_total = COALESCE(saldo_total, 0) + ?
+         WHERE id = ?"
+    );
+
+    if ($stmtSaldo) {
+        $stmtSaldo->bind_param("di", $variacaoSaldo, $usuario_id);
+        $sucesso = $stmtSaldo->execute();
+        $stmtSaldo->close();
+    } else {
+        $sucesso = false;
+        debugLog($logPath, 'ERRO ao preparar atualizacao do saldo -> ' . $conn->error);
+    }
+}
 
 if ($sucesso) {
     debugLog($logPath, "SUCESSO: transação inserida com id " . $stmt->insert_id . " (tipo={$tipo}, categoria_id=" . var_export($categoriaId, true) . ")");
 } else {
     debugLog($logPath, 'ERRO ao executar INSERT -> ' . $stmt->error);
+}
+
+if ($sucesso) {
+    $conn->commit();
+} else {
+    $conn->rollback();
 }
 
 $stmt->close();

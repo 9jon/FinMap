@@ -46,12 +46,70 @@ function encontrarOuCriarCategoria($conn, $usuario_id, $nome) {
     return $novoId;
 }
 
+function aplicarVariacaoNoSaldo($conn, $usuario_id, $variacao) {
+    if ((float) $variacao === 0.0) {
+        return true;
+    }
+
+    $stmt = $conn->prepare(
+        "UPDATE usuarios
+         SET saldo_total = COALESCE(saldo_total, 0) + ?
+         WHERE id = ?"
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("di", $variacao, $usuario_id);
+    $sucesso = $stmt->execute();
+    $stmt->close();
+
+    return $sucesso;
+}
+
+function valorComSinal($tipo, $valor) {
+    return $tipo === 'receita' ? (float) $valor : -(float) $valor;
+}
+
+$conn->begin_transaction();
+
+$stmt = $conn->prepare(
+    "SELECT tipo, valor, status
+     FROM transacoes
+     WHERE id = ? AND usuario_id = ?
+     FOR UPDATE"
+);
+$stmt->bind_param("ii", $id, $usuario_id);
+$stmt->execute();
+$transacaoAtual = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$transacaoAtual) {
+    $conn->rollback();
+    http_response_code(404);
+    echo json_encode(['sucesso' => false, 'erro' => 'Lancamento nao encontrado']);
+    exit;
+}
+
 switch ($acao) {
     case 'aprovar':
-        $stmt = $conn->prepare("UPDATE transacoes SET status = 'aprovado' WHERE id = ? AND usuario_id = ?");
-        $stmt->bind_param("ii", $id, $usuario_id);
-        $sucesso = $stmt->execute();
-        $stmt->close();
+        $sucesso = true;
+
+        if ($transacaoAtual['status'] !== 'aprovado') {
+            $stmt = $conn->prepare("UPDATE transacoes SET status = 'aprovado' WHERE id = ? AND usuario_id = ?");
+            $stmt->bind_param("ii", $id, $usuario_id);
+            $sucesso = $stmt->execute();
+            $stmt->close();
+
+            if ($sucesso) {
+                $sucesso = aplicarVariacaoNoSaldo(
+                    $conn,
+                    $usuario_id,
+                    valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+                );
+            }
+        }
         break;
 
     case 'rejeitar':
@@ -59,6 +117,14 @@ switch ($acao) {
         $stmt->bind_param("ii", $id, $usuario_id);
         $sucesso = $stmt->execute();
         $stmt->close();
+
+        if ($sucesso && $transacaoAtual['status'] === 'aprovado') {
+            $sucesso = aplicarVariacaoNoSaldo(
+                $conn,
+                $usuario_id,
+                -valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+            );
+        }
         break;
 
     case 'editar':
@@ -67,6 +133,7 @@ switch ($acao) {
         $categoriaNome = trim($dados['categoria'] ?? '');
 
         if ($descricao === '' || $valor === null || $valor <= 0 || $categoriaNome === '') {
+            $conn->rollback();
             http_response_code(400);
             echo json_encode(['sucesso' => false, 'erro' => 'Dados inválidos para edição']);
             exit;
@@ -78,17 +145,26 @@ switch ($acao) {
         $stmt->bind_param("sdiii", $descricao, $valor, $categoriaId, $id, $usuario_id);
         $sucesso = $stmt->execute();
         $stmt->close();
+
+        if ($sucesso && $transacaoAtual['status'] === 'aprovado') {
+            $variacaoSaldo = valorComSinal($transacaoAtual['tipo'], $valor)
+                - valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor']);
+            $sucesso = aplicarVariacaoNoSaldo($conn, $usuario_id, $variacaoSaldo);
+        }
         break;
 
     default:
+        $conn->rollback();
         http_response_code(400);
         echo json_encode(['sucesso' => false, 'erro' => 'Ação desconhecida']);
         exit;
 }
 
 if ($sucesso) {
+    $conn->commit();
     echo json_encode(['sucesso' => true]);
 } else {
+    $conn->rollback();
     http_response_code(500);
     echo json_encode(['sucesso' => false, 'erro' => 'Erro ao processar a ação']);
 }

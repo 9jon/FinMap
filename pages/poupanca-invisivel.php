@@ -1,13 +1,10 @@
 <?php
-// ============================================================
-// BLOCO PHP — busca configuração e oportunidades reais do usuário
-// ============================================================
 session_start();
 include '../config/conn.php';
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
-// --- Dados do usuário (avatar) ---
+
 $stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -15,14 +12,12 @@ $usuario = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 
-// --- Configuração da Poupança Invisível (cenário + categorias ativas) ---
 $stmt = $conn->prepare("SELECT * FROM poupanca_configuracao WHERE usuario_id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $config = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// Se o usuário ainda não tem configuração salva, cria uma com os padrões
 if (!$config) {
     $stmt = $conn->prepare("INSERT INTO poupanca_configuracao (usuario_id) VALUES (?)");
     $stmt->bind_param("i", $usuario_id);
@@ -38,36 +33,115 @@ if (!$config) {
     ];
 }
 
-// --- Oportunidades de economia detectadas ---
-// TODO: por enquanto usamos valores padrão quando o usuário ainda não tem
-// nenhuma oportunidade calculada no banco. No futuro isso deve vir de uma
-// análise automática em cima das transações reais (tabela "transacoes").
-$valoresPadrao = [
-    'cafe' => 86.00,
-    'impulso' => 124.00,
-    'assinatura' => 148.00,
-    'transporte' => 70.00
+require_once '../includes/analisador-poupanca-invisivel.php';
+
+$oportunidades = [
+    'coffee' => [
+        'titulo' => 'Cafés e lanches',
+        'descricao' => 'Pequenos consumos frequentes acima da média ideal da sua rotina.',
+        'icone' => 'cup-hot',
+        'cor' => 'orange',
+    ],
+    'impulse' => [
+        'titulo' => 'Compras por impulso',
+        'descricao' => 'Compras não planejadas ou de valor elevado em categorias flexíveis.',
+        'icone' => 'bag',
+        'cor' => 'blue',
+    ],
+    'subscription' => [
+        'titulo' => 'Assinaturas para revisar',
+        'descricao' => 'Serviços recorrentes identificados para uma revisão de uso e necessidade.',
+        'icone' => 'phone',
+        'cor' => 'purple',
+    ],
+    'transport' => [
+        'titulo' => 'Transporte por aplicativo',
+        'descricao' => 'Trajetos por aplicativo com chance de redução de custo.',
+        'icone' => 'car-front',
+        'cor' => 'green',
+    ],
 ];
 
-$stmt = $conn->prepare("SELECT tipo, valor_potencial_mensal FROM poupanca_oportunidades WHERE usuario_id = ?");
-$stmt->bind_param("i", $usuario_id);
-$stmt->execute();
-$oportunidadesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-$valoresBanco = [];
-foreach ($oportunidadesResult as $op) {
-    $valoresBanco[$op['tipo']] = (float) $op['valor_potencial_mensal'];
+foreach ($oportunidades as $chave => $oportunidade) {
+    $oportunidades[$chave]['total_gasto'] = 0.0;
+    $oportunidades[$chave]['quantidade'] = 0;
+    $oportunidades[$chave]['potencial'] = 0.0;
 }
 
-// Mapeia os nomes do banco (cafe, impulso, assinatura, transporte) pros
-// nomes usados no JavaScript original (coffee, impulse, subscription, transport)
-$baseValues = [
-    'coffee'       => $valoresBanco['cafe'] ?? $valoresPadrao['cafe'],
-    'impulse'      => $valoresBanco['impulso'] ?? $valoresPadrao['impulso'],
-    'subscription' => $valoresBanco['assinatura'] ?? $valoresPadrao['assinatura'],
-    'transport'    => $valoresBanco['transporte'] ?? $valoresPadrao['transporte']
+// A análise considera apenas despesas já aprovadas no mês corrente.
+$stmt = $conn->prepare(
+    "SELECT t.descricao, t.valor, c.nome AS categoria_nome
+     FROM transacoes t
+     LEFT JOIN categorias c ON c.id = t.categoria_id
+     WHERE t.usuario_id = ?
+       AND t.tipo = 'despesa'
+       AND t.status = 'aprovado'
+       AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND t.data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
+);
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$lancamentosDoMes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+foreach ($lancamentosDoMes as $lancamento) {
+    $chave = classificarLancamentoPoupanca($lancamento);
+
+    if ($chave === null) {
+        continue;
+    }
+
+    $oportunidades[$chave]['total_gasto'] += (float) $lancamento['valor'];
+    $oportunidades[$chave]['quantidade']++;
+}
+
+foreach ($oportunidades as $chave => $oportunidade) {
+    $oportunidades[$chave]['potencial'] = round(
+        estimarPotencialPoupanca(
+            $chave,
+            $oportunidade['total_gasto'],
+            $oportunidade['quantidade']
+        ),
+        2
+    );
+}
+
+$baseValues = array_map(
+    fn(array $oportunidade): float => (float) $oportunidade['potencial'],
+    $oportunidades
+);
+$oportunidadesVisiveis = array_filter(
+    $oportunidades,
+    fn(array $oportunidade): bool => $oportunidade['potencial'] > 0
+);
+uasort($oportunidadesVisiveis, fn(array $a, array $b): int => $b['potencial'] <=> $a['potencial']);
+
+$multiplicadoresCenario = ['conservador' => 0.514, 'equilibrado' => 1, 'agressivo' => 1.425];
+$rotulosCenario = ['conservador' => 'Conservador', 'equilibrado' => 'Equilibrado', 'agressivo' => 'Agressivo'];
+$cenarioInicial = $config['cenario_selecionado'] ?? 'equilibrado';
+
+if (!isset($multiplicadoresCenario[$cenarioInicial])) {
+    $cenarioInicial = 'equilibrado';
+}
+
+$categoriasAtivas = [
+    'coffee' => !empty($config['considerar_cafe']),
+    'impulse' => !empty($config['considerar_impulso']),
+    'subscription' => !empty($config['considerar_assinatura']),
+    'transport' => !empty($config['considerar_transporte']),
 ];
+$valorBaseAtivo = 0.0;
+$oportunidadesAtivas = 0;
+
+foreach ($baseValues as $chave => $valor) {
+    if ($categoriasAtivas[$chave] && $valor > 0) {
+        $valorBaseAtivo += $valor;
+        $oportunidadesAtivas++;
+    }
+}
+
+$valorMensalInicial = $valorBaseAtivo * $multiplicadoresCenario[$cenarioInicial];
+$valorAnualInicial = $valorMensalInicial * 12;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -142,18 +216,18 @@ $baseValues = [
           <div class="hero-summary-card__amounts">
             <article class="hero-kpi hero-kpi--main">
               <span>Potencial deste mês</span>
-              <strong id="mainMonthlyValue">R$ 428,00</strong>
+              <strong id="mainMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
               <small>valor que poderia entrar na sua caixinha</small>
             </article>
 
             <article class="hero-kpi">
               <span>Projeção em 12 meses</span>
-              <strong id="mainYearlyValue">R$ 5.136,00</strong>
+              <strong id="mainYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
             </article>
 
             <article class="hero-kpi">
               <span>Cenário atual</span>
-              <strong id="mainScenarioLabel">Equilibrado</strong>
+              <strong id="mainScenarioLabel"><?= htmlspecialchars($rotulosCenario[$cenarioInicial]) ?></strong>
             </article>
           </div>
 
@@ -188,31 +262,31 @@ $baseValues = [
 
             <div class="economy-chart__bars">
               <div class="economy-bar">
-                <div class="economy-bar__value" id="barLabel1">R$ 428</div>
+                <div class="economy-bar__value" id="barLabel1">R$ <?= number_format($valorMensalInicial, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar1" style="height: 18%;"></div>
                 <span>1º mês</span>
               </div>
 
               <div class="economy-bar">
-                <div class="economy-bar__value" id="barLabel3">R$ 1.284</div>
+                <div class="economy-bar__value" id="barLabel3">R$ <?= number_format($valorMensalInicial * 3, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar3" style="height: 36%;"></div>
                 <span>3 meses</span>
               </div>
 
               <div class="economy-bar">
-                <div class="economy-bar__value" id="barLabel6">R$ 2.568</div>
+                <div class="economy-bar__value" id="barLabel6">R$ <?= number_format($valorMensalInicial * 6, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar6" style="height: 58%;"></div>
                 <span>6 meses</span>
               </div>
 
               <div class="economy-bar">
-                <div class="economy-bar__value" id="barLabel9">R$ 3.852</div>
+                <div class="economy-bar__value" id="barLabel9">R$ <?= number_format($valorMensalInicial * 9, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar9" style="height: 78%;"></div>
                 <span>9 meses</span>
               </div>
 
               <div class="economy-bar economy-bar--highlight">
-                <div class="economy-bar__value" id="barLabel12">R$ 5.136</div>
+                <div class="economy-bar__value" id="barLabel12">R$ <?= number_format($valorAnualInicial, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar12" style="height: 100%;"></div>
                 <span>12 meses</span>
               </div>
@@ -222,7 +296,9 @@ $baseValues = [
           <div class="economy-chart-card__footer">
             <div class="chart-insight">
               <span>Faixa mais realista</span>
-              <strong id="realisticRange">R$ 300,00 a R$ 430,00 / mês</strong>
+              <strong id="realisticRange">
+                <?= $valorMensalInicial > 0 ? 'R$ ' . number_format($valorMensalInicial * 0.7, 2, ',', '.') . ' a R$ ' . number_format($valorMensalInicial, 2, ',', '.') . ' / mês' : 'Nenhuma oportunidade detectada' ?>
+              </strong>
             </div>
 
             <div class="chart-insight">
@@ -241,7 +317,7 @@ $baseValues = [
 
           <div class="overview-card__content">
             <span>Potencial mensal</span>
-            <strong id="overviewMonthlyValue">R$ 428,00</strong>
+            <strong id="overviewMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
             <p>Total identificado em gastos com chance real de redução.</p>
           </div>
         </article>
@@ -253,7 +329,7 @@ $baseValues = [
 
           <div class="overview-card__content">
             <span>Projeção anual</span>
-            <strong id="overviewYearlyValue">R$ 5.136,00</strong>
+            <strong id="overviewYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
             <p>Estimativa acumulada mantendo o mesmo padrão de economia.</p>
           </div>
         </article>
@@ -265,8 +341,8 @@ $baseValues = [
 
           <div class="overview-card__content">
             <span>Oportunidades detectadas</span>
-            <strong id="overviewOpportunities">12 pontos</strong>
-            <p id="overviewOpportunitiesText">Pequenos excessos que podem fortalecer sua caixinha.</p>
+            <strong id="overviewOpportunities"><?= $oportunidadesAtivas ?> categorias</strong>
+            <p id="overviewOpportunitiesText">Oportunidades encontradas nos seus lançamentos deste mês.</p>
           </div>
         </article>
       </section>
@@ -286,6 +362,7 @@ $baseValues = [
           </div>
 
           <div class="opportunity-list opportunity-list--compact" id="opportunityList">
+            <!-- Conteúdo estático preservado apenas como referência visual do layout.
             <article class="opportunity-item">
               <div class="opportunity-item__left">
                 <div class="opportunity-item__icon opportunity-item__icon--orange">
@@ -357,6 +434,39 @@ $baseValues = [
                 <span>potencial mensal</span>
               </div>
             </article>
+            -->
+
+            <?php if (empty($oportunidadesVisiveis)): ?>
+              <p style="padding: 16px 0; color: #888;">
+                Nenhuma oportunidade de economia foi identificada neste mês. Cadastre despesas para iniciar a análise.
+              </p>
+            <?php else: ?>
+              <?php foreach ($oportunidadesVisiveis as $chave => $oportunidade): ?>
+                <article class="opportunity-item">
+                  <div class="opportunity-item__left">
+                    <div class="opportunity-item__icon opportunity-item__icon--<?= htmlspecialchars($oportunidade['cor']) ?>">
+                      <i class="bi bi-<?= htmlspecialchars($oportunidade['icone']) ?>"></i>
+                    </div>
+
+                    <div class="opportunity-item__info">
+                      <h4><?= htmlspecialchars($oportunidade['titulo']) ?></h4>
+                      <p>
+                        <?= htmlspecialchars($oportunidade['descricao']) ?>
+                        <?= (int) $oportunidade['quantidade'] ?> lançamento(s) detectado(s),
+                        totalizando R$ <?= number_format($oportunidade['total_gasto'], 2, ',', '.') ?> no mês.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="opportunity-item__right">
+                    <strong class="opp-value" data-key="<?= htmlspecialchars($chave) ?>">
+                      R$ <?= number_format($oportunidade['potencial'], 2, ',', '.') ?>
+                    </strong>
+                    <span>potencial mensal</span>
+                  </div>
+                </article>
+              <?php endforeach; ?>
+            <?php endif; ?>
           </div>
         </section>
       </section>
@@ -386,13 +496,13 @@ $baseValues = [
         <div class="detail-grid">
           <article class="detail-box">
             <span>Total do mês</span>
-            <strong id="detailMonthlyValue">R$ 428,00</strong>
+            <strong id="detailMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
             <p>Valor com maior potencial de economia dentro do padrão atual de gastos.</p>
           </article>
 
           <article class="detail-box">
             <span>Projeção anual</span>
-            <strong id="detailYearlyValue">R$ 5.136,00</strong>
+            <strong id="detailYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
             <p>Estimativa acumulada caso o comportamento econômico seja mantido por 12 meses.</p>
           </article>
 
@@ -438,7 +548,7 @@ $baseValues = [
               <h4>Cenário conservador</h4>
               <p>Redução leve e mais fácil de sustentar no dia a dia.</p>
             </div>
-            <strong>R$ 220,00 / mês</strong>
+            <strong>R$ <?= number_format($valorBaseAtivo * $multiplicadoresCenario['conservador'], 2, ',', '.') ?> / mês</strong>
           </article>
 
           <article class="simulation-option simulation-option--active" data-scenario="equilibrado">
@@ -446,7 +556,7 @@ $baseValues = [
               <h4>Cenário equilibrado</h4>
               <p>Redução moderada, com boa consistência e menor atrito.</p>
             </div>
-            <strong>R$ 428,00 / mês</strong>
+            <strong>R$ <?= number_format($valorBaseAtivo * $multiplicadoresCenario['equilibrado'], 2, ',', '.') ?> / mês</strong>
           </article>
 
           <article class="simulation-option" data-scenario="agressivo">
@@ -454,7 +564,7 @@ $baseValues = [
               <h4>Cenário agressivo</h4>
               <p>Corte forte em excessos, assinaturas e compras impulsivas.</p>
             </div>
-            <strong>R$ 610,00 / mês</strong>
+            <strong>R$ <?= number_format($valorBaseAtivo * $multiplicadoresCenario['agressivo'], 2, ',', '.') ?> / mês</strong>
           </article>
         </div>
       </div>
@@ -553,22 +663,22 @@ $baseValues = [
         <div class="category-modal-grid">
           <article class="category-modal-box">
             <span>Assinaturas</span>
-            <strong id="catSubscription">R$ 148,00</strong>
+            <strong id="catSubscription">R$ <?= number_format($oportunidades['subscription']['potencial'], 2, ',', '.') ?></strong>
           </article>
 
           <article class="category-modal-box">
             <span>Compras por impulso</span>
-            <strong id="catImpulse">R$ 124,00</strong>
+            <strong id="catImpulse">R$ <?= number_format($oportunidades['impulse']['potencial'], 2, ',', '.') ?></strong>
           </article>
 
           <article class="category-modal-box">
             <span>Cafés e lanches</span>
-            <strong id="catCoffee">R$ 86,00</strong>
+            <strong id="catCoffee">R$ <?= number_format($oportunidades['coffee']['potencial'], 2, ',', '.') ?></strong>
           </article>
 
           <article class="category-modal-box">
             <span>Transporte por aplicativo</span>
-            <strong id="catTransport">R$ 70,00</strong>
+            <strong id="catTransport">R$ <?= number_format($oportunidades['transport']['potencial'], 2, ',', '.') ?></strong>
           </article>
         </div>
       </div>
@@ -740,9 +850,7 @@ $baseValues = [
       openCategoriesModal: "categoriesModal"
     };
 
-    // ATENÇÃO: esses valores agora vêm do banco (via PHP), não são mais
-    // fixos no JavaScript. O PHP lá em cima monta esse objeto com
-    // json_encode() usando os dados reais da tabela poupanca_oportunidades.
+
     const baseValues = <?= json_encode($baseValues) ?>;
 
     const scenarios = {
@@ -769,11 +877,8 @@ $baseValues = [
       }
     };
 
-    // ATENÇÃO: o estado inicial (cenário e categorias ativas) também
-    // vem do banco agora, em vez de sempre começar em "equilibrado"
-    // com tudo ligado.
     const state = {
-      scenario: "<?= htmlspecialchars($config['cenario_selecionado']) ?>",
+      scenario: "<?= htmlspecialchars($cenarioInicial) ?>",
       enabled: {
         coffee: <?= $config['considerar_cafe'] ? 'true' : 'false' ?>,
         impulse: <?= $config['considerar_impulso'] ? 'true' : 'false' ?>,
@@ -877,10 +982,23 @@ $baseValues = [
     }
 
     function updateScenarioButtons() {
+      const activeBaseValue = Object.keys(baseValues).reduce((total, key) => {
+        return total + (state.enabled[key] ? baseValues[key] : 0);
+      }, 0);
+
       document.querySelectorAll(".simulation-option").forEach((item) => {
+        const scenarioKey = item.getAttribute("data-scenario");
+        const scenarioOption = scenarios[scenarioKey];
+        const optionValue = activeBaseValue * scenarioOption.multiplier;
+        const valueElement = item.querySelector("strong");
+
+        if (valueElement) {
+          valueElement.textContent = formatBRL(optionValue) + " / mês";
+        }
+
         item.classList.toggle(
           "simulation-option--active",
-          item.getAttribute("data-scenario") === state.scenario
+          scenarioKey === state.scenario
         );
       });
     }
@@ -900,7 +1018,9 @@ $baseValues = [
       const value6 = monthly * 6;
       const value9 = monthly * 9;
       const value12 = monthly * 12;
-      const enabledCount = Object.values(state.enabled).filter(Boolean).length;
+      const enabledCount = Object.keys(baseValues).filter((key) => {
+        return state.enabled[key] && baseValues[key] > 0;
+      }).length;
 
       document.getElementById("mainMonthlyValue").textContent = formatBRL(monthly);
       document.getElementById("mainYearlyValue").textContent = formatBRL(value12);
@@ -911,10 +1031,12 @@ $baseValues = [
       document.getElementById("overviewOpportunities").textContent = enabledCount + " categorias";
       document.getElementById("overviewOpportunitiesText").textContent =
         enabledCount > 0
-          ? "Categorias ativas na leitura da sua poupança invisível."
-          : "Nenhuma categoria ativa no momento.";
+          ? "Categorias com oportunidades encontradas nos seus lançamentos deste mês."
+          : "Nenhuma oportunidade foi encontrada nas categorias ativas.";
 
-      document.getElementById("realisticRange").textContent = scenario.range;
+      document.getElementById("realisticRange").textContent = monthly > 0
+        ? `${formatBRL(monthly * 0.7)} a ${formatBRL(monthly)} / mês`
+        : "Nenhuma oportunidade detectada";
       document.getElementById("idealGoal").textContent = scenario.goal;
 
       document.getElementById("detailMonthlyValue").textContent = formatBRL(monthly);
@@ -949,10 +1071,6 @@ $baseValues = [
       updateToggles();
     }
 
-    // ATENÇÃO: essa função é NOVA — salva a configuração atual (cenário
-    // e categorias ativas) no banco, via AJAX, toda vez que o usuário
-    // muda alguma coisa. Assim, da próxima vez que ele abrir essa tela,
-    // continua do jeito que deixou.
     async function salvarConfiguracao() {
       try {
         await fetch("atualizar-poupanca-config.php", {

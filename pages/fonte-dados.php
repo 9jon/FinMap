@@ -45,9 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } else {
 
-            // CORRIGIDO: usava $usuario_id (variável que não existe nesta
-            // página) em vez de $id_usuario (a variável certa, definida
-            // a partir da sessão logo no topo do arquivo).
+            
             $sql = "INSERT INTO fonte_dados (usuario_id, tipo_fonte)
                     VALUES (?, ?)";
 

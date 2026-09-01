@@ -1,27 +1,25 @@
 <?php
-// pages/atualizar-saldo.php
-// Recebe o novo saldo via fetch() (POST) e grava no banco.
-// Responde em JSON pra o JavaScript saber se deu certo ou não.
+
 
 session_start();
 include '../config/conn.php';
 
 header('Content-Type: application/json');
 
-// Só aceita requisições POST
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['sucesso' => false, 'erro' => 'Método não permitido']);
     exit;
 }
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1; // depois vira só $_SESSION['usuario_id']
+$usuario_id = $_SESSION['usuario_id'] ?? 1; 
 
-// Lê o corpo da requisição (vem como JSON do fetch)
+
 $dados = json_decode(file_get_contents('php://input'), true);
 $novoSaldo = $dados['novo_saldo'] ?? null;
 
-// Validação básica
+
 if ($novoSaldo === null || !is_numeric($novoSaldo)) {
     http_response_code(400);
     echo json_encode(['sucesso' => false, 'erro' => 'Valor de saldo inválido']);

@@ -1,7 +1,5 @@
 <?php
-// ============================================================
-// BLOCO PHP — busca lançamentos pendentes/revisados e as regras
-// ============================================================
+
 session_start();
 include '../config/conn.php';
 
@@ -15,7 +13,6 @@ $usuario = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 
-// --- Regras de revisão (cria com padrão se ainda não existir) ---
 $stmt = $conn->prepare("SELECT * FROM revisao_regras WHERE usuario_id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -35,12 +32,7 @@ if (!$regras) {
     ];
 }
 
-// --- Lançamentos capturados/cadastrados ---
-// CORRIGIDO: antes essa consulta tinha "AND t.origem != 'manual'",
-// deixando de fora tudo que era cadastrado manualmente pelo dashboard.
-// O usuário pediu explicitamente que os cadastros manuais também
-// apareçam aqui, então removemos esse filtro — agora a fila mostra
-// TODAS as origens (manual, ocr, sms, importação).
+
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.origem, t.status, t.confianca_percentual,
            t.observacao_captura, t.data_transacao, c.nome AS categoria_nome
@@ -57,8 +49,7 @@ $stmt->close();
 
 
 
-// Metadados visuais por origem (ícone, cor, rótulo)
-// Adicionado "manual" à lista, já que agora ele aparece na fila também.
+
 $sourceMeta = [
     'manual'     => ['label' => 'Manual', 'badge' => 'green', 'icon' => 'pencil-square', 'padrao' => 'Cadastrado manualmente'],
     'ocr'        => ['label' => 'OCR', 'badge' => 'purple', 'icon' => 'receipt-cutoff', 'padrao' => 'Capturado de nota fiscal'],
@@ -66,7 +57,7 @@ $sourceMeta = [
     'importacao' => ['label' => 'Importação', 'badge' => 'blue', 'icon' => 'file-earmark-arrow-up', 'padrao' => 'Arquivo importado']
 ];
 
-// Mapeia status do banco (português) pro que o JS já usa (inglês)
+
 $statusMap = ['pendente' => 'pending', 'aprovado' => 'approved', 'rejeitado' => 'rejected'];
 
 $launches = [];
@@ -85,8 +76,7 @@ foreach ($transacoesResult as $t) {
     ];
 }
 
-// --- Contadores de hoje (aprovados/rejeitados) ---
-// Também sem o filtro de origem, pra contar tudo.
+
 $stmt = $conn->prepare("
     SELECT
         SUM(CASE WHEN status = 'aprovado' AND DATE(atualizado_em) = CURDATE() THEN 1 ELSE 0 END) AS aprovados_hoje,
@@ -601,9 +591,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
   <script>
     const body = document.body;
 
-    // ATENÇÃO: os lançamentos agora vêm do banco (via PHP), não são
-    // mais fixos no JavaScript. O approvedToday/rejectedToday também
-    // vêm de uma contagem real no banco.
+
     const state = {
       filter: "all",
       hideApproved: <?= $regras['ocultar_aprovados'] ? 'true' : 'false' ?>,
@@ -689,15 +677,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       unlockBody();
     }
 
-    // -----------------------------------------------------------------
-    // CORRIGIDO: "ocultar_aprovados" estava escondendo TODOS os itens
-    // com status "approved" — incluindo os manuais, que sempre entram
-    // já aprovados por definição (não passam por fila de validação).
-    // Resultado: assim que a página carregava, a regra (ativada por
-    // padrão) escondia todo cadastro manual, deixando a fila vazia.
-    // Agora essa regra só se aplica a itens que não são manuais — os
-    // manuais aparecem sempre, independente dessa configuração.
-    // -----------------------------------------------------------------
+
     function getFilteredLaunches() {
       let launches = state.launches;
 
