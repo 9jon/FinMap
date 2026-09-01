@@ -106,3 +106,39 @@
 [2026-08-26 00:32:08] Valores lidos: tipo=despesa | descricao='camisa' | valor_bruto='R$ 120,00' | valor_convertido=120 | categoriaIdRaw='25' | categoriaId=25 | data=2026-08-26
 [2026-08-26 00:32:08] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
 [2026-08-26 00:32:08] SUCESSO: transação inserida com id 10 (tipo=despesa, categoria_id=25)
+[2026-08-27 02:30:38] --- nova requisição ---
+[2026-08-27 02:30:38] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'camisa',
+  'valor' => 'R$ 40,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '20',
+  'data_transacao' => '2026-08-27',
+)
+[2026-08-27 02:30:38] Valores lidos: tipo=receita | descricao='camisa' | valor_bruto='R$ 40,00' | valor_convertido=40 | categoriaIdRaw='20' | categoriaId=20 | data=2026-08-27
+[2026-08-27 02:30:38] Categoria 20 confirmada para usuário 6 e tipo 'receita'.
+[2026-08-27 02:30:38] SUCESSO: transação inserida com id 11 (tipo=receita, categoria_id=20)
+[2026-08-27 02:33:28] --- nova requisição ---
+[2026-08-27 02:33:29] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'bermuda',
+  'valor' => 'R$ 10,00',
+  'categoria_id_despesa' => '25',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-27',
+)
+[2026-08-27 02:33:29] Valores lidos: tipo=despesa | descricao='bermuda' | valor_bruto='R$ 10,00' | valor_convertido=10 | categoriaIdRaw='25' | categoriaId=25 | data=2026-08-27
+[2026-08-27 02:33:29] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
+[2026-08-27 02:33:29] SUCESSO: transação inserida com id 12 (tipo=despesa, categoria_id=25)
+[2026-08-27 02:35:19] --- nova requisição ---
+[2026-08-27 02:35:19] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'ps5',
+  'valor' => 'R$ 5,00',
+  'categoria_id_despesa' => '25',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-08-27',
+)
+[2026-08-27 02:35:19] Valores lidos: tipo=despesa | descricao='ps5' | valor_bruto='R$ 5,00' | valor_convertido=5 | categoriaIdRaw='25' | categoriaId=25 | data=2026-08-27
+[2026-08-27 02:35:19] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
+[2026-08-27 02:35:19] SUCESSO: transação inserida com id 13 (tipo=despesa, categoria_id=25)

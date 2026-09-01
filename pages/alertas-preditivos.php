@@ -113,7 +113,181 @@ function severidadeParaLabel(string $severidade): string
 }
 
 // -----------------------------------------------------------------
-// Busca os alertas do usuário
+// Busca a configuração de sensibilidade do usuário
+// -----------------------------------------------------------------
+$sqlConfig = "SELECT alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade
+              FROM alertas_configuracao WHERE usuario_id = ?";
+$stmtConfig = $conn->prepare($sqlConfig);
+$stmtConfig->bind_param("i", $usuario_id);
+$stmtConfig->execute();
+$config = $stmtConfig->get_result()->fetch_assoc();
+$stmtConfig->close();
+
+$sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
+$alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
+$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+
+// -----------------------------------------------------------------
+// ANÁLISE REAL DOS GASTOS DO MÊS
+// Usa somente transações aprovadas do usuário logado.
+// -----------------------------------------------------------------
+$stmtFinanceiro = $conn->prepare("
+    SELECT
+        COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor ELSE 0 END), 0) AS receitas,
+        COALESCE(SUM(CASE WHEN tipo = 'despesa' THEN valor ELSE 0 END), 0) AS despesas
+    FROM transacoes
+    WHERE usuario_id = ?
+      AND status = 'aprovado'
+      AND MONTH(data_transacao) = MONTH(CURDATE())
+      AND YEAR(data_transacao) = YEAR(CURDATE())
+");
+$stmtFinanceiro->bind_param("i", $usuario_id);
+$stmtFinanceiro->execute();
+$dadosFinanceiros = $stmtFinanceiro->get_result()->fetch_assoc();
+$stmtFinanceiro->close();
+
+$receitasMes = (float)($dadosFinanceiros['receitas'] ?? 0);
+$despesasMes = (float)($dadosFinanceiros['despesas'] ?? 0);
+$saldoMes = $receitasMes - $despesasMes;
+
+$percentualGasto = $receitasMes > 0
+    ? ($despesasMes / $receitasMes) * 100
+    : 0;
+
+$riscoFinanceiro = 'controlado';
+$tituloRisco = 'Controlado';
+$textoRisco = 'Seu cenário atual está estável e sem grandes sinais de desequilíbrio.';
+$pressaoFinanceira = 'Sem pressão relevante';
+$acaoFinanceira = 'Manter rotina atual';
+
+if ($receitasMes <= 0 && $despesasMes > 0) {
+    $riscoFinanceiro = 'alto';
+    $tituloRisco = 'Alto risco';
+    $textoRisco = 'Há gastos registrados neste mês, mas nenhuma receita aprovada foi identificada. Evite novos gastos até organizar o orçamento.';
+    $pressaoFinanceira = 'Gastos sem receita registrada';
+    $acaoFinanceira = 'Evitar novos gastos';
+} elseif ($percentualGasto >= 85) {
+    $riscoFinanceiro = 'alto';
+    $tituloRisco = 'Alto risco';
+    $textoRisco = 'Você já comprometeu ' . number_format($percentualGasto, 1, ',', '.') . '% da sua receita deste mês. Evite novos gastos desnecessários.';
+    $pressaoFinanceira = 'Gastos do mês';
+    $acaoFinanceira = 'Evitar novos gastos';
+} elseif ($percentualGasto >= 70) {
+    $riscoFinanceiro = 'medio';
+    $tituloRisco = 'Médio risco';
+    $textoRisco = 'Você já gastou ' . number_format($percentualGasto, 1, ',', '.') . '% da sua receita deste mês. Reduza gastos para evitar pressão no final do mês.';
+    $pressaoFinanceira = 'Gastos do mês';
+    $acaoFinanceira = 'Reduzir gastos variáveis';
+} elseif ($percentualGasto >= 50) {
+    $riscoFinanceiro = 'baixo';
+    $tituloRisco = 'Atenção';
+    $textoRisco = 'Você já utilizou ' . number_format($percentualGasto, 1, ',', '.') . '% da sua receita deste mês. Acompanhe os próximos gastos.';
+    $pressaoFinanceira = 'Ritmo de gastos';
+    $acaoFinanceira = 'Controlar próximos gastos';
+}
+
+// -----------------------------------------------------------------
+// Cria/atualiza automaticamente um alerta real no banco quando o
+// comportamento financeiro indicar que é melhor evitar novos gastos.
+// O alerta é específico do usuário e do mês atual.
+// -----------------------------------------------------------------
+$tituloAlertaGastos = 'Alerta de gastos do mês';
+
+if ($alertasOrcamentoAtivo && ($riscoFinanceiro === 'medio' || $riscoFinanceiro === 'alto')) {
+    if ($receitasMes > 0) {
+        $restante = max($receitasMes - $despesasMes, 0);
+
+        if ($riscoFinanceiro === 'alto') {
+            $descricaoAlerta = 'Você já gastou R$ ' . number_format($despesasMes, 2, ',', '.') .
+                ' de R$ ' . number_format($receitasMes, 2, ',', '.') .
+                ' recebidos neste mês (' . number_format($percentualGasto, 1, ',', '.') .
+                '%). Restam R$ ' . number_format($restante, 2, ',', '.') .
+                '. Evite novos gastos desnecessários.';
+        } else {
+            $descricaoAlerta = 'Você já gastou R$ ' . number_format($despesasMes, 2, ',', '.') .
+                ' de R$ ' . number_format($receitasMes, 2, ',', '.') .
+                ' recebidos neste mês (' . number_format($percentualGasto, 1, ',', '.') .
+                '%). Restam R$ ' . number_format($restante, 2, ',', '.') .
+                '. Reduza os gastos para evitar pressão no fim do mês.';
+        }
+    } else {
+        $descricaoAlerta = 'Há R$ ' . number_format($despesasMes, 2, ',', '.') .
+            ' em gastos aprovados neste mês e nenhuma receita aprovada registrada. Evite novos gastos até organizar o orçamento.';
+    }
+
+    $impactoAlerta = max($despesasMes - ($receitasMes * 0.70), 0);
+    $severidadeAlerta = $riscoFinanceiro === 'alto' ? 'alto' : 'medio';
+    $horizonteAlerta = 'Neste mês';
+
+    $stmtBuscaAlerta = $conn->prepare("
+        SELECT id
+        FROM alertas_preditivos
+        WHERE usuario_id = ?
+          AND titulo = ?
+          AND MONTH(criado_em) = MONTH(CURDATE())
+          AND YEAR(criado_em) = YEAR(CURDATE())
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+    $stmtBuscaAlerta->bind_param("is", $usuario_id, $tituloAlertaGastos);
+    $stmtBuscaAlerta->execute();
+    $alertaExistente = $stmtBuscaAlerta->get_result()->fetch_assoc();
+    $stmtBuscaAlerta->close();
+
+    if ($alertaExistente) {
+        $stmtAtualizaAlerta = $conn->prepare("
+            UPDATE alertas_preditivos
+            SET descricao = ?, severidade = ?, impacto_estimado = ?, horizonte = ?
+            WHERE id = ? AND usuario_id = ?
+        ");
+        $idAlerta = (int)$alertaExistente['id'];
+        $stmtAtualizaAlerta->bind_param(
+            "ssdsii",
+            $descricaoAlerta,
+            $severidadeAlerta,
+            $impactoAlerta,
+            $horizonteAlerta,
+            $idAlerta,
+            $usuario_id
+        );
+        $stmtAtualizaAlerta->execute();
+        $stmtAtualizaAlerta->close();
+    } else {
+        $tituloAlerta = $tituloAlertaGastos;
+        $stmtInsereAlerta = $conn->prepare("
+            INSERT INTO alertas_preditivos
+                (usuario_id, titulo, descricao, severidade, impacto_estimado, horizonte, lido)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+        ");
+        $stmtInsereAlerta->bind_param(
+            "isssds",
+            $usuario_id,
+            $tituloAlerta,
+            $descricaoAlerta,
+            $severidadeAlerta,
+            $impactoAlerta,
+            $horizonteAlerta
+        );
+        $stmtInsereAlerta->execute();
+        $stmtInsereAlerta->close();
+    }
+} else {
+    // Se o cenário voltou ao normal, remove somente o alerta automático
+    // deste mês, sem mexer nos demais alertas cadastrados pelo sistema.
+    $stmtRemoveAlerta = $conn->prepare("
+        DELETE FROM alertas_preditivos
+        WHERE usuario_id = ?
+          AND titulo = ?
+          AND MONTH(criado_em) = MONTH(CURDATE())
+          AND YEAR(criado_em) = YEAR(CURDATE())
+    ");
+    $stmtRemoveAlerta->bind_param("is", $usuario_id, $tituloAlertaGastos);
+    $stmtRemoveAlerta->execute();
+    $stmtRemoveAlerta->close();
+}
+
+// -----------------------------------------------------------------
+// Busca novamente os alertas do usuário após criar/atualizar o alerta automático.
 // -----------------------------------------------------------------
 $sql = "SELECT id, titulo, descricao, severidade, impacto_estimado, horizonte, lido, criado_em
         FROM alertas_preditivos
@@ -130,21 +304,6 @@ while ($linha = $resultado->fetch_assoc()) {
     $alertas[] = $linha;
 }
 $stmt->close();
-
-// -----------------------------------------------------------------
-// Busca a configuração de sensibilidade do usuário
-// -----------------------------------------------------------------
-$sqlConfig = "SELECT alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade
-              FROM alertas_configuracao WHERE usuario_id = ?";
-$stmtConfig = $conn->prepare($sqlConfig);
-$stmtConfig->bind_param("i", $usuario_id);
-$stmtConfig->execute();
-$config = $stmtConfig->get_result()->fetch_assoc();
-$stmtConfig->close();
-
-$sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
-$alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
-$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
 
 // -----------------------------------------------------------------
 // Array pro JS usar só pra exibição (detalhes, cálculo de resumo,
@@ -669,6 +828,18 @@ $alertasParaJs = array_map(function ($a) {
     // <form method="post"> que já existem no HTML acima.
     const alerts = <?= json_encode($alertasParaJs, JSON_UNESCAPED_UNICODE) ?>;
 
+    const financialData = {
+      income: <?= json_encode($receitasMes) ?>,
+      expenses: <?= json_encode($despesasMes) ?>,
+      balance: <?= json_encode($saldoMes) ?>,
+      spentPercent: <?= json_encode(round($percentualGasto, 1)) ?>,
+      risk: <?= json_encode($riscoFinanceiro) ?>,
+      riskTitle: <?= json_encode($tituloRisco, JSON_UNESCAPED_UNICODE) ?>,
+      riskText: <?= json_encode($textoRisco, JSON_UNESCAPED_UNICODE) ?>,
+      pressure: <?= json_encode($pressaoFinanceira, JSON_UNESCAPED_UNICODE) ?>,
+      action: <?= json_encode($acaoFinanceira, JSON_UNESCAPED_UNICODE) ?>
+    };
+
     function formatBRL(value) {
       return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     }
@@ -830,41 +1001,22 @@ $alertasParaJs = array_map(function ($a) {
       }
     });
 
-    // Resumo (Risco atual, Não vistos, Leitura rápida, Sensibilidade)
+    // Resumo baseado nos gastos REAIS do banco.
     (function atualizarResumo() {
       const unread = alerts.filter(a => !a.read).length;
-      const highRisk = alerts.filter(a => a.severity === "high").length;
-      const mediumRisk = alerts.filter(a => a.severity === "medium").length;
 
-      let riskStatus = "Controlado";
-      let riskText = "Seu cenário atual está estável e sem grandes sinais de desequilíbrio.";
-      let quickPressure = "Sem pressão relevante";
-      let quickWindow = "Sem urgência crítica";
-      let quickAction = "Manter rotina atual";
-
-      if (highRisk > 0) {
-        riskStatus = "Moderado";
-        riskText = "Seu ritmo atual de gastos exige atenção para o fechamento do mês.";
-        quickPressure = "Despesas variáveis";
-        quickWindow = "Próximos 8 dias";
-        quickAction = "Reduzir alimentação e extras";
-      }
-
-      if (highRisk > 0 && mediumRisk >= 2) {
-        riskStatus = "Elevado";
-        riskText = "Há sinais claros de desequilíbrio financeiro se o comportamento atual continuar.";
-        quickPressure = "Orçamento e recorrências";
-        quickWindow = "Próximos 5 a 8 dias";
-        quickAction = "Cortar variáveis e rever cobranças";
-      }
-
-      document.getElementById("riskStatus").textContent = riskStatus;
-      document.getElementById("riskText").textContent = riskText;
+      document.getElementById("riskStatus").textContent = financialData.riskTitle;
+      document.getElementById("riskText").textContent = financialData.riskText;
       document.getElementById("unreadAlertsCount").textContent = unread;
-      document.getElementById("quickRiskStatus").textContent = riskStatus;
-      document.getElementById("quickMainPressure").textContent = quickPressure;
-      document.getElementById("quickCriticalWindow").textContent = quickWindow;
-      document.getElementById("quickBestAction").textContent = quickAction;
+      document.getElementById("activeAlertsCount").textContent = alerts.length;
+
+      document.getElementById("quickRiskStatus").textContent = financialData.riskTitle;
+      document.getElementById("quickMainPressure").textContent = financialData.pressure;
+      document.getElementById("quickCriticalWindow").textContent =
+        financialData.risk === "alto" ? "Agora" :
+        financialData.risk === "medio" ? "Próximos dias" :
+        financialData.risk === "baixo" ? "Acompanhar este mês" : "Sem urgência crítica";
+      document.getElementById("quickBestAction").textContent = financialData.action;
 
       const sensibilidade = <?= json_encode($sensibilidade) ?>;
       const fill = document.getElementById("sensitivityFill");
