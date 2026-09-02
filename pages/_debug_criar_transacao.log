@@ -142,3 +142,15 @@
 [2026-08-27 02:35:19] Valores lidos: tipo=despesa | descricao='ps5' | valor_bruto='R$ 5,00' | valor_convertido=5 | categoriaIdRaw='25' | categoriaId=25 | data=2026-08-27
 [2026-08-27 02:35:19] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
 [2026-08-27 02:35:19] SUCESSO: transação inserida com id 13 (tipo=despesa, categoria_id=25)
+[2026-09-03 00:47:45] --- nova requisição ---
+[2026-09-03 00:47:45] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'calça jeans',
+  'valor' => 'R$ 200,00',
+  'categoria_id_despesa' => '5',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-09-03',
+)
+[2026-09-03 00:47:45] Valores lidos: tipo=despesa | descricao='calça jeans' | valor_bruto='R$ 200,00' | valor_convertido=200 | categoriaIdRaw='5' | categoriaId=5 | data=2026-09-03
+[2026-09-03 00:47:45] Categoria 5 confirmada para usuário 1 e tipo 'despesa'.
+[2026-09-03 00:47:45] SUCESSO: transação inserida com id 29 (tipo=despesa, categoria_id=5)
