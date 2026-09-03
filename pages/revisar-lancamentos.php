@@ -4,6 +4,9 @@ session_start();
 include '../config/conn.php';
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
+$importacaoFeedback = $_SESSION['importacao_feedback'] ?? null;
+unset($_SESSION['importacao_feedback']);
+$importacaoFiltroId = filter_input(INPUT_GET, 'importacao', FILTER_VALIDATE_INT) ?: 0;
 
 // --- Avatar do usuário ---
 $stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
@@ -32,16 +35,29 @@ if (!$regras) {
     ];
 }
 
+$stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$categoriasUsuario = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
-$stmt = $conn->prepare("
-    SELECT t.id, t.descricao, t.valor, t.origem, t.status, t.confianca_percentual,
+$sqlTransacoes = "
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.categoria_id, t.origem, t.status, t.confianca_percentual,
            t.observacao_captura, t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ?
-    ORDER BY t.data_transacao DESC, t.id DESC
-");
-$stmt->bind_param("i", $usuario_id);
+    WHERE t.usuario_id = ?";
+if ($importacaoFiltroId > 0) {
+    $sqlTransacoes .= ' AND t.importacao_id = ?';
+}
+$sqlTransacoes .= ' ORDER BY t.data_transacao DESC, t.id DESC';
+
+$stmt = $conn->prepare($sqlTransacoes);
+if ($importacaoFiltroId > 0) {
+    $stmt->bind_param("ii", $usuario_id, $importacaoFiltroId);
+} else {
+    $stmt->bind_param("i", $usuario_id);
+}
 $stmt->execute();
 $transacoesResult = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -68,11 +84,14 @@ foreach ($transacoesResult as $t) {
         'amount' => (float) $t['valor'],
         'source' => $t['origem'],
         'sourceLabel' => $sourceMeta[$t['origem']]['label'] ?? ucfirst($t['origem']),
+        'type' => $t['tipo'],
+        'categoryId' => $t['categoria_id'] !== null ? (int) $t['categoria_id'] : null,
         'category' => $t['categoria_nome'] ?? 'Sem categoria',
         'confidence' => $t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 100,
         'status' => $statusMap[$t['status']] ?? 'pending',
         'note' => $t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''),
-        'date' => date('d/m/Y', strtotime($t['data_transacao']))
+        'date' => date('d/m/Y', strtotime($t['data_transacao'])),
+        'dateISO' => $t['data_transacao']
     ];
 }
 
@@ -107,6 +126,13 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
   <link rel="stylesheet" href="../assets/css/revisar-lancamentos.css">
 </head>
 <body>
+
+<?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'sucesso'): ?>
+  <div class="import-review-feedback" role="status">
+    <i class="bi bi-check2-circle"></i>
+    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'Importação concluída.')) ?></span>
+  </div>
+<?php endif; ?>
 
   <header class="topbar">
     <div class="topbar-left">
@@ -353,8 +379,15 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
           </label>
 
           <label class="review-field">
+            <span>Data</span>
+            <input type="date" id="editDateInput">
+          </label>
+
+          <label class="review-field">
             <span>Categoria</span>
-            <input type="text" id="editCategoryInput" placeholder="Categoria">
+            <select id="editCategorySelect">
+              <option value="">Sem categoria</option>
+            </select>
           </label>
 
           <label class="review-field">
@@ -600,6 +633,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       selectedIds: [],
       currentEditId: null,
       launches: <?= json_encode($launches) ?>,
+      categories: <?= json_encode($categoriasUsuario) ?>,
       approvedToday: <?= $aprovadosHoje ?>,
       rejectedToday: <?= $rejeitadosHoje ?>
     };
@@ -609,6 +643,11 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         style: "currency",
         currency: "BRL"
       });
+    }
+
+    function formatDateBR(value) {
+      const partes = String(value).split("-");
+      return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : value;
     }
 
     function hasClassSafe(element, className) {
@@ -682,7 +721,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       let launches = state.launches;
 
       if (state.hideApproved) {
-        launches = launches.filter(item => item.status === "pending" || item.source === "manual");
+        launches = launches.filter(item => item.status !== "approved");
       }
 
       if (state.filter !== "all") {
@@ -755,6 +794,21 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       openReviewModal("detailsModal");
     }
 
+    function preencherCategoriasDaEdicao(launch) {
+      const categorySelect = document.getElementById("editCategorySelect");
+      if (!categorySelect) return;
+
+      categorySelect.replaceChildren(new Option("Sem categoria", ""));
+
+      state.categories
+        .filter(category => category.tipo === launch.type)
+        .forEach((category) => {
+          categorySelect.add(new Option(category.nome, String(category.id)));
+        });
+
+      categorySelect.value = launch.categoryId === null ? "" : String(launch.categoryId);
+    }
+
     function openEdit(id) {
       const launch = state.launches.find(item => item.id === id);
       if (!launch) return;
@@ -762,7 +816,8 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       state.currentEditId = id;
       document.getElementById("editDescriptionInput").value = launch.description;
       document.getElementById("editAmountInput").value = launch.amount;
-      document.getElementById("editCategoryInput").value = launch.category;
+      document.getElementById("editDateInput").value = launch.dateISO;
+      preencherCategoriasDaEdicao(launch);
       document.getElementById("editSourceInput").value = launch.sourceLabel;
 
       openReviewModal("editModal");
@@ -906,14 +961,22 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
         const novaDescricao = document.getElementById("editDescriptionInput").value.trim() || launch.description;
         const novoValor = parseFloat(document.getElementById("editAmountInput").value) || launch.amount;
-        const novaCategoria = document.getElementById("editCategoryInput").value.trim() || launch.category;
+        const novaData = document.getElementById("editDateInput").value || launch.dateISO;
+        const categorySelect = document.getElementById("editCategorySelect");
+        const novaCategoriaId = categorySelect && categorySelect.value !== ""
+          ? Number(categorySelect.value)
+          : null;
+        const novaCategoria = categorySelect && categorySelect.selectedIndex >= 0
+          ? categorySelect.options[categorySelect.selectedIndex].text
+          : "Sem categoria";
 
         const resultado = await enviarAcao({
           acao: "editar",
           id: launch.id,
           descricao: novaDescricao,
           valor: novoValor,
-          categoria: novaCategoria
+          categoria_id: novaCategoriaId,
+          data_transacao: novaData
         });
 
         if (!resultado.sucesso) {
@@ -924,13 +987,20 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         launch.description = novaDescricao;
         launch.amount = novoValor;
         launch.category = novaCategoria;
+        launch.categoryId = novaCategoriaId;
+        launch.dateISO = novaData;
+        launch.date = formatDateBR(novaData);
 
         const item = document.querySelector(`.review-item[data-id="${launch.id}"]`);
         if (item) {
           const titleEl = item.querySelector(".review-item__title-row h4");
           const amountEl = item.querySelector(".review-item__amount strong");
+          const subtitleEl = item.querySelector(".review-item__info p");
+          const categoryMetaEl = item.querySelector(".review-item__meta span:first-child");
           if (titleEl) titleEl.textContent = novaDescricao;
           if (amountEl) amountEl.textContent = formatBRL(novoValor);
+          if (subtitleEl) subtitleEl.textContent = `${launch.note} • ${novaCategoria} • ${launch.date}`;
+          if (categoryMetaEl) categoryMetaEl.innerHTML = `<i class="bi bi-tag"></i> ${novaCategoria}`;
         }
 
         closeReviewModal("editModal");

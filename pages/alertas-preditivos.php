@@ -105,6 +105,8 @@ function severidadeParaLabel(string $severidade): string
 }
 
 
+
+
 // -----------------------------------------------------------------
 // Busca a configuração de sensibilidade do usuário
 // -----------------------------------------------------------------
@@ -281,7 +283,12 @@ if ($alertasOrcamentoAtivo && ($riscoFinanceiro === 'medio' || $riscoFinanceiro 
 
 // -----------------------------------------------------------------
 // Busca novamente os alertas do usuário após criar/atualizar o alerta automático.
+
 // ---------------
+
+// -----------------------------------------------------------------
+
+
 $sql = "SELECT id, titulo, descricao, severidade, impacto_estimado, horizonte, lido, criado_em
         FROM alertas_preditivos
         WHERE usuario_id = ?
@@ -299,6 +306,8 @@ while ($linha = $resultado->fetch_assoc()) {
 $stmt->close();
 
 
+
+ 
 // -----------------------------------------------------------------
 // Array pro JS usar só pra exibição (detalhes, cálculo de resumo,
 // preview da simulação). Nenhuma ação grava usando esse array —
@@ -1007,8 +1016,13 @@ $alertasParaJs = array_map(function ($a) {
     });
 
 
+<<<<<<< HEAD
     // Resumo baseado nos gastos REAIS do banco.
     
+=======
+
+ dd0639bbf625db9f56b0d7297230e0662e8547ba
+>>>>>>> 2610e91a98617e795a36837077d13e48d8fe3379
     (function atualizarResumo() {
       const unread = alerts.filter(a => !a.read).length;
 

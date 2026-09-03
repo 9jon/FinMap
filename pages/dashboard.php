@@ -6,6 +6,13 @@ include '../config/conn.php';
 
 $usuario_id = $_SESSION['usuario_id'] ?? 1;
 
+if (empty($_SESSION['csrf_importacao'])) {
+    $_SESSION['csrf_importacao'] = bin2hex(random_bytes(32));
+}
+$csrfImportacao = $_SESSION['csrf_importacao'];
+$importacaoFeedback = $_SESSION['importacao_feedback'] ?? null;
+unset($_SESSION['importacao_feedback']);
+
 
 $stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
@@ -22,28 +29,28 @@ $stmt = $conn->prepare("
     SELECT
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS receitas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS despesas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS receitas_anterior,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS despesas_anterior,
         SUM(CASE
-            WHEN data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            WHEN (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN 1 ELSE 0 END) AS lancamentos_anterior
     FROM transacoes
     WHERE usuario_id = ?
       AND status = 'aprovado'
-      AND data_transacao >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
-      AND data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -98,7 +105,9 @@ $stmt = $conn->prepare("
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.status = 'aprovado'
-    ORDER BY t.data_transacao DESC, t.id DESC
+    -- Recentes deve refletir os lançamentos incluídos ou aprovados por último.
+    -- A data do extrato pode ser antiga, mas a aprovação acabou de acontecer.
+    ORDER BY t.atualizado_em DESC, t.id DESC
     LIMIT 5
 ");
 $stmt->bind_param("i", $usuario_id);
@@ -134,11 +143,16 @@ $stmt->close();
 
 
 $stmt = $conn->prepare("
-    SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
+    SELECT COALESCE(c.id, 0) AS id,
+           COALESCE(c.nome, 'Sem categoria') AS nome,
+           COALESCE(c.icone, 'tag') AS icone,
+           COALESCE(c.cor, 'green') AS cor,
+           COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
-    INNER JOIN categorias c ON c.id = t.categoria_id
+    LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
-      AND MONTH(t.data_transacao) = MONTH(CURDATE()) AND YEAR(t.data_transacao) = YEAR(CURDATE())
+      AND MONTH(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = MONTH(CURDATE())
+      AND YEAR(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = YEAR(CURDATE())
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
 ");
@@ -331,6 +345,13 @@ foreach ($metas as $meta) {
   <link rel="stylesheet" href="../assets/css/dashboard.css">
 </head>
 <body>
+
+<?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'erro'): ?>
+  <div class="import-feedback import-feedback--error" role="alert">
+    <i class="bi bi-exclamation-circle"></i>
+    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'Não foi possível importar o arquivo.')) ?></span>
+  </div>
+<?php endif; ?>
 
   <header class="topbar">
     <div class="topbar-left">
@@ -1021,7 +1042,7 @@ $stmt->close();
           </div>
         </button>
 
-        <button class="transaction-option-card" type="button">
+        <button class="transaction-option-card" id="openImportTransactionOption" type="button">
           <div class="transaction-option-card__icon transaction-option-card__icon--orange">
             <i class="bi bi-file-earmark-arrow-up"></i>
           </div>
@@ -1138,6 +1159,65 @@ $stmt->close();
           <div class="d-flex justify-content-end gap-2">
             <button type="button" class="settings-footer-btn settings-footer-btn--secondary" id="cancelManualTransactionModal">Cancelar</button>
             <button type="submit" class="settings-footer-btn settings-footer-btn--primary">Salvar transação</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPORTAR ARQUIVO -->
+  <div class="dashboard-popout-overlay" id="importTransactionModal">
+    <div class="dashboard-popout dashboard-popout--small import-popout">
+      <div class="dashboard-popout__header">
+        <div class="dashboard-popout__title-group">
+          <div class="dashboard-popout__icon dashboard-popout__icon--orange">
+            <i class="bi bi-file-earmark-arrow-up"></i>
+          </div>
+          <div>
+            <h3>Importar transações</h3>
+            <p>Envie seu extrato para identificar lançamentos e preparar a revisão.</p>
+          </div>
+        </div>
+
+        <button class="dashboard-popout__close" id="closeImportTransactionModal" type="button" aria-label="Fechar">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="dashboard-popout__body">
+        <form class="import-form" method="post" action="importar-transacoes.php" enctype="multipart/form-data" id="importTransactionForm">
+          <input type="hidden" name="csrf_importacao" value="<?= htmlspecialchars($csrfImportacao) ?>">
+
+          <div class="import-file-callout import-file-callout--minimal">
+            <i class="bi bi-shield-check"></i>
+            <div>
+              <strong>Importação segura e pendente</strong>
+              <p>O saldo não é alterado agora. Cada lançamento será enviado para aprovação em Revisar lançamentos.</p>
+            </div>
+          </div>
+
+          <div class="mb-3 import-file-field">
+            <label for="importFile" class="form-label fw-semibold">Arquivo do extrato</label>
+            <input class="form-control import-file-input" id="importFile" name="arquivo_importacao" type="file" accept=".csv,.ofx,.qfx,.xlsx" required aria-describedby="importFileStatus">
+            <label class="import-file-picker" for="importFile">
+              <span class="import-file-picker__icon"><i class="bi bi-file-earmark-arrow-up"></i></span>
+              <span>Escolher arquivo</span>
+            </label>
+            <span class="import-file-status" id="importFileStatus" aria-live="polite">Nenhum arquivo selecionado</span>
+            <div class="form-text">Formatos aceitos: CSV, OFX e Excel (.xlsx). Máximo de 10 MB e 5.000 lançamentos.</div>
+          </div>
+
+          <div class="import-file-tips import-file-tips--minimal">
+            <div><i class="bi bi-check2"></i><span>Leitura automática</span></div>
+            <div><i class="bi bi-check2"></i><span>Categorias sugeridas</span></div>
+            <div><i class="bi bi-check2"></i><span>Duplicados ignorados</span></div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4 import-form__actions">
+            <button type="button" class="settings-footer-btn settings-footer-btn--secondary" id="cancelImportTransactionModal">Cancelar</button>
+            <button type="submit" class="settings-footer-btn settings-footer-btn--primary" id="submitImportTransaction">
+              <i class="bi bi-file-earmark-arrow-up me-1"></i> Importar e revisar
+            </button>
           </div>
         </form>
       </div>
@@ -1597,6 +1677,14 @@ $stmt->close();
   const closeManualTransactionModal = document.getElementById("closeManualTransactionModal");
   const cancelManualTransactionModal = document.getElementById("cancelManualTransactionModal");
   const manualTransactionModal = document.getElementById("manualTransactionModal");
+  const openImportTransactionOption = document.getElementById("openImportTransactionOption");
+  const closeImportTransactionModal = document.getElementById("closeImportTransactionModal");
+  const cancelImportTransactionModal = document.getElementById("cancelImportTransactionModal");
+  const importTransactionModal = document.getElementById("importTransactionModal");
+  const importTransactionForm = document.getElementById("importTransactionForm");
+  const submitImportTransaction = document.getElementById("submitImportTransaction");
+  const importFileInput = document.getElementById("importFile");
+  const importFileStatus = document.getElementById("importFileStatus");
 
   const tipoDespesaRadio = document.getElementById("tipoDespesa");
   const tipoReceitaRadio = document.getElementById("tipoReceita");
@@ -1624,7 +1712,8 @@ $stmt->close();
       hasClassSafe(allTransactionsModal, "active") ||
       hasClassSafe(goalsMenuModal, "active") ||
       hasClassSafe(categoryPeriodModal, "active") ||
-      hasClassSafe(manualTransactionModal, "active");
+      hasClassSafe(manualTransactionModal, "active") ||
+      hasClassSafe(importTransactionModal, "active");
 
     body.style.overflow = hasOpenModal ? "hidden" : "";
   }
@@ -2025,6 +2114,13 @@ $stmt->close();
     });
   }
 
+  if (openImportTransactionOption) {
+    openImportTransactionOption.addEventListener("click", () => {
+      closeModal(transactionModal);
+      openModal(importTransactionModal);
+    });
+  }
+
   if (closeManualTransactionModal) {
     closeManualTransactionModal.addEventListener("click", () => closeModal(manualTransactionModal));
   }
@@ -2036,6 +2132,39 @@ $stmt->close();
   if (manualTransactionModal) {
     manualTransactionModal.addEventListener("click", (e) => {
       if (e.target === manualTransactionModal) closeModal(manualTransactionModal);
+    });
+  }
+
+  if (closeImportTransactionModal) {
+    closeImportTransactionModal.addEventListener("click", () => closeModal(importTransactionModal));
+  }
+
+  if (cancelImportTransactionModal) {
+    cancelImportTransactionModal.addEventListener("click", () => closeModal(importTransactionModal));
+  }
+
+  if (importTransactionModal) {
+    importTransactionModal.addEventListener("click", (e) => {
+      if (e.target === importTransactionModal) closeModal(importTransactionModal);
+    });
+  }
+
+  if (importFileInput && importFileStatus) {
+    importFileInput.addEventListener("change", () => {
+      const arquivo = importFileInput.files && importFileInput.files[0];
+      const campoArquivo = importFileInput.closest(".import-file-field");
+
+      importFileStatus.textContent = arquivo
+        ? arquivo.name
+        : "Nenhum arquivo selecionado";
+      campoArquivo?.classList.toggle("has-file", Boolean(arquivo));
+    });
+  }
+
+  if (importTransactionForm && submitImportTransaction) {
+    importTransactionForm.addEventListener("submit", () => {
+      submitImportTransaction.disabled = true;
+      submitImportTransaction.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Importando...';
     });
   }
 
@@ -2070,6 +2199,7 @@ $stmt->close();
       closeModal(goalsMenuModal);
       closeModal(categoryPeriodModal);
       closeModal(manualTransactionModal);
+      closeModal(importTransactionModal);
       closeNotifications();
     }
   });

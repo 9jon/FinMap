@@ -130,19 +130,42 @@ switch ($acao) {
     case 'editar':
         $descricao = trim($dados['descricao'] ?? '');
         $valor = isset($dados['valor']) ? (float) $dados['valor'] : null;
-        $categoriaNome = trim($dados['categoria'] ?? '');
+        $categoriaId = isset($dados['categoria_id']) && $dados['categoria_id'] !== null && $dados['categoria_id'] !== ''
+            ? (int) $dados['categoria_id']
+            : null;
+        $dataTransacao = $dados['data_transacao'] ?? '';
 
-        if ($descricao === '' || $valor === null || $valor <= 0 || $categoriaNome === '') {
+        $dataValida = DateTime::createFromFormat('!Y-m-d', $dataTransacao);
+        $errosData = DateTime::getLastErrors();
+        $dataInvalida = !$dataValida
+            || ($errosData !== false && ($errosData['warning_count'] > 0 || $errosData['error_count'] > 0));
+
+        if ($descricao === '' || $valor === null || $valor <= 0 || $dataInvalida) {
             $conn->rollback();
             http_response_code(400);
             echo json_encode(['sucesso' => false, 'erro' => 'Dados inválidos para edição']);
             exit;
         }
 
-        $categoriaId = encontrarOuCriarCategoria($conn, $usuario_id, $categoriaNome);
+        if ($categoriaId !== null) {
+            $stmtCategoria = $conn->prepare(
+                'SELECT id FROM categorias WHERE id = ? AND usuario_id = ? AND tipo = ? LIMIT 1'
+            );
+            $stmtCategoria->bind_param('iis', $categoriaId, $usuario_id, $transacaoAtual['tipo']);
+            $stmtCategoria->execute();
+            $categoriaValida = $stmtCategoria->get_result()->fetch_assoc();
+            $stmtCategoria->close();
 
-        $stmt = $conn->prepare("UPDATE transacoes SET descricao = ?, valor = ?, categoria_id = ? WHERE id = ? AND usuario_id = ?");
-        $stmt->bind_param("sdiii", $descricao, $valor, $categoriaId, $id, $usuario_id);
+            if (!$categoriaValida) {
+                $conn->rollback();
+                http_response_code(400);
+                echo json_encode(['sucesso' => false, 'erro' => 'Categoria invÃ¡lida para este lanÃ§amento']);
+                exit;
+            }
+        }
+
+        $stmt = $conn->prepare("UPDATE transacoes SET descricao = ?, valor = ?, categoria_id = ?, data_transacao = ? WHERE id = ? AND usuario_id = ?");
+        $stmt->bind_param("sdisii", $descricao, $valor, $categoriaId, $dataTransacao, $id, $usuario_id);
         $sucesso = $stmt->execute();
         $stmt->close();
 
