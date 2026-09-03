@@ -1005,10 +1005,9 @@ $alertasParaJs = array_map(function ($a) {
       }
     });
 
-<<<<<<< HEAD
-    // Resumo baseado nos gastos REAIS do banco.
-=======
->>>>>>> dd0639bbf625db9f56b0d7297230e0662e8547ba
+
+
+ dd0639bbf625db9f56b0d7297230e0662e8547ba
     (function atualizarResumo() {
       const unread = alerts.filter(a => !a.read).length;
 
