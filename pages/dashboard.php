@@ -1301,7 +1301,7 @@ $stmt->close();
                   <h5>Alertas preditivos</h5>
                   <p>Avisos quando houver risco no orçamento.</p>
                 </div>
-                <label class="switch switch--yellow">
+                <label class="switch switch--green">
                   <input type="checkbox" checked>
                   <span class="switch-slider"></span>
                 </label>
@@ -1323,7 +1323,7 @@ $stmt->close();
                   <h5>Sugestões da IA</h5>
                   <p>Recomendações rápidas do assistente.</p>
                 </div>
-                <label class="switch switch--purple">
+                <label class="switch switch--green">
                   <input type="checkbox" checked>
                   <span class="switch-slider"></span>
                 </label>
@@ -2038,6 +2038,15 @@ $stmt->close();
   settingsTriggers.forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const group = trigger.closest(".settings-group");
+      const content = group ? group.querySelector(".settings-group__content") : null;
+      const isOpen = trigger.classList.contains("active") && content?.classList.contains("open");
+
+      if (isOpen) {
+        trigger.classList.remove("active");
+        content.classList.remove("open");
+        return;
+      }
+
       const groupId = group ? group.getAttribute("id") : null;
       if (groupId) openSettingsSection(groupId, false);
     });
