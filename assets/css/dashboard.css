@@ -357,7 +357,7 @@ body {
 }
 
 /* =========================
-   FUNÇÕES PRINCIPAIS
+   FUNÃƒâ€¡Ãƒâ€¢ES PRINCIPAIS
 ========================= */
 
 .main-actions {
@@ -464,7 +464,7 @@ body {
 }
 
 /* =========================
-   GRID DOS PAINÉIS
+   GRID DOS PAINÃƒâ€°IS
 ========================= */
 
 .dashboard-panels {
@@ -483,7 +483,7 @@ body {
 }
 
 /* =========================
-   TRANSAÇÕES RECENTES
+   TRANSAÃƒâ€¡Ãƒâ€¢ES RECENTES
 ========================= */
 
 .recent-transactions-panel {
@@ -763,6 +763,11 @@ body {
   color: #ea580c;
 }
 
+.goal-card__icon--purple {
+  background: rgba(139, 92, 246, 0.14);
+  color: #8b5cf6;
+}
+
 .goal-card__info h4 {
   margin: 0;
   font-size: 1rem;
@@ -812,6 +817,10 @@ body {
 
 .goal-card__progress-fill--orange {
   background: linear-gradient(135deg, #fb923c, #ea580c);
+}
+
+.goal-card__progress-fill--purple {
+  background: linear-gradient(135deg, #c084fc, #9333ea);
 }
 
 .goal-card__bottom {
@@ -983,6 +992,16 @@ body {
   color: #9333ea;
 }
 
+.category-expense-card__icon--orange {
+  background: rgba(249, 115, 22, 0.14);
+  color: #ea580c;
+}
+
+.category-expense-card__icon--red {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+}
+
 .category-expense-card__info h4 {
   margin: 0;
   font-size: 1rem;
@@ -1044,8 +1063,16 @@ body {
   background: linear-gradient(135deg, #c084fc, #9333ea);
 }
 
+.category-expense-card__fill--orange {
+  background: linear-gradient(135deg, #fb923c, #ea580c);
+}
+
+.category-expense-card__fill--red {
+  background: linear-gradient(135deg, #f87171, #dc2626);
+}
+
 /* =========================
-   BOTÃO FLUTUANTE DE TRANSAÇÃO
+   BOTÃƒÆ’O FLUTUANTE DE TRANSAÃƒâ€¡ÃƒÆ’O
 ========================= */
 
 .floating-transaction-btn {
@@ -1122,7 +1149,7 @@ body {
 }
 
 /* =========================
-   MODAL ADICIONAR TRANSAÇÃO
+   MODAL ADICIONAR TRANSAÃƒâ€¡ÃƒÆ’O
 ========================= */
 
 .transaction-modal-overlay {
@@ -1565,7 +1592,7 @@ body {
 
 
 /* =========================
-   EDIÇÃO DO SALDO TOTAL
+   EDIÃƒâ€¡ÃƒÆ’O DO SALDO TOTAL
 ========================= */
 
 .finance-card__main {
@@ -1775,7 +1802,7 @@ body {
 }
 
 /* =========================
-   BOTÃO NOTIFICAÇÃO
+   BOTÃƒÆ’O NOTIFICAÃƒâ€¡ÃƒÆ’O
 ========================= */
 
 .notification-btn {
@@ -1794,7 +1821,7 @@ body {
 }
 
 /* =========================
-   PAINEL DE NOTIFICAÇÕES
+   PAINEL DE NOTIFICAÃƒâ€¡Ãƒâ€¢ES
 ========================= */
 
 .notif-overlay {
@@ -2467,11 +2494,11 @@ body {
 
 
 
-/* Estilos legados do modal: mantidos temporariamente como referência,
-   mas desativados para não concorrerem com a versão abaixo. */
+/* Estilos legados do modal: mantidos temporariamente como referÃƒÂªncia,
+   mas desativados para nÃƒÂ£o concorrerem com a versÃƒÂ£o abaixo. */
 @media not all {
 /* =========================
-   MODAL DE CONFIGURAÇÕES
+   MODAL DE CONFIGURAÃƒâ€¡Ãƒâ€¢ES
 ========================= */
 
 .settings-modal-overlay {
@@ -2911,7 +2938,7 @@ body {
 }
 
 /* =========================
-   RESPONSIVO CONFIGURAÇÕES
+   RESPONSIVO CONFIGURAÃƒâ€¡Ãƒâ€¢ES
 ========================= */
 
 @media (max-width: 1200px) {
@@ -3034,7 +3061,7 @@ body {
 }
 
 /* =========================
-   MODAL DE CONFIGURAÇÕES
+   MODAL DE CONFIGURAÃƒâ€¡Ãƒâ€¢ES
 ========================= */
 
 .settings-modal-overlay {
