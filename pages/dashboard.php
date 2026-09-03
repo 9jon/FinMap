@@ -158,6 +158,163 @@ $stmt->close();
 $categoriasDespesa = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'despesa');
 $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === 'receita');
 
+
+/* =========================================================
+   SISTEMA DE NOTIFICAÇÕES
+   ========================================================= */
+
+function criarNotificacao(
+    mysqli $conn,
+    int $usuario_id,
+    string $categoria,
+    string $titulo,
+    string $mensagem
+): void {
+
+    // Evita criar a mesma notificação várias vezes
+    $stmt = $conn->prepare("
+        SELECT id
+        FROM notificacoes
+        WHERE usuario_id = ?
+          AND categoria = ?
+          AND titulo = ?
+          AND mensagem = ?
+          AND criado_em >= NOW() - INTERVAL 24 HOUR
+        LIMIT 1
+    ");
+
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param(
+        "isss",
+        $usuario_id,
+        $categoria,
+        $titulo,
+        $mensagem
+    );
+
+    $stmt->execute();
+
+    $resultado = $stmt->get_result();
+
+    $existe = $resultado->num_rows > 0;
+
+    $stmt->close();
+
+    if ($existe) {
+        return;
+    }
+
+    // Insere a nova notificação
+    $stmt = $conn->prepare("
+        INSERT INTO notificacoes
+        (
+            usuario_id,
+            categoria,
+            titulo,
+            mensagem,
+            lida
+        )
+        VALUES (?, ?, ?, ?, 0)
+    ");
+
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param(
+        "isss",
+        $usuario_id,
+        $categoria,
+        $titulo,
+        $mensagem
+    );
+
+    $stmt->execute();
+
+    $stmt->close();
+}
+
+
+/* =========================================================
+   ALERTA DE ORÇAMENTO
+   ========================================================= */
+
+if ($receitasMes > 0) {
+
+    $percentualGasto =
+        ($despesasMes / $receitasMes) * 100;
+
+    if ($percentualGasto >= 80) {
+
+        $percentual = round($percentualGasto);
+
+        criarNotificacao(
+            $conn,
+            $usuario_id,
+            'alerta',
+            'Alerta preditivo de orçamento',
+            "Você já utilizou {$percentual}% das suas receitas deste mês em despesas. Seu ritmo atual de gastos pode comprometer o fechamento do mês."
+        );
+    }
+}
+
+
+/* =========================================================
+   ALERTAS DAS METAS
+   ========================================================= */
+
+foreach ($metas as $meta) {
+
+    $valorMeta = (float) $meta['valor_meta'];
+    $valorGuardado = (float) $meta['valor_guardado'];
+
+    if ($valorMeta <= 0) {
+        continue;
+    }
+
+    $percentual =
+        ($valorGuardado / $valorMeta) * 100;
+
+    if ($percentual >= 100) {
+
+        criarNotificacao(
+            $conn,
+            $usuario_id,
+            'meta',
+            'Meta concluída!',
+            "Parabéns! Você atingiu 100% da meta \"{$meta['nome']}\"."
+        );
+
+    } elseif ($percentual >= 75) {
+
+        criarNotificacao(
+            $conn,
+            $usuario_id,
+            'meta',
+            'Meta avançando muito bem',
+            "Sua meta \"{$meta['nome']}\" já atingiu " .
+            round($percentual) .
+            "% do valor planejado."
+        );
+
+    } elseif ($percentual >= 50) {
+
+        criarNotificacao(
+            $conn,
+            $usuario_id,
+            'meta',
+            'Meta avançando bem',
+            "Sua meta \"{$meta['nome']}\" atingiu " .
+            round($percentual) .
+            "% do valor planejado."
+        );
+    }
+}
+
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -199,11 +356,41 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
   <i class="bi bi-gear"></i>
 </button>
 
-      <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
-        <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
-      </button>
+      <?php
 
+$stmt = $conn->prepare("
+    SELECT COUNT(*)
+    FROM notificacoes
+    WHERE usuario_id = ?
+      AND lida = 0
+");
+
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+
+$stmt->bind_result($notificacoesNaoLidas);
+$stmt->fetch();
+
+$stmt->close();
+
+?>
+
+<button
+    class="icon-plain notification-btn"
+    id="openNotificationsPanel"
+    type="button"
+    aria-label="Notificações"
+>
+
+    <i class="bi bi-bell"></i>
+
+    <?php if ($notificacoesNaoLidas > 0): ?>
+
+        <span class="notification-dot"></span>
+
+    <?php endif; ?>
+
+</button>
       <button class="profile-avatar" type="button" aria-label="Perfil">
         <?= htmlspecialchars($iniciais) ?>
       </button>
@@ -573,59 +760,148 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
+<div class="notif-panel__tabs">
 
-    <div class="notif-panel__tabs">
-      <button class="notif-tab active" type="button">Todos</button>
-      <button class="notif-tab" type="button">Alertas</button>
-      <button class="notif-tab" type="button">Metas</button>
-      <button class="notif-tab" type="button">Gastos</button>
+    <button
+        class="notif-tab active"
+        type="button"
+        data-filter="todos"
+    >
+        Todos
+    </button>
+
+    <button
+        class="notif-tab"
+        type="button"
+        data-filter="alerta"
+    >
+        Alertas
+    </button>
+
+    <button
+        class="notif-tab"
+        type="button"
+        data-filter="meta"
+    >
+        Metas
+    </button>
+
+    <button
+        class="notif-tab"
+        type="button"
+        data-filter="gasto"
+    >
+        Gastos
+    </button>
+
+</div>
+
+   <div class="notif-panel__list" id="notificationsList">
+
+<?php
+
+$stmt = $conn->prepare("
+    SELECT
+        id,
+        categoria,
+        titulo,
+        mensagem,
+        lida,
+        criado_em
+    FROM notificacoes
+    WHERE usuario_id = ?
+    ORDER BY criado_em DESC
+    LIMIT 30
+");
+
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+
+$notificacoes =
+    $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+$stmt->close();
+
+?>
+
+<?php if (empty($notificacoes)): ?>
+
+    <div class="notif-empty">
+
+        <i class="bi bi-bell-slash"></i>
+
+        <h4>Nenhuma notificação</h4>
+
+        <p>
+            Você está em dia! Novos alertas aparecerão aqui.
+        </p>
+
     </div>
 
-    <div class="notif-panel__list">
-      <article class="notif-card notif-card--danger">
-        <div class="notif-card__icon">
-          <i class="bi bi-exclamation-triangle"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Alerta preditivo de orçamento</h4>
-          <p>Seu ritmo atual de gastos pode comprometer o fechamento do mês.</p>
-          <span>Agora mesmo</span>
-        </div>
-      </article>
+<?php else: ?>
 
-      <article class="notif-card notif-card--success">
-        <div class="notif-card__icon">
-          <i class="bi bi-bullseye"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Meta avançando bem</h4>
-          <p>Sua reserva de emergência atingiu 58% do valor planejado.</p>
-          <span>Hoje, 09:20</span>
-        </div>
-      </article>
+    <?php foreach ($notificacoes as $n): ?>
 
-      <article class="notif-card notif-card--warning">
-        <div class="notif-card__icon">
-          <i class="bi bi-receipt"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Gasto acima da média</h4>
-          <p>A categoria alimentação ficou acima da média prevista nesta semana.</p>
-          <span>Hoje, 08:05</span>
-        </div>
-      </article>
+        <?php
 
-      <article class="notif-card notif-card--info">
-        <div class="notif-card__icon">
-          <i class="bi bi-stars"></i>
-        </div>
-        <div class="notif-card__content">
-          <h4>Sugestão da IA</h4>
-          <p>Você pode economizar até R$ 240 ajustando despesas recorrentes.</p>
-          <span>Ontem</span>
-        </div>
-      </article>
-    </div>
+        if ($n['categoria'] === 'meta') {
+
+            $classe = 'success';
+            $icone = 'bullseye';
+
+        } elseif ($n['categoria'] === 'gasto') {
+
+            $classe = 'warning';
+            $icone = 'receipt';
+
+        } elseif ($n['categoria'] === 'ia') {
+
+            $classe = 'info';
+            $icone = 'stars';
+
+        } else {
+
+            $classe = 'danger';
+            $icone = 'exclamation-triangle';
+        }
+
+        ?>
+
+        <article
+            class="notif-card notif-card--<?= $classe ?>"
+            data-tipo="<?= htmlspecialchars($n['categoria']) ?>"
+            data-id="<?= (int) $n['id'] ?>"
+        >
+
+            <div class="notif-card__icon">
+
+                <i class="bi bi-<?= $icone ?>"></i>
+
+            </div>
+
+            <div class="notif-card__content">
+
+                <h4>
+                    <?= htmlspecialchars($n['titulo']) ?>
+                </h4>
+
+                <p>
+                    <?= htmlspecialchars($n['mensagem']) ?>
+                </p>
+
+                <span>
+                    <?= date('d/m/Y H:i', strtotime($n['criado_em'])) ?>
+                </span>
+
+            </div>
+
+        </article>
+
+    <?php endforeach; ?>
+
+<?php endif; ?>
+
+</div>
   </aside>
 
   <!-- MODAL CENTRALIZADO DA IA -->
@@ -1906,6 +2182,122 @@ if (balanceForm) {
     }
   });
 }
+
+/* =========================================================
+   NOTIFICAÇÕES
+   ========================================================= */
+
+const notifTabs =
+    document.querySelectorAll(".notif-tab");
+
+const notifCards =
+    document.querySelectorAll(".notif-card");
+
+
+/* FILTROS */
+
+notifTabs.forEach((tab) => {
+
+    tab.addEventListener("click", () => {
+
+        const filtro =
+            tab.getAttribute("data-filter");
+
+        notifTabs.forEach((item) => {
+            item.classList.remove("active");
+        });
+
+        tab.classList.add("active");
+
+        notifCards.forEach((card) => {
+
+            const tipo =
+                card.getAttribute("data-tipo");
+
+            if (
+                filtro === "todos" ||
+                tipo === filtro
+            ) {
+
+                card.style.display = "";
+
+            } else {
+
+                card.style.display = "none";
+
+            }
+
+        });
+
+    });
+
+});
+
+
+/* MARCAR NOTIFICAÇÃO COMO LIDA */
+
+notifCards.forEach((card) => {
+
+    card.addEventListener("click", async () => {
+
+        const id =
+            card.getAttribute("data-id");
+
+        if (!id) {
+            return;
+        }
+
+        const dados = new FormData();
+
+        dados.append("id", id);
+
+        try {
+
+            const resposta = await fetch(
+                "marcar-notificacao.php",
+                {
+                    method: "POST",
+                    body: dados
+                }
+            );
+
+            const resultado =
+                await resposta.json();
+
+            if (resultado.sucesso) {
+
+                card.style.opacity = "0.6";
+
+                const dot =
+                    document.querySelector(
+                        ".notification-dot"
+                    );
+
+                if (dot) {
+
+                    const naoLidas =
+                        document.querySelectorAll(
+                            ".notif-card:not([style*='opacity'])"
+                        );
+
+                    if (naoLidas.length === 0) {
+                        dot.remove();
+                    }
+                }
+            }
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao marcar notificação:",
+                erro
+            );
+
+        }
+
+    });
+
+});
 
 </script>
 

@@ -104,7 +104,7 @@ function severidadeParaLabel(string $severidade): string
     };
 }
 
-<<<<<<< HEAD
+
 // -----------------------------------------------------------------
 // Busca a configuração de sensibilidade do usuário
 // -----------------------------------------------------------------
@@ -281,10 +281,7 @@ if ($alertasOrcamentoAtivo && ($riscoFinanceiro === 'medio' || $riscoFinanceiro 
 
 // -----------------------------------------------------------------
 // Busca novamente os alertas do usuário após criar/atualizar o alerta automático.
-// -----------------------------------------------------------------
-=======
-
->>>>>>> dd0639bbf625db9f56b0d7297230e0662e8547ba
+// ---------------
 $sql = "SELECT id, titulo, descricao, severidade, impacto_estimado, horizonte, lido, criado_em
         FROM alertas_preditivos
         WHERE usuario_id = ?
@@ -301,13 +298,13 @@ while ($linha = $resultado->fetch_assoc()) {
 }
 $stmt->close();
 
-<<<<<<< HEAD
+
 // -----------------------------------------------------------------
 // Array pro JS usar só pra exibição (detalhes, cálculo de resumo,
 // preview da simulação). Nenhuma ação grava usando esse array —
 // quem grava é sempre o PHP no topo da página, via POST normal.
 // -----------------------------------------------------------------
-=======
+
 
 $sqlConfig = "SELECT alertas_orcamento_ativo, alertas_categoria_ativo, sensibilidade
               FROM alertas_configuracao WHERE usuario_id = ?";
@@ -321,7 +318,7 @@ $sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
 $alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
 $alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
 
->>>>>>> dd0639bbf625db9f56b0d7297230e0662e8547ba
+
 $alertasParaJs = array_map(function ($a) {
     return [
         'id'            => (int)$a['id'],
@@ -1009,10 +1006,9 @@ $alertasParaJs = array_map(function ($a) {
       }
     });
 
-<<<<<<< HEAD
+
     // Resumo baseado nos gastos REAIS do banco.
-=======
->>>>>>> dd0639bbf625db9f56b0d7297230e0662e8547ba
+    
     (function atualizarResumo() {
       const unread = alerts.filter(a => !a.read).length;
 
