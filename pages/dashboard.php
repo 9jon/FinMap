@@ -29,28 +29,28 @@ $stmt = $conn->prepare("
     SELECT
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS receitas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS despesas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS receitas_anterior,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS despesas_anterior,
         SUM(CASE
-            WHEN (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            WHEN (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN 1 ELSE 0 END) AS lancamentos_anterior
     FROM transacoes
     WHERE usuario_id = ?
       AND status = 'aprovado'
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -151,8 +151,8 @@ $stmt = $conn->prepare("
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
-      AND MONTH(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = MONTH(CURDATE())
-      AND YEAR(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = YEAR(CURDATE())
+      AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
 ");
@@ -1277,7 +1277,7 @@ $stmt->close();
 
       <div class="settings-content">
         <!-- NOTIFICAÇÕES -->
-        <section class="settings-group" id="settings-notifications">
+        <section class="settings-group is-active" id="settings-notifications">
           <button class="settings-group__trigger active" type="button">
             <div class="settings-group__trigger-left">
               <span class="settings-group__badge settings-group__badge--yellow">
@@ -1747,6 +1747,7 @@ $stmt->close();
     settingsGroups.forEach((group) => {
       const trigger = group.querySelector(".settings-group__trigger");
       const content = group.querySelector(".settings-group__content");
+      group.classList.remove("is-active");
       if (trigger) trigger.classList.remove("active");
       if (content) content.classList.remove("open");
     });
@@ -1767,6 +1768,7 @@ $stmt->close();
     const trigger = targetSection.querySelector(".settings-group__trigger");
     const content = targetSection.querySelector(".settings-group__content");
 
+    targetSection.classList.add("is-active");
     if (trigger) trigger.classList.add("active");
     if (content) content.classList.add("open");
 
@@ -2036,21 +2038,8 @@ $stmt->close();
   settingsTriggers.forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const group = trigger.closest(".settings-group");
-      const content = trigger.nextElementSibling;
-      if (!group || !content) return;
-
-      const groupId = group.getAttribute("id");
-      const isOpen = trigger.classList.contains("active");
-
-      closeAllSettingsSections();
-
-      if (!isOpen) {
-        trigger.classList.add("active");
-        content.classList.add("open");
-        activateSidebarItemById(groupId);
-      } else {
-        settingsSidebarItems.forEach((item) => item.classList.remove("active"));
-      }
+      const groupId = group ? group.getAttribute("id") : null;
+      if (groupId) openSettingsSection(groupId, false);
     });
   });
 
