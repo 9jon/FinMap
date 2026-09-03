@@ -154,3 +154,15 @@
 [2026-09-03 00:47:45] Valores lidos: tipo=despesa | descricao='calça jeans' | valor_bruto='R$ 200,00' | valor_convertido=200 | categoriaIdRaw='5' | categoriaId=5 | data=2026-09-03
 [2026-09-03 00:47:45] Categoria 5 confirmada para usuário 1 e tipo 'despesa'.
 [2026-09-03 00:47:45] SUCESSO: transação inserida com id 29 (tipo=despesa, categoria_id=5)
+[2026-09-03 01:05:47] --- nova requisição ---
+[2026-09-03 01:05:47] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'freelance',
+  'valor' => 'R$ 650,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '7',
+  'data_transacao' => '2026-09-01',
+)
+[2026-09-03 01:05:47] Valores lidos: tipo=receita | descricao='freelance' | valor_bruto='R$ 650,00' | valor_convertido=650 | categoriaIdRaw='7' | categoriaId=7 | data=2026-09-01
+[2026-09-03 01:05:47] Categoria 7 confirmada para usuário 2 e tipo 'receita'.
+[2026-09-03 01:05:47] SUCESSO: transação inserida com id 30 (tipo=receita, categoria_id=7)
