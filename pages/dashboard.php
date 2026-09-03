@@ -1001,7 +1001,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
 
       <div class="settings-content">
         <!-- NOTIFICAÇÕES -->
-        <section class="settings-group" id="settings-notifications">
+        <section class="settings-group is-active" id="settings-notifications">
           <button class="settings-group__trigger active" type="button">
             <div class="settings-group__trigger-left">
               <span class="settings-group__badge settings-group__badge--yellow">
@@ -1471,6 +1471,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     settingsGroups.forEach((group) => {
       const trigger = group.querySelector(".settings-group__trigger");
       const content = group.querySelector(".settings-group__content");
+      group.classList.remove("is-active");
       if (trigger) trigger.classList.remove("active");
       if (content) content.classList.remove("open");
     });
@@ -1491,6 +1492,7 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
     const trigger = targetSection.querySelector(".settings-group__trigger");
     const content = targetSection.querySelector(".settings-group__content");
 
+    targetSection.classList.add("is-active");
     if (trigger) trigger.classList.add("active");
     if (content) content.classList.add("open");
 
@@ -1760,21 +1762,8 @@ $categoriasReceita = array_filter($categoriasUsuario, fn($c) => $c['tipo'] === '
   settingsTriggers.forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const group = trigger.closest(".settings-group");
-      const content = trigger.nextElementSibling;
-      if (!group || !content) return;
-
-      const groupId = group.getAttribute("id");
-      const isOpen = trigger.classList.contains("active");
-
-      closeAllSettingsSections();
-
-      if (!isOpen) {
-        trigger.classList.add("active");
-        content.classList.add("open");
-        activateSidebarItemById(groupId);
-      } else {
-        settingsSidebarItems.forEach((item) => item.classList.remove("active"));
-      }
+      const groupId = group ? group.getAttribute("id") : null;
+      if (groupId) openSettingsSection(groupId, false);
     });
   });
 

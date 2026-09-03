@@ -357,7 +357,7 @@ body {
 }
 
 /* =========================
-   FUNÃƒâ€¡Ãƒâ€¢ES PRINCIPAIS
+   FUNÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES PRINCIPAIS
 ========================= */
 
 .main-actions {
@@ -464,7 +464,7 @@ body {
 }
 
 /* =========================
-   GRID DOS PAINÃƒâ€°IS
+   GRID DOS PAINÃƒÆ’Ã¢â‚¬Â°IS
 ========================= */
 
 .dashboard-panels {
@@ -483,7 +483,7 @@ body {
 }
 
 /* =========================
-   TRANSAÃƒâ€¡Ãƒâ€¢ES RECENTES
+   TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES RECENTES
 ========================= */
 
 .recent-transactions-panel {
@@ -1072,7 +1072,7 @@ body {
 }
 
 /* =========================
-   BOTÃƒÆ’O FLUTUANTE DE TRANSAÃƒâ€¡ÃƒÆ’O
+   BOTÃƒÆ’Ã†â€™O FLUTUANTE DE TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
 ========================= */
 
 .floating-transaction-btn {
@@ -1149,7 +1149,7 @@ body {
 }
 
 /* =========================
-   MODAL ADICIONAR TRANSAÃƒâ€¡ÃƒÆ’O
+   MODAL ADICIONAR TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
 ========================= */
 
 .transaction-modal-overlay {
@@ -1592,7 +1592,7 @@ body {
 
 
 /* =========================
-   EDIÃƒâ€¡ÃƒÆ’O DO SALDO TOTAL
+   EDIÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O DO SALDO TOTAL
 ========================= */
 
 .finance-card__main {
@@ -1802,7 +1802,7 @@ body {
 }
 
 /* =========================
-   BOTÃƒÆ’O NOTIFICAÃƒâ€¡ÃƒÆ’O
+   BOTÃƒÆ’Ã†â€™O NOTIFICAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
 ========================= */
 
 .notification-btn {
@@ -1821,7 +1821,7 @@ body {
 }
 
 /* =========================
-   PAINEL DE NOTIFICAÃƒâ€¡Ãƒâ€¢ES
+   PAINEL DE NOTIFICAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
 ========================= */
 
 .notif-overlay {
@@ -2494,11 +2494,11 @@ body {
 
 
 
-/* Estilos legados do modal: mantidos temporariamente como referÃƒÂªncia,
-   mas desativados para nÃƒÂ£o concorrerem com a versÃƒÂ£o abaixo. */
+/* Estilos legados do modal: mantidos temporariamente como referÃƒÆ’Ã‚Âªncia,
+   mas desativados para nÃƒÆ’Ã‚Â£o concorrerem com a versÃƒÆ’Ã‚Â£o abaixo. */
 @media not all {
 /* =========================
-   MODAL DE CONFIGURAÃƒâ€¡Ãƒâ€¢ES
+   MODAL DE CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
 ========================= */
 
 .settings-modal-overlay {
@@ -2938,7 +2938,7 @@ body {
 }
 
 /* =========================
-   RESPONSIVO CONFIGURAÃƒâ€¡Ãƒâ€¢ES
+   RESPONSIVO CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
 ========================= */
 
 @media (max-width: 1200px) {
@@ -3061,7 +3061,7 @@ body {
 }
 
 /* =========================
-   MODAL DE CONFIGURAÃƒâ€¡Ãƒâ€¢ES
+   MODAL DE CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
 ========================= */
 
 .settings-modal-overlay {
@@ -3199,7 +3199,7 @@ body {
   background: linear-gradient(180deg, rgba(249,251,250,0.98), rgba(245,248,246,0.98));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   overflow-y: auto;
   min-height: 0;
   scrollbar-width: thin;
@@ -3293,8 +3293,12 @@ body {
 }
 
 .settings-group {
-  display: flex;
+  display: none;
   flex-direction: column;
+}
+
+.settings-group.is-active {
+  display: flex;
 }
 
 .settings-group__trigger {
@@ -4009,7 +4013,7 @@ body {
   font-weight: 800;
 }
 
-/* Importação: composição mais leve, alinhada aos cards do dashboard. */
+/* ImportaÃ§Ã£o: composiÃ§Ã£o mais leve, alinhada aos cards do dashboard. */
 .import-popout {
   width: min(500px, 100%);
   max-height: none;
@@ -4244,7 +4248,7 @@ body {
 .dashboard-period-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .dashboard-menu-item,
