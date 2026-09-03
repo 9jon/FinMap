@@ -14,28 +14,36 @@ if (!in_array($periodo, $periodosValidos, true)) {
     $periodo = 'this-month';
 }
 
+// Importações entram no painel assim que são aprovadas. Para elas, usa-se a
+// data da aprovação; nos lançamentos manuais, preserva-se a data informada.
+$dataReferencia = "CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END";
+
 switch ($periodo) {
     case 'last-30':
-        $condicaoData = "t.data_transacao >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+        $condicaoData = "$dataReferencia >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
         break;
     case 'last-month':
-        $condicaoData = "MONTH(t.data_transacao) = MONTH(CURDATE() - INTERVAL 1 MONTH)
-                          AND YEAR(t.data_transacao) = YEAR(CURDATE() - INTERVAL 1 MONTH)";
+        $condicaoData = "MONTH($dataReferencia) = MONTH(CURDATE() - INTERVAL 1 MONTH)
+                          AND YEAR($dataReferencia) = YEAR(CURDATE() - INTERVAL 1 MONTH)";
         break;
     case 'last-3-months':
-        $condicaoData = "t.data_transacao >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)";
+        $condicaoData = "$dataReferencia >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)";
         break;
     default: 
-        $condicaoData = "MONTH(t.data_transacao) = MONTH(CURDATE())
-                          AND YEAR(t.data_transacao) = YEAR(CURDATE())";
+        $condicaoData = "MONTH($dataReferencia) = MONTH(CURDATE())
+                          AND YEAR($dataReferencia) = YEAR(CURDATE())";
         break;
 }
 
 $sql = "
-    SELECT c.id, c.nome, c.icone, c.cor, COALESCE(SUM(t.valor), 0) AS total
+    SELECT COALESCE(c.id, 0) AS id,
+           COALESCE(c.nome, 'Sem categoria') AS nome,
+           COALESCE(c.icone, 'tag') AS icone,
+           COALESCE(c.cor, 'green') AS cor,
+           COALESCE(SUM(t.valor), 0) AS total
     FROM transacoes t
-    INNER JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status IN ('pendente', 'aprovado')
+    LEFT JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
       AND $condicaoData
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
