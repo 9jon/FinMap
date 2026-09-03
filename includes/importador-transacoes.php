@@ -602,6 +602,7 @@ function importacaoNormalizarLinha(array $bruta, array $categoriasTipo, array $a
     $credito = importacaoValor($bruta['credito'] ?? '');
     $valorLido = importacaoValor($bruta['valor'] ?? '');
     $tipoTexto = importacaoTipoPorTexto((string) ($bruta['tipo'] ?? ''));
+    $tipoDescricao = importacaoTipoPorTexto($descricao);
     $tipoConhecido = false;
 
     if ($debito !== null && abs($debito) > 0) {
@@ -619,6 +620,9 @@ function importacaoNormalizarLinha(array $bruta, array $categoriasTipo, array $a
             $tipoConhecido = true;
         } elseif ($valorLido < 0) {
             $tipo = 'despesa';
+            $tipoConhecido = true;
+        } elseif ($tipoDescricao !== null) {
+            $tipo = $tipoDescricao;
             $tipoConhecido = true;
         } else {
             $tipo = 'despesa';

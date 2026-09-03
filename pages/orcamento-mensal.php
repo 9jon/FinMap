@@ -141,17 +141,9 @@ $faixaAlerta = $config['faixa_alerta_percentual'] ?? 85;
 $cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
 
-// -----------------------------------------------------------------
-// CORRIGIDO: antes o "Comprometido" vinha de categorias.valor_base_orcamento,
-// uma coluna estática que nunca é preenchida por nenhuma tela do sistema
-// (sempre fica 0). Por isso "Ajustar renda" nunca mudava o comprometido,
-// o círculo de % e o "Livre no mês" — esses números nunca dependeram de
-// renda nem de gasto real, só de uma coluna sempre zerada.
-//
-// Agora buscamos o gasto REAL de cada categoria de despesa no mês atual,
-// direto da tabela transacoes (mesma fonte usada no dashboard), via
-// LEFT JOIN — assim toda categoria aparece mesmo sem gasto ainda.
-// -----------------------------------------------------------------
+// Importações passam a compor o período no momento em que são aprovadas;
+// lançamentos manuais preservam a data financeira informada pelo usuário.
+// O LEFT JOIN mantém visíveis as categorias sem gastos no período.
 $sqlCategorias = "
     SELECT c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento,
            COALESCE(SUM(t.valor), 0) AS gasto_real
@@ -161,8 +153,8 @@ $sqlCategorias = "
        AND t.usuario_id = c.usuario_id
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND MONTH(t.data_transacao) = MONTH(CURDATE())
-       AND YEAR(t.data_transacao) = YEAR(CURDATE())
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     WHERE c.usuario_id = ? AND c.tipo = 'despesa'
     GROUP BY c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento
     ORDER BY gasto_real DESC
@@ -172,6 +164,21 @@ $stmtCategorias->bind_param("i", $usuario_id);
 $stmtCategorias->execute();
 $categorias = $stmtCategorias->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmtCategorias->close();
+
+$stmtSemCategoria = $conn->prepare("
+    SELECT COALESCE(SUM(valor), 0) AS gasto_sem_categoria
+    FROM transacoes
+    WHERE usuario_id = ?
+      AND tipo = 'despesa'
+      AND status = 'aprovado'
+      AND categoria_id IS NULL
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+");
+$stmtSemCategoria->bind_param("i", $usuario_id);
+$stmtSemCategoria->execute();
+$gastoSemCategoria = (float) ($stmtSemCategoria->get_result()->fetch_assoc()['gasto_sem_categoria'] ?? 0);
+$stmtSemCategoria->close();
 
 
 $mapaCategoriaParaChave = [
@@ -215,6 +222,22 @@ foreach ($categorias as $cat) {
         'ativo'      => $ativo,
         'valor'      => $valorCalculado,
         'valor_base' => $valorBase,
+    ];
+}
+
+// A tela permite salvar ou aprovar lançamentos ainda sem categoria. Eles não
+// devem desaparecer do comprometimento; aparecem separados para que possam
+// ser classificados depois, sem alterar o total do orçamento.
+if ($gastoSemCategoria > 0) {
+    $comprometido += $gastoSemCategoria;
+    $categoriasCalculadas[] = [
+        'id'         => 0,
+        'nome'       => 'Sem categoria',
+        'icone'      => 'question-circle',
+        'cor'        => 'orange',
+        'ativo'      => true,
+        'valor'      => $gastoSemCategoria,
+        'valor_base' => $gastoSemCategoria,
     ];
 }
 
@@ -669,7 +692,7 @@ function brl(float $valor): string
           <article class="details-box">
             <span>Total comprometido</span>
             <strong><?= brl($comprometido) ?></strong>
-            <p>Soma de todas as categorias ativas no orçamento deste mês.</p>
+            <p>Soma das despesas consideradas no orçamento deste mês.</p>
           </article>
 
           <article class="details-box">
@@ -713,6 +736,7 @@ function brl(float $valor): string
         <div class="budget-modal__body">
           <div class="budget-config-list">
             <?php foreach ($categoriasCalculadas as $c): ?>
+              <?php if ((int)$c['id'] <= 0) continue; ?>
               <div class="budget-config-row">
                 <div>
                   <h4><?= htmlspecialchars($c['nome']) ?></h4>

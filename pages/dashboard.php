@@ -151,8 +151,8 @@ $stmt = $conn->prepare("
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
-      AND MONTH(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = MONTH(CURDATE())
-      AND YEAR(CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) = YEAR(CURDATE())
+      AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
 ");
