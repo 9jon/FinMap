@@ -68,7 +68,8 @@ foreach ($oportunidades as $chave => $oportunidade) {
     $oportunidades[$chave]['potencial'] = 0.0;
 }
 
-// A análise considera apenas despesas já aprovadas no mês corrente.
+// Importações entram na análise assim que são aprovadas; lançamentos manuais
+// permanecem vinculados à data financeira informada pelo usuário.
 $stmt = $conn->prepare(
     "SELECT t.descricao, t.valor, c.nome AS categoria_nome
      FROM transacoes t
@@ -76,8 +77,8 @@ $stmt = $conn->prepare(
      WHERE t.usuario_id = ?
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-       AND t.data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
 );
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
