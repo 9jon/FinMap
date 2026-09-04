@@ -286,3 +286,15 @@
 [2026-09-04 02:23:55] Valores lidos: tipo=despesa | descricao='bermuda' | valor_bruto='R$ 30,00' | valor_convertido=30 | categoriaIdRaw='31' | categoriaId=31 | data=2026-09-04
 [2026-09-04 02:23:55] Categoria 31 confirmada para usuário 5 e tipo 'despesa'.
 [2026-09-04 02:23:55] SUCESSO: transação inserida com id 76 (tipo=despesa, categoria_id=31)
+[2026-09-04 02:37:29] --- nova requisição ---
+[2026-09-04 02:37:29] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'passe de onibus',
+  'valor' => 'R$ 5,00',
+  'categoria_id_despesa' => '29',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 02:37:29] Valores lidos: tipo=despesa | descricao='passe de onibus' | valor_bruto='R$ 5,00' | valor_convertido=5 | categoriaIdRaw='29' | categoriaId=29 | data=2026-09-04
+[2026-09-04 02:37:29] Categoria 29 confirmada para usuário 5 e tipo 'despesa'.
+[2026-09-04 02:37:29] SUCESSO: transação inserida com id 77 (tipo=despesa, categoria_id=29)
