@@ -3530,6 +3530,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: 6px;
+
+
 }
 
 .settings-action-btn {
@@ -4329,3 +4332,43 @@ body {
   box-shadow: 0 0 0 4px rgba(36, 187, 69, 0.08);
 }
 
+
+/* Padronização verde do modal de configurações */
+.settings-modal .settings-sidebar__icon--yellow,
+.settings-modal .settings-sidebar__icon--blue,
+.settings-modal .settings-sidebar__icon--purple,
+.settings-modal .settings-sidebar__icon--red,
+.settings-modal .settings-group__badge--yellow,
+.settings-modal .settings-group__badge--blue,
+.settings-modal .settings-group__badge--purple,
+.settings-modal .settings-group__badge--red {
+  background: rgba(36, 187, 69, 0.14);
+  color: #16a34a;
+}
+
+.settings-modal .switch--yellow input:checked + .switch-slider,
+.settings-modal .switch--green input:checked + .switch-slider,
+.settings-modal .switch--purple input:checked + .switch-slider,
+.settings-modal .switch--blue input:checked + .switch-slider,
+.settings-modal .switch--red input:checked + .switch-slider {
+  background: linear-gradient(135deg, #24bb45, #16a34a);
+}
+
+.settings-modal .settings-action-btn--blue,
+.settings-modal .settings-action-btn--purple {
+  background: linear-gradient(135deg, #24bb45, #16a34a);
+  color: #ffffff;
+}
+
+.settings-modal .settings-action-btn--blue-soft,
+.settings-modal .settings-action-btn--red-soft {
+  background: rgba(36, 187, 69, 0.10);
+  color: #15803d;
+  border-color: rgba(36, 187, 69, 0.18);
+}
+/* Destaque da alteração de e-mail */
+.settings-modal #settings-account .settings-profile-card .settings-action-btn--red-soft {
+  background: rgba(239, 68, 68, 0.10);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.18);
+}
