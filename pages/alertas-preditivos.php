@@ -417,8 +417,18 @@ $alertasParaJs = array_map(function ($a) {
           </div>
           <div class="summary-card__content">
             <span>Risco atual</span>
-            <strong id="riskStatus">-</strong>
-            <p id="riskText">-</p>
+            <strong id="riskStatus">
+    <?= htmlspecialchars($tituloRisco) ?>
+</strong>
+
+<p id="riskText">
+    <?= htmlspecialchars($textoRisco) ?>
+</p>
+<small>
+    Receita: R$ <?= number_format($receitasMes, 2, ',', '.') ?>
+    &nbsp; | &nbsp;
+    Gastos: R$ <?= number_format($despesasMes, 2, ',', '.') ?>
+</small>
           </div>
         </article>
 
@@ -439,7 +449,11 @@ $alertasParaJs = array_map(function ($a) {
           </div>
           <div class="summary-card__content">
             <span>Não vistos</span>
-            <strong id="unreadAlertsCount">-</strong>
+            <strong id="unreadAlertsCount">
+    <?= count(array_filter($alertas, function ($alerta) {
+        return (int)$alerta['lido'] === 0;
+    })) ?>
+</strong>
             <p>Alertas que ainda precisam da sua atenção.</p>
           </div>
         </article>
@@ -531,27 +545,75 @@ $alertasParaJs = array_map(function ($a) {
               </div>
             </div>
 
-            <div class="quick-reading-list">
-              <article class="quick-reading-card">
-                <span>Status geral</span>
-                <strong id="quickRiskStatus">-</strong>
-              </article>
+           <?php
+if ($riscoFinanceiro === 'alto') {
+    $horizonteCritico = 'Agora';
+} elseif ($riscoFinanceiro === 'medio') {
+    $horizonteCritico = 'Próximos dias';
+} elseif ($riscoFinanceiro === 'baixo') {
+    $horizonteCritico = 'Acompanhar este mês';
+} else {
+    $horizonteCritico = 'Sem urgência crítica';
+}
 
-              <article class="quick-reading-card">
-                <span>Maior pressão</span>
-                <strong id="quickMainPressure">-</strong>
-              </article>
+// =========================================================
+// BUSCAR NOTIFICAÇÕES DO USUÁRIO
+// =========================================================
 
-              <article class="quick-reading-card">
-                <span>Horizonte crítico</span>
-                <strong id="quickCriticalWindow">-</strong>
-              </article>
+$sqlNotificacoes = "
+    SELECT id, categoria, titulo, mensagem, lida, criado_em
+    FROM notificacoes
+    WHERE usuario_id = ?
+    ORDER BY criado_em DESC
+    LIMIT 20
+";
 
-              <article class="quick-reading-card">
-                <span>Melhor ação</span>
-                <strong id="quickBestAction">-</strong>
-              </article>
-            </div>
+$stmtNotificacoes = $conn->prepare($sqlNotificacoes);
+$stmtNotificacoes->bind_param("i", $usuario_id);
+$stmtNotificacoes->execute();
+
+$resultNotificacoes = $stmtNotificacoes->get_result();
+
+$notificacoes = [];
+
+while ($notificacao = $resultNotificacoes->fetch_assoc()) {
+    $notificacoes[] = $notificacao;
+}
+
+$stmtNotificacoes->close();
+?>
+
+<div class="quick-reading-list">
+
+    <article class="quick-reading-card">
+        <span>Status geral</span>
+        <strong id="quickRiskStatus">
+            <?= htmlspecialchars($tituloRisco) ?>
+        </strong>
+    </article>
+
+    <article class="quick-reading-card">
+        <span>Maior pressão</span>
+        <strong id="quickMainPressure">
+            <?= htmlspecialchars($pressaoFinanceira) ?>
+        </strong>
+    </article>
+
+    <article class="quick-reading-card">
+        <span>Horizonte crítico</span>
+        <strong id="quickCriticalWindow">
+            <?= htmlspecialchars($horizonteCritico) ?>
+        </strong>
+    </article>
+
+    <article class="quick-reading-card">
+        <span>Melhor ação</span>
+        <strong id="quickBestAction">
+            <?= htmlspecialchars($acaoFinanceira) ?>
+        </strong>
+    </article>
+
+</div>
           </section>
 
           <section class="alerts-panel">
@@ -562,18 +624,53 @@ $alertasParaJs = array_map(function ($a) {
               </div>
             </div>
 
-            <div class="sensitivity-card">
-              <div class="sensitivity-card__top">
-                <span>Nível configurado</span>
-                <strong id="sensitivityLabel">-</strong>
-              </div>
+            <?php
+if ($sensibilidade === 'baixo') {
 
-              <div class="sensitivity-card__bar">
-                <div class="sensitivity-card__fill" id="sensitivityFill" style="width: 0%;"></div>
-              </div>
+    $sensibilidadeLabel = 'Baixo';
+    $sensibilidadeWidth = 36;
+    $sensibilidadeTexto =
+        'Sensibilidade menor, focada apenas em desvios mais evidentes.';
 
-              <p id="sensitivityText">-</p>
-            </div>
+} elseif ($sensibilidade === 'alto') {
+
+    $sensibilidadeLabel = 'Alto';
+    $sensibilidadeWidth = 100;
+    $sensibilidadeTexto =
+        'Sensibilidade alta para detectar movimentos pequenos antes que cresçam.';
+
+} else {
+
+    $sensibilidadeLabel = 'Equilibrado';
+    $sensibilidadeWidth = 66;
+    $sensibilidadeTexto =
+        'Sensibilidade intermediária para detectar desvios antes de se tornarem críticos.';
+}
+?>
+
+<div class="sensitivity-card">
+
+    <div class="sensitivity-card__top">
+        <span>Nível configurado</span>
+
+        <strong id="sensitivityLabel">
+            <?= $sensibilidadeLabel ?>
+        </strong>
+    </div>
+
+    <div class="sensitivity-card__bar">
+        <div
+            class="sensitivity-card__fill"
+            id="sensitivityFill"
+            style="width: <?= $sensibilidadeWidth ?>%;">
+        </div>
+    </div>
+
+    <p id="sensitivityText">
+        <?= $sensibilidadeTexto ?>
+    </p>
+
+</div>
           </section>
         </aside>
       </section>
@@ -771,18 +868,83 @@ $alertasParaJs = array_map(function ($a) {
       <button class="notif-tab" type="button">IA</button>
     </div>
 
-    <div class="notif-panel__list">
-      <article class="notif-card notif-card--danger">
-        <div class="notif-card__icon">
-          <i class="bi bi-exclamation-triangle"></i>
+   <div class="notif-panel__list">
+
+    <?php if (empty($notificacoes)): ?>
+
+        <div class="text-center p-4 text-muted">
+            <i class="bi bi-bell-slash fs-3"></i>
+
+            <p class="mt-2 mb-0">
+                Nenhuma notificação no momento.
+            </p>
         </div>
-        <div class="notif-card__content">
-          <h4>Risco de orçamento</h4>
-          <p>O fechamento do mês pode ficar pressionado se o ritmo atual continuar.</p>
-          <span>Agora mesmo</span>
-        </div>
-      </article>
-    </div>
+
+    <?php else: ?>
+
+        <?php foreach ($notificacoes as $notificacao): ?>
+
+            <?php
+
+            $categoria = $notificacao['categoria'];
+
+            if ($categoria === 'meta') {
+
+                $classeNotif = 'success';
+                $iconeNotif = 'bi-bullseye';
+
+            } elseif ($categoria === 'gasto') {
+
+                $classeNotif = 'warning';
+                $iconeNotif = 'bi-wallet2';
+
+            } elseif ($categoria === 'ia') {
+
+                $classeNotif = 'info';
+                $iconeNotif = 'bi-stars';
+
+            } else {
+
+                $classeNotif = 'danger';
+                $iconeNotif = 'bi-exclamation-triangle';
+            }
+
+            $dataNotif = date(
+                'd/m/Y H:i',
+                strtotime($notificacao['criado_em'])
+            );
+
+            ?>
+
+            <article class="notif-card notif-card--<?= $classeNotif ?>">
+
+                <div class="notif-card__icon">
+                    <i class="bi <?= $iconeNotif ?>"></i>
+                </div>
+
+                <div class="notif-card__content">
+
+                    <h4>
+                        <?= htmlspecialchars($notificacao['titulo']) ?>
+                    </h4>
+
+                    <p>
+                        <?= htmlspecialchars($notificacao['mensagem']) ?>
+                    </p>
+
+                    <span>
+                        <?= $dataNotif ?>
+                    </span>
+
+                </div>
+
+            </article>
+
+        <?php endforeach; ?>
+
+    <?php endif; ?>
+
+</div>
   </aside>
 
   <!-- MODAL IA -->
@@ -1016,48 +1178,12 @@ $alertasParaJs = array_map(function ($a) {
     });
 
 
-<<<<<<< HEAD
+
     // Resumo baseado nos gastos REAIS do banco.
     
-=======
 
- dd0639bbf625db9f56b0d7297230e0662e8547ba
->>>>>>> 2610e91a98617e795a36837077d13e48d8fe3379
-    (function atualizarResumo() {
-      const unread = alerts.filter(a => !a.read).length;
-
-      document.getElementById("riskStatus").textContent = financialData.riskTitle;
-      document.getElementById("riskText").textContent = financialData.riskText;
-      document.getElementById("unreadAlertsCount").textContent = unread;
-      document.getElementById("activeAlertsCount").textContent = alerts.length;
-
-      document.getElementById("quickRiskStatus").textContent = financialData.riskTitle;
-      document.getElementById("quickMainPressure").textContent = financialData.pressure;
-      document.getElementById("quickCriticalWindow").textContent =
-        financialData.risk === "alto" ? "Agora" :
-        financialData.risk === "medio" ? "Próximos dias" :
-        financialData.risk === "baixo" ? "Acompanhar este mês" : "Sem urgência crítica";
-      document.getElementById("quickBestAction").textContent = financialData.action;
-
-      const sensibilidade = <?= json_encode($sensibilidade) ?>;
-      const fill = document.getElementById("sensitivityFill");
-      const label = document.getElementById("sensitivityLabel");
-      const text = document.getElementById("sensitivityText");
-
-      if (sensibilidade === "baixo") {
-        label.textContent = "Baixo";
-        fill.style.width = "36%";
-        text.textContent = "Sensibilidade menor, focada apenas em desvios mais evidentes.";
-      } else if (sensibilidade === "alto") {
-        label.textContent = "Alto";
-        fill.style.width = "100%";
-        text.textContent = "Sensibilidade alta para detectar movimentos pequenos antes que cresçam.";
-      } else {
-        label.textContent = "Equilibrado";
-        fill.style.width = "66%";
-        text.textContent = "Sensibilidade intermediária para detectar desvios antes de se tornarem críticos.";
-      }
-    })();
+ 
+    
   </script>
 
 </body>
