@@ -226,3 +226,63 @@
 [2026-09-03 03:07:44] Valores lidos: tipo=despesa | descricao='camisa' | valor_bruto='R$ 100,00' | valor_convertido=100 | categoriaIdRaw='25' | categoriaId=25 | data=2026-09-03
 [2026-09-03 03:07:44] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
 [2026-09-03 03:07:45] SUCESSO: transação inserida com id 22 (tipo=despesa, categoria_id=25)
+[2026-09-04 01:25:40] --- nova requisição ---
+[2026-09-04 01:25:40] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'camisa',
+  'valor' => 'R$ 70,00',
+  'categoria_id_despesa' => '25',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 01:25:40] Valores lidos: tipo=despesa | descricao='camisa' | valor_bruto='R$ 70,00' | valor_convertido=70 | categoriaIdRaw='25' | categoriaId=25 | data=2026-09-04
+[2026-09-04 01:25:40] Categoria 25 confirmada para usuário 6 e tipo 'despesa'.
+[2026-09-04 01:25:40] SUCESSO: transação inserida com id 23 (tipo=despesa, categoria_id=25)
+[2026-09-04 02:04:50] --- nova requisição ---
+[2026-09-04 02:04:50] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'camisa',
+  'valor' => 'R$ 80,00',
+  'categoria_id_despesa' => '31',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 02:04:50] Valores lidos: tipo=despesa | descricao='camisa' | valor_bruto='R$ 80,00' | valor_convertido=80 | categoriaIdRaw='31' | categoriaId=31 | data=2026-09-04
+[2026-09-04 02:04:50] Categoria 31 confirmada para usuário 5 e tipo 'despesa'.
+[2026-09-04 02:04:50] SUCESSO: transação inserida com id 73 (tipo=despesa, categoria_id=31)
+[2026-09-04 02:05:34] --- nova requisição ---
+[2026-09-04 02:05:34] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'uber',
+  'valor' => 'R$ 50,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '26',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 02:05:34] Valores lidos: tipo=receita | descricao='uber' | valor_bruto='R$ 50,00' | valor_convertido=50 | categoriaIdRaw='26' | categoriaId=26 | data=2026-09-04
+[2026-09-04 02:05:34] Categoria 26 confirmada para usuário 5 e tipo 'receita'.
+[2026-09-04 02:05:34] SUCESSO: transação inserida com id 74 (tipo=receita, categoria_id=26)
+[2026-09-04 02:20:42] --- nova requisição ---
+[2026-09-04 02:20:42] POST bruto: array (
+  'tipo' => 'receita',
+  'descricao' => 'lava-rapido',
+  'valor' => 'R$ 80,00',
+  'categoria_id_despesa' => '',
+  'categoria_id_receita' => '26',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 02:20:42] Valores lidos: tipo=receita | descricao='lava-rapido' | valor_bruto='R$ 80,00' | valor_convertido=80 | categoriaIdRaw='26' | categoriaId=26 | data=2026-09-04
+[2026-09-04 02:20:42] Categoria 26 confirmada para usuário 5 e tipo 'receita'.
+[2026-09-04 02:20:42] SUCESSO: transação inserida com id 75 (tipo=receita, categoria_id=26)
+[2026-09-04 02:23:55] --- nova requisição ---
+[2026-09-04 02:23:55] POST bruto: array (
+  'tipo' => 'despesa',
+  'descricao' => 'bermuda',
+  'valor' => 'R$ 30,00',
+  'categoria_id_despesa' => '31',
+  'categoria_id_receita' => '',
+  'data_transacao' => '2026-09-04',
+)
+[2026-09-04 02:23:55] Valores lidos: tipo=despesa | descricao='bermuda' | valor_bruto='R$ 30,00' | valor_convertido=30 | categoriaIdRaw='31' | categoriaId=31 | data=2026-09-04
+[2026-09-04 02:23:55] Categoria 31 confirmada para usuário 5 e tipo 'despesa'.
+[2026-09-04 02:23:55] SUCESSO: transação inserida com id 76 (tipo=despesa, categoria_id=31)

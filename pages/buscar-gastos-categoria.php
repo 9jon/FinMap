@@ -16,7 +16,7 @@ if (!in_array($periodo, $periodosValidos, true)) {
 
 // Importações entram no painel assim que são aprovadas. Para elas, usa-se a
 // data da aprovação; nos lançamentos manuais, preserva-se a data informada.
-$dataReferencia = "CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END";
+$dataReferencia = "CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END";
 
 switch ($periodo) {
     case 'last-30':

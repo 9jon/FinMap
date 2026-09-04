@@ -133,8 +133,8 @@ $stmtFinanceiro = $conn->prepare("
     FROM transacoes
     WHERE usuario_id = ?
       AND status = 'aprovado'
-      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmtFinanceiro->bind_param("i", $usuario_id);
 $stmtFinanceiro->execute();

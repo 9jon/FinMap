@@ -143,6 +143,8 @@ $cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
 // Importações passam a compor o período no momento em que são aprovadas;
 // lançamentos manuais preservam a data financeira informada pelo usuário.
+// `atualizado_em` é alterado na aprovação e está disponível em todas as versões
+// atuais da tabela `transacoes`.
 // O LEFT JOIN mantém visíveis as categorias sem gastos no período.
 $sqlCategorias = "
     SELECT c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento,
@@ -153,8 +155,8 @@ $sqlCategorias = "
        AND t.usuario_id = c.usuario_id
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     WHERE c.usuario_id = ? AND c.tipo = 'despesa'
     GROUP BY c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento
     ORDER BY gasto_real DESC
@@ -172,8 +174,8 @@ $stmtSemCategoria = $conn->prepare("
       AND tipo = 'despesa'
       AND status = 'aprovado'
       AND categoria_id IS NULL
-      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-      AND (CASE WHEN origem = 'importacao' THEN DATE(COALESCE(aprovado_em, atualizado_em)) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmtSemCategoria->bind_param("i", $usuario_id);
 $stmtSemCategoria->execute();

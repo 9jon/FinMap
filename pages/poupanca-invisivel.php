@@ -77,8 +77,8 @@ $stmt = $conn->prepare(
      WHERE t.usuario_id = ?
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(COALESCE(t.aprovado_em, t.atualizado_em)) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
 );
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();

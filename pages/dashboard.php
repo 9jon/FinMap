@@ -275,7 +275,29 @@ if ($receitasMes > 0) {
     }
 }
 
+/* =========================================================
+   ALERTAS DE GASTOS POR CATEGORIA
+   ========================================================= */
 
+foreach ($gastosCategorias as $gasto) {
+
+    $nomeCategoria = $gasto['nome'];
+    $totalCategoria = (float) $gasto['total'];
+
+    // Só cria notificação se existir gasto
+    if ($totalCategoria > 0) {
+
+        criarNotificacao(
+            $conn,
+            $usuario_id,
+            'gasto',
+            'Gasto em ' . $nomeCategoria,
+            'Você já gastou R$ ' .
+            number_format($totalCategoria, 2, ',', '.') .
+            ' na categoria ' . $nomeCategoria . ' neste mês.'
+        );
+    }
+}
 /* =========================================================
    ALERTAS DAS METAS
    ========================================================= */
@@ -316,16 +338,28 @@ foreach ($metas as $meta) {
 
     } elseif ($percentual >= 50) {
 
-        criarNotificacao(
-            $conn,
-            $usuario_id,
-            'meta',
-            'Meta avançando bem',
-            "Sua meta \"{$meta['nome']}\" atingiu " .
-            round($percentual) .
-            "% do valor planejado."
-        );
-    }
+    criarNotificacao(
+        $conn,
+        $usuario_id,
+        'meta',
+        'Meta avançando bem',
+        "Sua meta \"{$meta['nome']}\" atingiu " .
+        round($percentual) .
+        "% do valor planejado."
+    );
+
+} else {
+
+    criarNotificacao(
+        $conn,
+        $usuario_id,
+        'meta',
+        'Acompanhe sua meta',
+        "Sua meta \"{$meta['nome']}\" está em " .
+        round($percentual) .
+        "% do valor planejado."
+    );
+}
 }
 
 

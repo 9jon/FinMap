@@ -97,7 +97,7 @@ switch ($acao) {
         $sucesso = true;
 
         if ($transacaoAtual['status'] !== 'aprovado') {
-            $stmt = $conn->prepare("UPDATE transacoes SET status = 'aprovado', aprovado_em = NOW() WHERE id = ? AND usuario_id = ?");
+            $stmt = $conn->prepare("UPDATE transacoes SET status = 'aprovado' WHERE id = ? AND usuario_id = ?");
             $stmt->bind_param("ii", $id, $usuario_id);
             $sucesso = $stmt->execute();
             $stmt->close();
