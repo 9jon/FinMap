@@ -181,6 +181,30 @@ if ($receitasMes <= 0 && $despesasMes > 0) {
     $acaoFinanceira = 'Controlar próximos gastos';
 }
 
+if ($riscoFinanceiro === 'alto') {
+    $horizonteCritico = 'Agora';
+} elseif ($riscoFinanceiro === 'medio') {
+    $horizonteCritico = 'Próximos dias';
+} elseif ($riscoFinanceiro === 'baixo') {
+    $horizonteCritico = 'Acompanhar este mês';
+} else {
+    $horizonteCritico = 'Sem urgência crítica';
+}
+
+if ($sensibilidade === 'baixo') {
+    $sensibilidadeLabel = 'Baixo';
+    $sensibilidadeWidth = 36;
+    $sensibilidadeTexto = 'Sensibilidade menor, focada apenas em desvios mais evidentes.';
+} elseif ($sensibilidade === 'alto') {
+    $sensibilidadeLabel = 'Alto';
+    $sensibilidadeWidth = 100;
+    $sensibilidadeTexto = 'Sensibilidade alta para detectar movimentos pequenos antes que cresçam.';
+} else {
+    $sensibilidadeLabel = 'Equilibrado';
+    $sensibilidadeWidth = 66;
+    $sensibilidadeTexto = 'Sensibilidade intermediária para detectar desvios antes de se tornarem críticos.';
+}
+
 // -----------------------------------------------------------------
 // Cria/atualiza automaticamente um alerta real no banco quando o
 // comportamento financeiro indicar que é melhor evitar novos gastos.
@@ -340,6 +364,21 @@ $alertasParaJs = array_map(function ($a) {
         'read'          => (bool)$a['lido'],
     ];
 }, $alertas);
+
+// Dados do resumo lateral. Mantemos estes valores reunidos para que a tela
+// renderize corretamente tanto no PHP quanto após o JavaScript ser carregado.
+$resumoRapido = [
+    'status' => $tituloRisco,
+    'pressao' => $pressaoFinanceira,
+    'horizonte' => $horizonteCritico,
+    'acao' => $acaoFinanceira,
+];
+
+$dadosSensibilidade = [
+    'nivel' => $sensibilidadeLabel,
+    'largura' => $sensibilidadeWidth,
+    'texto' => $sensibilidadeTexto,
+];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1016,6 +1055,32 @@ if ($sensibilidade === 'baixo') {
       pressure: <?= json_encode($pressaoFinanceira, JSON_UNESCAPED_UNICODE) ?>,
       action: <?= json_encode($acaoFinanceira, JSON_UNESCAPED_UNICODE) ?>
     };
+
+    const quickReadingData = <?= json_encode($resumoRapido, JSON_UNESCAPED_UNICODE) ?>;
+    const sensitivityData = <?= json_encode($dadosSensibilidade, JSON_UNESCAPED_UNICODE) ?>;
+
+    function fillSidebarSummary() {
+      const fields = {
+        quickRiskStatus: quickReadingData.status,
+        quickMainPressure: quickReadingData.pressao,
+        quickCriticalWindow: quickReadingData.horizonte,
+        quickBestAction: quickReadingData.acao,
+        sensitivityLabel: sensitivityData.nivel,
+        sensitivityText: sensitivityData.texto
+      };
+
+      Object.entries(fields).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value || '-';
+      });
+
+      const sensitivityFill = document.getElementById('sensitivityFill');
+      if (sensitivityFill) {
+        sensitivityFill.style.width = `${Number(sensitivityData.largura) || 0}%`;
+      }
+    }
+
+    fillSidebarSummary();
 
     function formatBRL(value) {
       return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
