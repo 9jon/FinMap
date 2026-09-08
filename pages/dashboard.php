@@ -1192,7 +1192,7 @@ $stmt->close();
 
   <!-- MODAL: NOVA TRANSAÇÃO MANUAL -->
   <div class="dashboard-popout-overlay" id="manualTransactionModal">
-    <div class="dashboard-popout">
+    <div class="dashboard-popout dashboard-popout--form dashboard-popout--manual">
       <div class="dashboard-popout__header">
         <div class="dashboard-popout__title-group">
           <div class="dashboard-popout__icon dashboard-popout__icon--green">
@@ -1214,7 +1214,7 @@ $stmt->close();
 
           <div class="mb-3">
             <label class="form-label fw-semibold">Tipo</label>
-            <div class="d-flex gap-3">
+            <div class="d-flex gap-3 manual-transaction-type">
               <div class="form-check">
                 <input class="form-check-input" type="radio" name="tipo" id="tipoDespesa" value="despesa" checked>
                 <label class="form-check-label" for="tipoDespesa">Despesa</label>
@@ -1274,7 +1274,7 @@ $stmt->close();
 
   <!-- MODAL: IMPORTAR ARQUIVO -->
   <div class="dashboard-popout-overlay" id="importTransactionModal">
-    <div class="dashboard-popout dashboard-popout--small import-popout">
+    <div class="dashboard-popout dashboard-popout--form import-popout">
       <div class="dashboard-popout__header">
         <div class="dashboard-popout__title-group">
           <div class="dashboard-popout__icon dashboard-popout__icon--orange">
