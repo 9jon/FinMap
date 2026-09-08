@@ -2,7 +2,8 @@
 // pages/revisar-acao.php
 // Recebe aprovar / rejeitar / editar de um lançamento via fetch()
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado(true);
 include '../config/conn.php';
 
 header('Content-Type: application/json');
@@ -13,7 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
 $dados = json_decode(file_get_contents('php://input'), true);
 
 $acao = $dados['acao'] ?? '';
@@ -75,7 +75,7 @@ function valorComSinal($tipo, $valor) {
 $conn->begin_transaction();
 
 $stmt = $conn->prepare(
-    "SELECT tipo, valor, status
+    "SELECT tipo, valor, status, data_transacao, observacao_captura
      FROM transacoes
      WHERE id = ? AND usuario_id = ?
      FOR UPDATE"
@@ -94,6 +94,16 @@ if (!$transacaoAtual) {
 
 switch ($acao) {
     case 'aprovar':
+        $agendamentoFuturo = $transacaoAtual['status'] === 'pendente'
+            && in_array($transacaoAtual['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true)
+            && $transacaoAtual['data_transacao'] > date('Y-m-d');
+        if ($agendamentoFuturo) {
+            $conn->rollback();
+            http_response_code(400);
+            echo json_encode(['sucesso' => false, 'erro' => 'Este lanÃ§amento sÃ³ pode ser aprovado na data agendada']);
+            exit;
+        }
+
         $sucesso = true;
 
         if ($transacaoAtual['status'] !== 'aprovado') {
@@ -114,6 +124,21 @@ switch ($acao) {
 
     case 'rejeitar':
         $stmt = $conn->prepare("UPDATE transacoes SET status = 'rejeitado' WHERE id = ? AND usuario_id = ?");
+        $stmt->bind_param("ii", $id, $usuario_id);
+        $sucesso = $stmt->execute();
+        $stmt->close();
+
+        if ($sucesso && $transacaoAtual['status'] === 'aprovado') {
+            $sucesso = aplicarVariacaoNoSaldo(
+                $conn,
+                $usuario_id,
+                -valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+            );
+        }
+        break;
+
+    case 'excluir':
+        $stmt = $conn->prepare("DELETE FROM transacoes WHERE id = ? AND usuario_id = ?");
         $stmt->bind_param("ii", $id, $usuario_id);
         $sucesso = $stmt->execute();
         $stmt->close();

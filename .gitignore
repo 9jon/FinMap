@@ -1,0 +1,4 @@
+*.log
+*.log.*
+/config/oauth-google.local.php
+/config/oauth-google.local.php.*

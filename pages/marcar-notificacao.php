@@ -1,22 +1,13 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado(true);
 
 include '../config/conn.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (!isset($_SESSION['usuario_id'])) {
 
-    echo json_encode([
-        'sucesso' => false,
-        'erro' => 'Usuário não autenticado.'
-    ]);
-
-    exit;
-}
-
-$usuario_id = (int) $_SESSION['usuario_id'];
 
 $id = (int) ($_POST['id'] ?? 0);
 

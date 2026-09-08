@@ -5,15 +5,30 @@
 // no Google, e faz login/cadastro automático no FinMap.
 
 session_start();
-include '../config/conn.php';
-include '../config/oauth-google.php';
+require_once __DIR__ . '/oauth-google.php';
+header('Cache-Control: no-store');
+
+$estadoRecebido = $_GET['state'] ?? null;
+$estadoEsperado = $_SESSION['google_oauth_state'] ?? null;
+$expiraEm = $_SESSION['google_oauth_expira'] ?? 0;
+unset($_SESSION['google_oauth_state'], $_SESSION['google_oauth_expira']);
+if (!is_string($estadoRecebido) || !is_string($estadoEsperado)
+    || !hash_equals($estadoEsperado, $estadoRecebido) || time() >= $expiraEm) {
+    header('Location: ../login/login.php?erro=google_sessao');
+    exit;
+}
+
+if (!googleOAuthConfigurado() || !function_exists('curl_init')) {
+    header('Location: ../login/login.php?erro=google_configuracao');
+    exit;
+}
 
 // O Google manda um "code" na URL quando o login dá certo
 $code = $_GET['code'] ?? null;
 
-if (!$code) {
+if (!is_string($code) || $code === '' || isset($_GET['error'])) {
     // Usuário cancelou o login ou algo deu errado
-    header('Location: login.php?erro=google_cancelado');
+    header('Location: ../login/login.php?erro=google_cancelado');
     exit;
 }
 
@@ -32,33 +47,42 @@ $ch = curl_init($tokenUrl);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($tokenParams));
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+curl_setopt($ch, CURLOPT_TIMEOUT, 20);
 $tokenResponse = curl_exec($ch);
+$tokenStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-$tokenData = json_decode($tokenResponse, true);
+$tokenData = is_string($tokenResponse) ? json_decode($tokenResponse, true) : null;
 
-if (!isset($tokenData['access_token'])) {
-    header('Location: login.php?erro=google_token');
+if ($tokenStatus !== 200 || empty($tokenData['access_token'])) {
+    header('Location: ../login/login.php?erro=google_token');
     exit;
 }
 
 $accessToken = $tokenData['access_token'];
 
 // --- PASSO 2: usar o access_token pra pegar os dados do usuário ---
-$userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo?access_token=' . urlencode($accessToken);
+$userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 $ch = curl_init($userInfoUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $accessToken]);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+curl_setopt($ch, CURLOPT_TIMEOUT, 20);
 $userInfoResponse = curl_exec($ch);
+$userInfoStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-$googleUser = json_decode($userInfoResponse, true);
+$googleUser = is_string($userInfoResponse) ? json_decode($userInfoResponse, true) : null;
 
-if (!isset($googleUser['id']) || !isset($googleUser['email'])) {
-    header('Location: login.php?erro=google_dados');
+if ($userInfoStatus !== 200 || empty($googleUser['id']) || empty($googleUser['email'])
+    || ($googleUser['verified_email'] ?? false) !== true) {
+    header('Location: ../login/login.php?erro=google_dados');
     exit;
 }
 
+require_once __DIR__ . '/conn.php';
 $googleId = $googleUser['id'];
 $email = $googleUser['email'];
 $nome = $googleUser['name'] ?? 'Usuário Google';
@@ -112,6 +136,8 @@ $usuario = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 $conn->close();
 
+session_regenerate_id(true);
+$_SESSION['autenticado'] = true;
 $_SESSION['usuario_id'] = $usuarioId;
 $_SESSION['usuario_nome'] = $usuario['nome'];
 

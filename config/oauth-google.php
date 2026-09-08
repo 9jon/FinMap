@@ -1,10 +1,16 @@
 <?php
-// config/oauth-google.php
-// Preenchido com os valores copiados do Google Cloud Console
+// Credenciais locais ficam fora do Git e bloqueadas para acesso pela web.
+$arquivoLocalGoogle = __DIR__ . '/oauth-google.local.php';
+if (is_file($arquivoLocalGoogle)) {
+    require_once $arquivoLocalGoogle;
+}
+foreach (['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI'] as $chaveGoogle) {
+    if (!defined($chaveGoogle)) {
+        define($chaveGoogle, getenv($chaveGoogle) ?: '');
+    }
+}
 
-define('GOOGLE_CLIENT_ID', '424836112785-6lts7ap0e5l9u06bqj5ciljfnjs94kjo.apps.googleusercontent.com');
-define('GOOGLE_CLIENT_SECRET', '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');
-
-// Precisa ser IDÊNTICO ao que você cadastrou no Google Cloud Console
-define('GOOGLE_REDIRECT_URI', 'http://localhost/finmap/login/google-callback.php');
-?>
+function googleOAuthConfigurado(): bool
+{
+    return GOOGLE_CLIENT_ID !== '' && GOOGLE_CLIENT_SECRET !== '' && GOOGLE_REDIRECT_URI !== '';
+}

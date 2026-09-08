@@ -1,19 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 require_once __DIR__ . '/../config/conn.php'; 
-if (!isset($_SESSION['usuario_id'])) {
-    $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
-    $resultadoTeste = $conn->query($sqlTeste);
-    $usuarioTeste = $resultadoTeste ? $resultadoTeste->fetch_assoc() : null;
 
-    if ($usuarioTeste) {
-        $_SESSION['usuario_id'] = (int)$usuarioTeste['id'];
-    } else {
-        die('Nenhum usuário de teste encontrado na tabela usuarios. Rode o INSERT do usuário de exemplo (joao@email.com) do schema antes de testar esta tela.');
-    }
-}
-
-$usuario_id = (int)$_SESSION['usuario_id'];
 
 $coresValidas = ['green', 'blue', 'orange', 'purple'];
 $iconesValidos = ['shield-check', 'airplane', 'car-front', 'house-door', 'mortarboard', 'heart-pulse', 'gift', 'stars'];

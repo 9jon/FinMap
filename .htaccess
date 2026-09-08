@@ -1,0 +1,9 @@
+# Impede o download de registros de depuracao, inclusive arquivos antigos.
+<FilesMatch "(?i)\.log(?:\..*)?$">
+    Require all denied
+</FilesMatch>
+
+# Credenciais locais e eventuais copias de seguranca nao sao arquivos publicos.
+<FilesMatch "(?i)^oauth-google\.local\.php(?:\..*)?$">
+    Require all denied
+</FilesMatch>

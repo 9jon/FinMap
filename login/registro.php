@@ -43,6 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->execute()) {
                 $novoUsuarioId = (int) $stmt->insert_id;
                 garantirCategoriasPadrao($conn, $novoUsuarioId);
+                session_regenerate_id(true);
+                $_SESSION['autenticado'] = true;
                 $_SESSION['usuario_id'] = $novoUsuarioId;
                 $stmt->close();
                 $conn->close();
@@ -148,8 +150,8 @@ Criar conta
 
 <div class="social-login">
 
-<?php include '../config/oauth-google.php'; ?>
-<a class="social-btn google" href="https://accounts.google.com/o/oauth2/v2/auth?client_id=<?= urlencode(GOOGLE_CLIENT_ID) ?>&redirect_uri=<?= urlencode(GOOGLE_REDIRECT_URI) ?>&response_type=code&scope=email%20profile&access_type=online">
+
+<a class="social-btn google" href="google.php">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google">
 </a>
 

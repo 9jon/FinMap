@@ -1,13 +1,9 @@
- <?php
-session_start();
+<?php
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
 
-if (!isset($_SESSION['usuario_id'])) {
-    header('Location: ../login/login.php');
-    exit;
-}
 
-$usuario_id = (int)$_SESSION['usuario_id'];
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
@@ -133,8 +129,8 @@ $stmtFinanceiro = $conn->prepare("
     FROM transacoes
     WHERE usuario_id = ?
       AND status = 'aprovado'
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmtFinanceiro->bind_param("i", $usuario_id);
 $stmtFinanceiro->execute();

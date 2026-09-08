@@ -1,7 +1,8 @@
 <?php
 
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado(true);
 include '../config/conn.php';
 
 header('Content-Type: application/json');
@@ -13,7 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1; 
 
 
 $dados = json_decode(file_get_contents('php://input'), true);

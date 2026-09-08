@@ -1,9 +1,9 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
 $importacaoFeedback = $_SESSION['importacao_feedback'] ?? null;
 unset($_SESSION['importacao_feedback']);
 $importacaoFiltroId = filter_input(INPUT_GET, 'importacao', FILTER_VALIDATE_INT) ?: 0;
@@ -78,6 +78,13 @@ $statusMap = ['pendente' => 'pending', 'aprovado' => 'approved', 'rejeitado' => 
 
 $launches = [];
 foreach ($transacoesResult as $t) {
+    $ehAgendado = $t['status'] === 'pendente'
+        && in_array($t['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true);
+    $ehAgendamentoFuturo = $ehAgendado && $t['data_transacao'] > date('Y-m-d');
+    $observacao = $ehAgendado
+        ? $t['observacao_captura']
+        : ($t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''));
+
     $launches[] = [
         'id' => (int) $t['id'],
         'description' => $t['descricao'],
@@ -89,7 +96,10 @@ foreach ($transacoesResult as $t) {
         'category' => $t['categoria_nome'] ?? 'Sem categoria',
         'confidence' => $t['confianca_percentual'] !== null ? (int) $t['confianca_percentual'] : 100,
         'status' => $statusMap[$t['status']] ?? 'pending',
-        'note' => $t['observacao_captura'] ?? ($sourceMeta[$t['origem']]['padrao'] ?? ''),
+        'note' => $observacao,
+        'scheduled' => $ehAgendado,
+        'scheduledLabel' => $ehAgendado ? $t['observacao_captura'] : '',
+        'scheduledFuture' => $ehAgendamentoFuturo,
         'date' => date('d/m/Y', strtotime($t['data_transacao'])),
         'dateISO' => $t['data_transacao']
     ];
@@ -223,7 +233,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
               <article class="review-item" data-id="<?= $l['id'] ?>" data-source="<?= htmlspecialchars($l['source']) ?>" data-status="<?= htmlspecialchars($l['status']) ?>" data-confidence="<?= $l['confidence'] ?>">
                 <div class="review-item__select">
                   <label class="review-check">
-                    <input type="checkbox" class="launch-checkbox">
+                    <input type="checkbox" class="launch-checkbox" <?= $l['scheduledFuture'] ? 'disabled title="Disponível para aprovação na data agendada"' : '' ?>>
                     <span></span>
                   </label>
                 </div>
@@ -239,6 +249,9 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
                         <div class="review-item__title-row">
                           <h4><?= htmlspecialchars($l['description']) ?></h4>
                           <span class="review-badge review-badge--<?= $meta['badge'] ?>"><?= htmlspecialchars($l['sourceLabel']) ?></span>
+                          <?php if ($l['scheduled']): ?>
+                            <span class="review-badge review-badge--orange"><?= htmlspecialchars($l['note']) ?></span>
+                          <?php endif; ?>
                         </div>
                         <p><?= htmlspecialchars($l['note']) ?> • <?= htmlspecialchars($l['category']) ?> • <?= htmlspecialchars($l['date']) ?></p>
                       </div>
@@ -267,16 +280,25 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
                       Editar
                     </button>
 
+                    <button class="item-action-btn item-action-btn--danger" type="button" data-delete="<?= $l['id'] ?>">
+                      <i class="bi bi-trash3"></i>
+                      Excluir
+                    </button>
+
                     <?php if ($l['status'] === 'pending'): ?>
                       <button class="item-action-btn item-action-btn--danger" type="button" data-reject="<?= $l['id'] ?>">
                         <i class="bi bi-x-circle"></i>
                         Rejeitar
                       </button>
 
-                      <button class="item-action-btn item-action-btn--success" type="button" data-approve="<?= $l['id'] ?>">
-                        <i class="bi bi-check-circle"></i>
-                        Aprovar
-                      </button>
+                      <?php if ($l['scheduledFuture']): ?>
+                        <span class="review-badge review-badge--orange">Aprovação na data agendada</span>
+                      <?php else: ?>
+                        <button class="item-action-btn item-action-btn--success" type="button" data-approve="<?= $l['id'] ?>">
+                          <i class="bi bi-check-circle"></i>
+                          Aprovar
+                        </button>
+                      <?php endif; ?>
                     <?php else: ?>
                       <span class="review-badge review-badge--<?= $l['status'] === 'approved' ? 'green' : 'red' ?>">
                         <?= $l['status'] === 'approved' ? 'Já aprovado' : 'Rejeitado' ?>
@@ -441,7 +463,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
               <p>Remove automaticamente da fila os itens já validados.</p>
             </div>
             <label class="switch switch--green">
-              <input type="checkbox" id="toggleHideApproved" <?= $regras['ocultar_aprovados'] ? 'checked' : '' ?>>
+              <input type="checkbox" id="toggleHideApproved" checked disabled>
               <span class="switch-slider"></span>
             </label>
           </div>
@@ -627,7 +649,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
     const state = {
       filter: "all",
-      hideApproved: <?= $regras['ocultar_aprovados'] ? 'true' : 'false' ?>,
+      hideApproved: false,
       prioritizeOCR: <?= $regras['priorizar_ocr_baixa_confianca'] ? 'true' : 'false' ?>,
       confidenceThreshold: <?= (int) $regras['limite_confianca_percentual'] ?>,
       selectedIds: [],
@@ -720,10 +742,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
     function getFilteredLaunches() {
       let launches = state.launches;
 
-      if (state.hideApproved) {
-        launches = launches.filter(item => item.status !== "approved");
-      }
-
       if (state.filter !== "all") {
         launches = launches.filter(item => item.source === state.filter);
       }
@@ -787,9 +805,10 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       document.getElementById("detailSource").textContent = launch.sourceLabel;
       document.getElementById("detailConfidence").textContent = launch.confidence + "%";
       document.getElementById("detailCategory").textContent = launch.category;
-      document.getElementById("detailStatus").textContent =
-        launch.status === "approved" ? "Aprovado" :
-        launch.status === "rejected" ? "Rejeitado" : "Pendente";
+      document.getElementById("detailStatus").textContent = launch.scheduled
+        ? (launch.scheduledLabel || "Lançamento agendado")
+        : launch.status === "approved" ? "Aprovado" :
+          launch.status === "rejected" ? "Rejeitado" : "Pendente";
 
       openReviewModal("detailsModal");
     }
@@ -869,6 +888,22 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       updateUI();
     }
 
+    async function deleteLaunch(id) {
+      const launch = state.launches.find(item => item.id === id);
+      if (!launch) return;
+      if (!window.confirm("Excluir este lançamento? Essa ação não pode ser desfeita.")) return;
+
+      const resultado = await enviarAcao({ acao: "excluir", id });
+      if (!resultado.sucesso) {
+        alert("Não foi possível excluir esse lançamento.");
+        return;
+      }
+
+      state.launches = state.launches.filter(item => item.id !== id);
+      state.selectedIds = state.selectedIds.filter(selectedId => selectedId !== id);
+      updateUI();
+    }
+
     async function approveSelected() {
       const idsToApprove = [...state.selectedIds];
       for (const id of idsToApprove) {
@@ -923,6 +958,12 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
     document.querySelectorAll("[data-reject]").forEach((button) => {
       button.addEventListener("click", () => {
         rejectLaunch(Number(button.getAttribute("data-reject")));
+      });
+    });
+
+    document.querySelectorAll("[data-delete]").forEach((button) => {
+      button.addEventListener("click", () => {
+        deleteLaunch(Number(button.getAttribute("data-delete")));
       });
     });
 
@@ -1019,7 +1060,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         }
 
         state.prioritizeOCR = document.getElementById("togglePrioritizeOCR").checked;
-        state.hideApproved = document.getElementById("toggleHideApproved").checked;
+        state.hideApproved = false;
         document.getElementById("confidenceThresholdText").textContent = state.confidenceThreshold + "%";
 
         try {

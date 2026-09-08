@@ -1,20 +1,8 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 require_once '../config/conn.php';
-
-$logPath = __DIR__ . '/_debug_criar_transacao.log';
-
-function debugLog(string $logPath, string $msg): void
-{
-    $linha = '[' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
-    file_put_contents($logPath, $linha, FILE_APPEND | LOCK_EX);
-}
-
-debugLog($logPath, '--- nova requisição ---');
-debugLog($logPath, 'POST bruto: ' . var_export($_POST, true));
-
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 function parseBRLParaFloat(string $valor): float
 {
@@ -26,13 +14,11 @@ function parseBRLParaFloat(string $valor): float
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    debugLog($logPath, 'Método não é POST, redirecionando sem fazer nada.');
     header('Location: dashboard.php');
     exit;
 }
 
 if (!isset($conn) || $conn->connect_error) {
-    debugLog($logPath, 'ERRO: conexão com o banco indisponível: ' . ($conn->connect_error ?? 'desconhecido'));
     header('Location: dashboard.php');
     exit;
 }
@@ -51,35 +37,29 @@ $categoriaId = ($categoriaIdRaw !== '' && $categoriaIdRaw !== null) ? (int) $cat
 
 $dataTransacao = $_POST['data_transacao'] ?? date('Y-m-d');
 
-debugLog($logPath, "Valores lidos: tipo={$tipo} | descricao=" . var_export($descricao, true)
-    . " | valor_bruto=" . var_export($valorPost, true) . " | valor_convertido={$valor}"
-    . " | categoriaIdRaw=" . var_export($categoriaIdRaw, true) . " | categoriaId=" . var_export($categoriaId, true)
-    . " | data={$dataTransacao}");
-
-
 if (!in_array($tipo, $tiposValidos, true)) {
-    debugLog($logPath, "FALHOU: tipo inválido -> '{$tipo}'");
     header('Location: dashboard.php');
     exit;
 }
 if ($descricao === '') {
-    debugLog($logPath, 'FALHOU: descrição vazia');
     header('Location: dashboard.php');
     exit;
 }
 if ($valor <= 0) {
-    debugLog($logPath, "FALHOU: valor <= 0 (valor_bruto=" . var_export($valorPost, true) . ", convertido={$valor})");
     header('Location: dashboard.php');
     exit;
 }
 
-
 $dataValidada = DateTime::createFromFormat('Y-m-d', $dataTransacao);
 if (!$dataValidada || $dataValidada->format('Y-m-d') !== $dataTransacao) {
-    debugLog($logPath, "Data '{$dataTransacao}' inválida, usando hoje.");
     $dataTransacao = date('Y-m-d');
 }
 
+$agendado = $dataTransacao > date('Y-m-d');
+$observacaoAgendamento = $agendado
+    ? ($tipo === 'despesa' ? 'Fatura agendada' : 'Receita agendada')
+    : null;
+$statusTransacao = $agendado ? 'pendente' : 'aprovado';
 
 if ($categoriaId !== null) {
     $stmtCheck = $conn->prepare("SELECT id FROM categorias WHERE id = ? AND usuario_id = ? AND tipo = ?");
@@ -90,34 +70,40 @@ if ($categoriaId !== null) {
         $stmtCheck->close();
 
         if (!$existe) {
-            debugLog($logPath, "Categoria {$categoriaId} não pertence ao usuário {$usuario_id} com tipo '{$tipo}' -> zerando categoria.");
             $categoriaId = null;
-        } else {
-            debugLog($logPath, "Categoria {$categoriaId} confirmada para usuário {$usuario_id} e tipo '{$tipo}'.");
         }
     } else {
-        debugLog($logPath, 'ERRO ao preparar SELECT categorias -> ' . $conn->error);
         $categoriaId = null;
     }
 }
 
 $stmt = $conn->prepare("
-    INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria_id, data_transacao, origem, status)
-    VALUES (?, ?, ?, ?, ?, ?, 'manual', 'aprovado')
+    INSERT INTO transacoes
+        (usuario_id, descricao, valor, tipo, categoria_id, data_transacao, origem, status, observacao_captura)
+    VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?)
 ");
 
 if (!$stmt) {
-    debugLog($logPath, 'ERRO ao preparar INSERT -> ' . $conn->error);
     header('Location: dashboard.php');
     exit;
 }
 
-$stmt->bind_param("isdsis", $usuario_id, $descricao, $valor, $tipo, $categoriaId, $dataTransacao);
+$stmt->bind_param(
+    "isdsisss",
+    $usuario_id,
+    $descricao,
+    $valor,
+    $tipo,
+    $categoriaId,
+    $dataTransacao,
+    $statusTransacao,
+    $observacaoAgendamento
+);
 $conn->begin_transaction();
 $sucesso = $stmt->execute();
 
 // Mantém o saldo total sincronizado com lançamentos aprovados.
-if ($sucesso) {
+if ($sucesso && !$agendado) {
     $variacaoSaldo = $tipo === 'receita' ? $valor : -$valor;
     $stmtSaldo = $conn->prepare(
         "UPDATE usuarios
@@ -131,14 +117,7 @@ if ($sucesso) {
         $stmtSaldo->close();
     } else {
         $sucesso = false;
-        debugLog($logPath, 'ERRO ao preparar atualizacao do saldo -> ' . $conn->error);
     }
-}
-
-if ($sucesso) {
-    debugLog($logPath, "SUCESSO: transação inserida com id " . $stmt->insert_id . " (tipo={$tipo}, categoria_id=" . var_export($categoriaId, true) . ")");
-} else {
-    debugLog($logPath, 'ERRO ao executar INSERT -> ' . $stmt->error);
 }
 
 if ($sucesso) {

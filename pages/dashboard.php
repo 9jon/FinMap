@@ -1,10 +1,11 @@
 <?php
   
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
+require_once __DIR__ . '/../includes/percentuais-categorias.php';
 
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 if (empty($_SESSION['csrf_importacao'])) {
     $_SESSION['csrf_importacao'] = bin2hex(random_bytes(32));
@@ -24,33 +25,50 @@ $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = (float) ($usuario['saldo_total'] ?? 0);
 
+function formatarDataCurta(string $data): string
+{
+    $timestamp = strtotime($data);
+    if ($timestamp === false) {
+        return $data;
+    }
+
+    $meses = [
+        1 => 'jan', 2 => 'fev', 3 => 'mar', 4 => 'abr', 5 => 'mai', 6 => 'jun',
+        7 => 'jul', 8 => 'ago', 9 => 'set', 10 => 'out', 11 => 'nov', 12 => 'dez'
+    ];
+
+    return date('d', $timestamp) . ' ' . $meses[(int) date('n', $timestamp)];
+}
+
 
 $stmt = $conn->prepare("
     SELECT
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao <= CURDATE()
             THEN valor ELSE 0 END), 0) AS receitas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao <= CURDATE()
             THEN valor ELSE 0 END), 0) AS despesas_atual,
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS receitas_anterior,
         COALESCE(SUM(CASE
             WHEN tipo = 'despesa'
-             AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+             AND data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN valor ELSE 0 END), 0) AS despesas_anterior,
         SUM(CASE
-            WHEN (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_FORMAT(CURDATE(), '%Y-%m-01')
+            WHEN data_transacao < DATE_FORMAT(CURDATE(), '%Y-%m-01')
             THEN 1 ELSE 0 END) AS lancamentos_anterior
     FROM transacoes
     WHERE usuario_id = ?
       AND status = 'aprovado'
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND data_transacao >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND data_transacao <= CURDATE()
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -63,23 +81,31 @@ $receitasMesAnterior = (float) $comparativoMensal['receitas_anterior'];
 $despesasMesAnterior = (float) $comparativoMensal['despesas_anterior'];
 $temRegistroMesAnterior = (int) $comparativoMensal['lancamentos_anterior'] > 0;
 
-function calcularVariacaoMensal(float $valorAtual, float $valorAnterior, bool $temRegistroAnterior): float
+function calcularVariacaoMensal(float $valorAtual, float $valorAnterior, bool $temRegistroAnterior): ?float
 {
     if (!$temRegistroAnterior || abs($valorAnterior) < 0.00001) {
-        return 0.0;
+        return null;
     }
 
     return (($valorAtual - $valorAnterior) / abs($valorAnterior)) * 100;
 }
 
-function textoVariacaoMensal(float $variacao): string
+function textoVariacaoMensal(?float $variacao): string
 {
+    if ($variacao === null) {
+        return 'Sem dados para comparar';
+    }
+
     $sinal = $variacao > 0 ? '+' : '';
     return $sinal . number_format($variacao, 1, ',', '.') . '% vs mês anterior';
 }
 
-function iconeVariacaoMensal(float $variacao): string
+function iconeVariacaoMensal(?float $variacao): string
 {
+    if ($variacao === null) {
+        return 'dash-lg';
+    }
+
     if ($variacao > 0) {
         return 'arrow-up-right';
     }
@@ -91,20 +117,48 @@ function iconeVariacaoMensal(float $variacao): string
     return 'dash-lg';
 }
 
-$saldoMesAnterior = $saldoTotal - ($receitasMes - $despesasMes);
-$variacaoSaldo = calcularVariacaoMensal($saldoTotal, $saldoMesAnterior, $temRegistroMesAnterior);
+$movimentacaoMes = $receitasMes - $despesasMes;
 $variacaoReceitas = calcularVariacaoMensal($receitasMes, $receitasMesAnterior, $temRegistroMesAnterior);
 $variacaoDespesas = calcularVariacaoMensal($despesasMes, $despesasMesAnterior, $temRegistroMesAnterior);
 
-$classeVariacaoReceitas = $variacaoReceitas < 0 ? 'negative' : 'positive';
-$classeVariacaoDespesas = $variacaoDespesas > 0 ? 'negative' : 'positive';
+$classeVariacaoReceitas = $variacaoReceitas === null
+    ? 'neutral'
+    : ($variacaoReceitas < 0 ? 'negative' : 'positive');
+$classeVariacaoDespesas = $variacaoDespesas === null
+    ? 'neutral'
+    : ($variacaoDespesas > 0 ? 'negative' : 'positive');
+
+function textoMovimentacaoMensal(float $valor): string
+{
+    if (abs($valor) < 0.005) {
+        return 'Nenhuma movimentação neste mês';
+    }
+
+    $sinal = $valor > 0 ? '+' : '−';
+    return 'Movimentação do mês: ' . $sinal . ' R$ ' . number_format(abs($valor), 2, ',', '.');
+}
+
+function iconeMovimentacaoMensal(float $valor): string
+{
+    if ($valor > 0.005) {
+        return 'arrow-up-right';
+    }
+
+    if ($valor < -0.005) {
+        return 'arrow-down-right';
+    }
+
+    return 'dash-lg';
+}
 
 
 $stmt = $conn->prepare("
-    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.status, t.observacao_captura,
+           t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.status = 'aprovado'
+    WHERE t.usuario_id = ?
+      AND (t.status = 'aprovado' OR (t.status = 'pendente' AND t.observacao_captura IN ('Fatura agendada', 'Receita agendada')))
     -- Recentes deve refletir os lançamentos incluídos ou aprovados por último.
     -- A data do extrato pode ser antiga, mas a aprovação acabou de acontecer.
     ORDER BY t.atualizado_em DESC, t.id DESC
@@ -117,11 +171,13 @@ $stmt->close();
 
 
 $stmt = $conn->prepare("
-    SELECT t.id, t.descricao, t.valor, t.tipo, t.data_transacao, c.nome AS categoria_nome
+    SELECT t.id, t.descricao, t.valor, t.tipo, t.status, t.observacao_captura,
+           t.data_transacao, c.nome AS categoria_nome
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
-    WHERE t.usuario_id = ? AND t.status = 'aprovado'
-    ORDER BY t.data_transacao DESC, t.id DESC
+    WHERE t.usuario_id = ?
+      AND (t.status = 'aprovado' OR (t.status = 'pendente' AND t.observacao_captura IN ('Fatura agendada', 'Receita agendada')))
+    ORDER BY t.atualizado_em DESC, t.id DESC
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -151,8 +207,8 @@ $stmt = $conn->prepare("
     FROM transacoes t
     LEFT JOIN categorias c ON c.id = t.categoria_id
     WHERE t.usuario_id = ? AND t.tipo = 'despesa' AND t.status = 'aprovado'
-      AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-      AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND t.data_transacao <= CURDATE()
     GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY total DESC
 ");
@@ -161,7 +217,7 @@ $stmt->execute();
 $gastosCategorias = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-$totalGastosCategorias = array_sum(array_column($gastosCategorias, 'total'));
+aplicarPercentuaisInteiros($gastosCategorias, 'total', 'percentual');
 
 $stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
 $stmt->bind_param("i", $usuario_id);
@@ -192,8 +248,7 @@ function criarNotificacao(
         WHERE usuario_id = ?
           AND categoria = ?
           AND titulo = ?
-          AND mensagem = ?
-          AND criado_em >= NOW() - INTERVAL 24 HOUR
+        ORDER BY criado_em DESC, id DESC
         LIMIT 1
     ");
 
@@ -202,22 +257,37 @@ function criarNotificacao(
     }
 
     $stmt->bind_param(
-        "isss",
+        "iss",
         $usuario_id,
         $categoria,
-        $titulo,
-        $mensagem
+        $titulo
     );
 
     $stmt->execute();
 
     $resultado = $stmt->get_result();
 
-    $existe = $resultado->num_rows > 0;
+    $notificacaoAtual = $resultado->fetch_assoc();
 
     $stmt->close();
 
-    if ($existe) {
+    if ($notificacaoAtual) {
+        $notificacaoId = (int) $notificacaoAtual['id'];
+
+        $stmt = $conn->prepare("DELETE FROM notificacoes WHERE usuario_id = ? AND categoria = ? AND titulo = ? AND id <> ?");
+        if ($stmt) {
+            $stmt->bind_param("issi", $usuario_id, $categoria, $titulo, $notificacaoId);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $stmt = $conn->prepare("UPDATE notificacoes SET mensagem = ?, lida = 0, criado_em = CURRENT_TIMESTAMP WHERE id = ? AND usuario_id = ? AND mensagem <> ?");
+        if ($stmt) {
+            $stmt->bind_param("siis", $mensagem, $notificacaoId, $usuario_id, $mensagem);
+            $stmt->execute();
+            $stmt->close();
+        }
+
         return;
     }
 
@@ -487,8 +557,8 @@ $stmt->close();
 
         <div class="finance-card__bottom">
           <span class="finance-card__trend finance-card__trend--light">
-            <i class="bi bi-<?= iconeVariacaoMensal($variacaoSaldo) ?>"></i>
-            <?= textoVariacaoMensal($variacaoSaldo) ?>
+            <i class="bi bi-<?= iconeMovimentacaoMensal($movimentacaoMes) ?>"></i>
+            <?= textoMovimentacaoMensal($movimentacaoMes) ?>
           </span>
         </div>
       </article>
@@ -537,45 +607,45 @@ $stmt->close();
 
   <section class="main-actions">
     <div class="main-actions__grid">
-  <article class="action-card action-card--green" data-link-page="orcamento-mensal.php">
+  <a class="action-card action-card--green" href="orcamento-mensal.php">
     <div class="action-icon">
       <i class="bi bi-calendar2-week"></i>
     </div>
     <h4>Orçamento mensal</h4>
     <p>Veja quanto da sua renda já foi comprometido neste mês</p>
-  </article>
+  </a>
 
-  <article class="action-card action-card--purple" data-link-page="metas-financeiras.php">
+  <a class="action-card action-card--purple" href="metas-financeiras.php">
     <div class="action-icon">
       <i class="bi bi-bullseye"></i>
     </div>
     <h4>Metas financeiras</h4>
     <p>Defina objetivos e acompanhe sua evolução com clareza</p>
-  </article>
+  </a>
 
-  <article class="action-card action-card--orange" data-link-page="poupanca-invisivel.php">
+  <a class="action-card action-card--orange" href="poupanca-invisivel.php">
     <div class="action-icon">
       <i class="bi bi-piggy-bank"></i>
     </div>
     <h4>Poupança invisível</h4>
     <p>Converta desperdícios recorrentes em reserva automática</p>
-  </article>
+  </a>
 
-  <article class="action-card action-card--red" data-link-page="alertas-preditivos.php">
+  <a class="action-card action-card--red" href="alertas-preditivos.php">
     <div class="action-icon">
       <i class="bi bi-exclamation-triangle"></i>
     </div>
     <h4>Alertas preditivos</h4>
     <p>Receba avisos antes de um possível desequilíbrio financeiro</p>
-  </article>
+  </a>
 
-  <article class="action-card action-card--blue" data-link-page="revisar-lancamentos.php">
+  <a class="action-card action-card--blue" href="revisar-lancamentos.php">
     <div class="action-icon">
       <i class="bi bi-check2-square"></i>
     </div>
     <h4>Revisar lançamentos</h4>
     <p>Valide capturas automáticas vindas de OCR, SMS ou importação</p>
-  </article>
+  </a>
 </div>
 
     <div class="dashboard-panels">
@@ -583,7 +653,7 @@ $stmt->close();
         <div class="recent-transactions-panel__header">
           <div>
             <h3>Transações recentes</h3>
-            <p>Últimas movimentações registradas e consolidadas pelo FinMap</p>
+            <p>Últimos lançamentos adicionados ou atualizados pelo FinMap</p>
           </div>
 
           <a href="#" class="recent-transactions-panel__link" id="openAllTransactionsModal">
@@ -597,7 +667,11 @@ $stmt->close();
             <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
           <?php else: ?>
             <?php foreach ($transacoes as $t): ?>
-              <?php $isReceita = $t['tipo'] === 'receita'; ?>
+              <?php
+                $isReceita = $t['tipo'] === 'receita';
+                $isAgendado = $t['status'] === 'pendente'
+                    && in_array($t['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true);
+              ?>
               <article class="transaction-item">
                 <div class="transaction-item__left">
                   <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
@@ -614,7 +688,10 @@ $stmt->close();
                   <strong class="transaction-item__value transaction-item__value--<?= $isReceita ? 'positive' : 'negative' ?>">
                     <?= $isReceita ? '+ ' : '' ?>R$ <?= number_format($t['valor'], 2, ',', '.') ?>
                   </strong>
-                  <span class="transaction-item__date"><?= date('d M', strtotime($t['data_transacao'])) ?></span>
+                  <span class="transaction-item__date"><?= htmlspecialchars(formatarDataCurta($t['data_transacao'])) ?></span>
+                  <?php if ($isAgendado): ?>
+                    <span class="transaction-item__status transaction-item__status--scheduled"><?= htmlspecialchars($t['observacao_captura']) ?></span>
+                  <?php endif; ?>
                 </div>
               </article>
             <?php endforeach; ?>
@@ -703,8 +780,10 @@ $stmt->close();
         <div class="category-expenses-panel__header">
           <div>
             <h3>Gastos por categoria</h3>
-            <p>Distribuição atual das principais despesas do mês</p>
+            <p>Veja como as despesas aprovadas se distribuem no período selecionado</p>
           </div>
+
+          <p id="categoryPeriodDescription">Do primeiro dia do mês atual até hoje</p>
 
           <button class="category-expenses-panel__filter" id="openCategoryPeriodModal" type="button">
             <i class="bi bi-sliders"></i>
@@ -717,9 +796,7 @@ $stmt->close();
             <p style="padding: 16px 0; color: #888;">Nenhum gasto registrado neste período ainda.</p>
           <?php else: ?>
             <?php foreach ($gastosCategorias as $g):
-              $percentualCat = $totalGastosCategorias > 0
-                  ? round(($g['total'] / $totalGastosCategorias) * 100)
-                  : 0;
+              $percentualCat = (int) ($g['percentual'] ?? 0);
             ?>
               <article class="category-expense-card">
                 <div class="category-expense-card__top">
@@ -1188,6 +1265,7 @@ $stmt->close();
           <div class="mb-4">
             <label for="manualData" class="form-label fw-semibold">Data</label>
             <input type="date" class="form-control" id="manualData" name="data_transacao" value="<?= date('Y-m-d') ?>" required>
+            <div class="form-text">Datas futuras ficam como lançamento agendado e não alteram o saldo até a aprovação.</div>
           </div>
 
           <div class="d-flex justify-content-end gap-2">
@@ -1545,7 +1623,7 @@ $stmt->close();
         </div>
         <div>
           <h3>Todas as transações</h3>
-          <p>Histórico completo das movimentações do FinMap, da mais recente à mais antiga.</p>
+          <p>Histórico completo das movimentações, ordenado pela atividade mais recente.</p>
         </div>
       </div>
 
@@ -1561,7 +1639,11 @@ $stmt->close();
           <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
         <?php else: ?>
           <?php foreach ($todasTransacoes as $t): ?>
-            <?php $isReceita = $t['tipo'] === 'receita'; ?>
+            <?php
+              $isReceita = $t['tipo'] === 'receita';
+              $isAgendado = $t['status'] === 'pendente'
+                  && in_array($t['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true);
+            ?>
             <article class="transaction-item">
               <div class="transaction-item__left">
                 <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
@@ -1576,7 +1658,10 @@ $stmt->close();
                 <strong class="transaction-item__value transaction-item__value--<?= $isReceita ? 'positive' : 'negative' ?>">
                   <?= $isReceita ? '+ ' : '' ?>R$ <?= number_format($t['valor'], 2, ',', '.') ?>
                 </strong>
-                <span class="transaction-item__date"><?= date('d M', strtotime($t['data_transacao'])) ?></span>
+                <span class="transaction-item__date"><?= htmlspecialchars(formatarDataCurta($t['data_transacao'])) ?></span>
+                <?php if ($isAgendado): ?>
+                  <span class="transaction-item__status transaction-item__status--scheduled"><?= htmlspecialchars($t['observacao_captura']) ?></span>
+                <?php endif; ?>
               </div>
             </article>
           <?php endforeach; ?>
@@ -1646,11 +1731,20 @@ $stmt->close();
     </div>
 
     <div class="dashboard-popout__body">
+      <p class="dashboard-period-help">Os valores consideram apenas despesas aprovadas e com data até hoje.</p>
       <div class="dashboard-period-list">
         <button class="dashboard-period-option active" type="button" data-period="this-month">Este mês</button>
-        <button class="dashboard-period-option" type="button" data-period="last-30">Últimos 30 dias</button>
-        <button class="dashboard-period-option" type="button" data-period="last-month">Último mês</button>
+        <button class="dashboard-period-option" type="button" data-period="last-month">Mês anterior</button>
         <button class="dashboard-period-option" type="button" data-period="last-3-months">Últimos 3 meses</button>
+        <button class="dashboard-period-option" type="button" data-period="custom">Período personalizado</button>
+      </div>
+      <div class="dashboard-period-custom" id="customPeriodFields" hidden>
+        <label for="customPeriodStart">De</label>
+        <input type="date" id="customPeriodStart">
+        <label for="customPeriodEnd">Até</label>
+        <input type="date" id="customPeriodEnd">
+        <button class="dashboard-period-apply" type="button" id="applyCustomPeriod">Aplicar período</button>
+        <small id="customPeriodError" role="alert"></small>
       </div>
     </div>
   </div>
@@ -1904,17 +1998,26 @@ $stmt->close();
   }
 
 
-  async function renderCategoryExpenses(periodKey) {
+  async function renderCategoryExpenses(periodKey, inicio = "", fim = "") {
     const panelList = document.getElementById("categoryExpensesList");
     if (!panelList) return;
 
     try {
-      const response = await fetch(`buscar-gastos-categoria.php?periodo=${encodeURIComponent(periodKey)}`);
+      const parametros = new URLSearchParams({ periodo: periodKey });
+      if (periodKey === "custom") {
+        parametros.set("inicio", inicio);
+        parametros.set("fim", fim);
+      }
+      const response = await fetch(`buscar-gastos-categoria.php?${parametros.toString()}`);
       const resultado = await response.json();
 
       if (!resultado.sucesso) return;
 
       categoryPeriodLabel.textContent = resultado.label;
+      const categoryPeriodDescription = document.getElementById("categoryPeriodDescription");
+      if (categoryPeriodDescription) {
+        categoryPeriodDescription.textContent = `${resultado.intervalo} · somente despesas aprovadas`;
+      }
 
       if (!resultado.categorias.length) {
         panelList.innerHTML = `<p style="padding: 16px 0; color: #888;">Nenhum gasto registrado neste período ainda.</p>`;
@@ -1952,13 +2055,6 @@ $stmt->close();
       btn.classList.toggle("active", btn.getAttribute("data-period") === periodKey);
     });
   }
-
-  document.querySelectorAll("[data-link-page]").forEach((card) => {
-    card.addEventListener("click", () => {
-      const page = card.getAttribute("data-link-page");
-      if (page) window.location.href = page;
-    });
-  });
 
   if (goToGoalsPageBtn) {
     goToGoalsPageBtn.addEventListener("click", () => {
@@ -2131,13 +2227,68 @@ $stmt->close();
     });
   }
 
+  const customPeriodFields = document.getElementById("customPeriodFields");
+  const customPeriodStart = document.getElementById("customPeriodStart");
+  const customPeriodEnd = document.getElementById("customPeriodEnd");
+  const customPeriodError = document.getElementById("customPeriodError");
+  const applyCustomPeriod = document.getElementById("applyCustomPeriod");
+  const formatarDataLocal = (data) => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, "0");
+    const dia = String(data.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+  };
+  const hojeParaFiltro = formatarDataLocal(new Date());
+
+  if (customPeriodStart && customPeriodEnd) {
+    customPeriodStart.max = hojeParaFiltro;
+    customPeriodEnd.max = hojeParaFiltro;
+    const primeiroDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    customPeriodStart.value = formatarDataLocal(primeiroDiaMes);
+    customPeriodEnd.value = hojeParaFiltro;
+  }
+
   document.querySelectorAll(".dashboard-period-option").forEach((button) => {
     button.addEventListener("click", () => {
       const period = button.getAttribute("data-period");
+
+      if (period === "custom") {
+        if (customPeriodFields) customPeriodFields.hidden = false;
+        if (customPeriodError) customPeriodError.textContent = "";
+        return;
+      }
+
+      if (customPeriodFields) customPeriodFields.hidden = true;
       renderCategoryExpenses(period);
       closeModal(categoryPeriodModal);
     });
   });
+
+  if (applyCustomPeriod) {
+    applyCustomPeriod.addEventListener("click", () => {
+      const inicio = customPeriodStart ? customPeriodStart.value : "";
+      const fim = customPeriodEnd ? customPeriodEnd.value : "";
+
+      if (!inicio || !fim) {
+        if (customPeriodError) customPeriodError.textContent = "Informe as duas datas para continuar.";
+        return;
+      }
+      if (inicio > fim) {
+        if (customPeriodError) customPeriodError.textContent = "A data inicial deve ser anterior à data final.";
+        return;
+      }
+      if (fim > hojeParaFiltro) {
+        if (customPeriodError) customPeriodError.textContent = "A data final não pode passar de hoje.";
+        return;
+      }
+
+      if (customPeriodFields) customPeriodFields.hidden = true;
+      renderCategoryExpenses("custom", inicio, fim);
+      closeModal(categoryPeriodModal);
+    });
+  }
+
+  renderCategoryExpenses("this-month");
 
   if (openManualTransactionOption) {
     openManualTransactionOption.addEventListener("click", () => {

@@ -1,6 +1,7 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuarioId = exigirUsuarioAutenticado();
 require_once '../config/conn.php';
 require_once '../includes/importador-transacoes.php';
 
@@ -18,11 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $token = $_POST['csrf_importacao'] ?? '';
 if (!isset($_SESSION['csrf_importacao']) || !is_string($token) || !hash_equals($_SESSION['csrf_importacao'], $token)) {
     responderErroImportacao('Sua sessão de importação expirou. Tente novamente.');
-}
-
-$usuarioId = (int) ($_SESSION['usuario_id'] ?? 0);
-if ($usuarioId <= 0) {
-    responderErroImportacao('Faça login novamente antes de importar um arquivo.');
 }
 
 $upload = $_FILES['arquivo_importacao'] ?? null;

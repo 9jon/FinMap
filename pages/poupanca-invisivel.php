@@ -1,8 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
 
-$usuario_id = $_SESSION['usuario_id'] ?? 1;
 
 
 $stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
@@ -68,8 +68,7 @@ foreach ($oportunidades as $chave => $oportunidade) {
     $oportunidades[$chave]['potencial'] = 0.0;
 }
 
-// Importações entram na análise assim que são aprovadas; lançamentos manuais
-// permanecem vinculados à data financeira informada pelo usuário.
+// Totais seguem a data do lancamento, independentemente da importacao ou edicao.
 $stmt = $conn->prepare(
     "SELECT t.descricao, t.valor, c.nome AS categoria_nome
      FROM transacoes t
@@ -77,8 +76,8 @@ $stmt = $conn->prepare(
      WHERE t.usuario_id = ?
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
+       AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND t.data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)"
 );
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();

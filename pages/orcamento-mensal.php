@@ -1,19 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$usuario_id = exigirUsuarioAutenticado();
 require_once __DIR__ . '/../config/conn.php';
-if (!isset($_SESSION['usuario_id'])) {
-    $sqlTeste = "SELECT id FROM usuarios WHERE email = 'joao@email.com' LIMIT 1";
-    $resultadoTeste = $conn->query($sqlTeste);
-    $usuarioTeste = $resultadoTeste ? $resultadoTeste->fetch_assoc() : null;
 
-    if ($usuarioTeste) {
-        $_SESSION['usuario_id'] = (int)$usuarioTeste['id'];
-    } else {
-        die('Nenhum usuário de teste encontrado. Rode o INSERT do usuário de exemplo (joao@email.com) do schema antes de testar esta tela.');
-    }
-}
-
-$usuario_id = (int)$_SESSION['usuario_id'];
 
 function parseBRLParaFloat(string $valor): float
 {
@@ -141,11 +130,7 @@ $faixaAlerta = $config['faixa_alerta_percentual'] ?? 85;
 $cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
 
-// Importações passam a compor o período no momento em que são aprovadas;
-// lançamentos manuais preservam a data financeira informada pelo usuário.
-// `atualizado_em` é alterado na aprovação e está disponível em todas as versões
-// atuais da tabela `transacoes`.
-// O LEFT JOIN mantém visíveis as categorias sem gastos no período.
+// Totais seguem a data do lancamento, independentemente da importacao ou edicao.
 $sqlCategorias = "
     SELECT c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento,
            COALESCE(SUM(t.valor), 0) AS gasto_real
@@ -155,8 +140,8 @@ $sqlCategorias = "
        AND t.usuario_id = c.usuario_id
        AND t.tipo = 'despesa'
        AND t.status = 'aprovado'
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-       AND (CASE WHEN t.origem = 'importacao' THEN DATE(t.atualizado_em) ELSE t.data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+       AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       AND t.data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     WHERE c.usuario_id = ? AND c.tipo = 'despesa'
     GROUP BY c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento
     ORDER BY gasto_real DESC
@@ -174,8 +159,8 @@ $stmtSemCategoria = $conn->prepare("
       AND tipo = 'despesa'
       AND status = 'aprovado'
       AND categoria_id IS NULL
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-      AND (CASE WHEN origem = 'importacao' THEN DATE(atualizado_em) ELSE data_transacao END) < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+      AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
 ");
 $stmtSemCategoria->bind_param("i", $usuario_id);
 $stmtSemCategoria->execute();

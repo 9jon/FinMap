@@ -356,6 +356,10 @@ body {
   color: #ef4444;
 }
 
+.finance-card__trend--neutral {
+  color: var(--muted);
+}
+
 /* =========================
    FUNÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES PRINCIPAIS
 ========================= */
@@ -405,6 +409,8 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  text-decoration: none;
+  color: inherit;
   gap: 12px;
   cursor: pointer;
   transition: 0.25s ease;
@@ -641,6 +647,22 @@ body {
   font-size: 0.88rem;
   color: var(--muted);
   font-weight: 500;
+}
+
+.transaction-item__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.transaction-item__status--scheduled {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
 }
 
 /* =========================
@@ -4258,6 +4280,90 @@ body {
 .dashboard-period-option {
   width: 100%;
   min-height: 52px;
+}
+
+.dashboard-menu-item {
+  padding: 0 16px;
+  border: 1px solid #dfe7e2;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.dashboard-menu-item i {
+  width: 22px;
+  color: #7c3aed;
+  font-size: 1.05rem;
+  text-align: center;
+}
+
+.dashboard-period-help {
+  margin: 0 0 14px;
+  color: #6b7280;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.dashboard-period-custom {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.dashboard-period-custom[hidden] {
+  display: none;
+}
+
+.dashboard-period-custom label {
+  color: #4b5563;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dashboard-period-custom input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #dfe7e2;
+  border-radius: 12px;
+  color: #111827;
+  font: inherit;
+}
+
+.dashboard-period-apply {
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #15803d;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-period-apply:hover {
+  background: #166534;
+}
+
+#customPeriodError {
+  min-height: 18px;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.dashboard-period-option {
   padding: 0 16px;
   border-radius: 16px;
   border: 1px solid #dfe7e2;
@@ -4280,6 +4386,16 @@ body {
   border-color: rgba(36, 187, 69, 0.24);
   color: #15803d;
   box-shadow: 0 10px 18px rgba(16, 24, 40, 0.05);
+}
+
+.dashboard-menu-item:hover i {
+  color: #15803d;
+}
+
+.dashboard-menu-item:focus-visible,
+.dashboard-period-option:focus-visible {
+  outline: 3px solid rgba(21, 128, 61, 0.24);
+  outline-offset: 2px;
 }
 
 @media (max-width: 768px) {

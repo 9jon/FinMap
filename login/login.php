@@ -2,7 +2,15 @@
 session_start();
 include '../config/conn.php';
 
-$erro = '';
+$errosGoogle = [
+    'google_cancelado' => 'O login com Google foi cancelado. Você pode tentar novamente.',
+    'google_sessao' => 'O login com Google expirou ou não foi iniciado neste navegador. Clique no botão Google novamente.',
+    'google_configuracao' => 'O login com Google está indisponível. Use seu e-mail e senha.',
+    'google_token' => 'Não foi possível concluir o login com Google. Tente novamente.',
+    'google_dados' => 'Não foi possível confirmar sua conta Google. Tente novamente.',
+];
+$codigoErro = $_GET['erro'] ?? '';
+$erro = is_string($codigoErro) ? ($errosGoogle[$codigoErro] ?? '') : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -20,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$usuario || !password_verify($senha, $usuario['senha_hash'])) {
             $erro = 'E-mail ou senha incorretos.';
         } else {
+            session_regenerate_id(true);
+            $_SESSION['autenticado'] = true;
             $_SESSION['usuario_id'] = $usuario['id'];
             $_SESSION['usuario_nome'] = $usuario['nome'];
             $conn->close();
@@ -101,8 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="social-login">
-          <?php include '../config/oauth-google.php'; ?>
-<a class="social-btn google" href="https://accounts.google.com/o/oauth2/v2/auth?client_id=<?= urlencode(GOOGLE_CLIENT_ID) ?>&redirect_uri=<?= urlencode(GOOGLE_REDIRECT_URI) ?>&response_type=code&scope=email%20profile&access_type=online">
+
+<a class="social-btn google" href="google.php">
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" alt="Google">
 </a>
 

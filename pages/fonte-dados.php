@@ -1,17 +1,13 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/autenticacao.php';
+$id_usuario = exigirUsuarioAutenticado();
 include(__DIR__ . "/../config/conn.php");
 
 if (!isset($conn)) {
     die("Erro: o arquivo conn.php não criou a variável \$conn.");
 }
 
-if (!isset($_SESSION['usuario_id'])) {
-  header("Location: ../login/login.php");
-  exit();
-}
 
-$id_usuario = $_SESSION['usuario_id'];
 
 $erro = "";
 
