@@ -2071,8 +2071,16 @@ body {
 .notif-panel__tabs {
   padding: 16px 22px 0;
   display: flex;
+  flex: 0 0 auto;
   gap: 10px;
   overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.notif-panel__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .notif-tab {
@@ -2101,8 +2109,10 @@ body {
 .notif-panel__list {
   padding: 18px 22px 24px;
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   gap: 14px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -2115,6 +2125,11 @@ body {
   align-items: flex-start;
   gap: 14px;
   transition: 0.25s ease;
+}
+
+.notif-card__content {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .notif-card:hover {
@@ -2163,6 +2178,7 @@ body {
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
 }
 
 .notif-card__content p {
@@ -2170,6 +2186,7 @@ body {
   font-size: 0.9rem;
   line-height: 1.45;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .notif-card__content span {

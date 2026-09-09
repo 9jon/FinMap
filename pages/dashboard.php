@@ -190,7 +190,6 @@ $stmt = $conn->prepare("
     FROM metas_financeiras
     WHERE usuario_id = ?
     ORDER BY criado_em DESC
-    LIMIT 3
 ");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -307,67 +306,133 @@ function criarNotificacao(
     if (!$stmt) {
         return;
     }
+$stmt->bind_param(
+    "isss",
+    $usuario_id,
+    $categoria,
+    $titulo,
+    $mensagem
+);
 
-    $stmt->bind_param(
-        "isss",
-        $usuario_id,
-        $categoria,
-        $titulo,
-        $mensagem
-    );
+if (!$stmt->execute()) {
+    die("ERRO AO CRIAR NOTIFICAÇÃO: " . $stmt->error);
+}
 
-    $stmt->execute();
-
-    $stmt->close();
+$stmt->close();
 }
 
 
 /* =========================================================
-   ALERTA DE ORÇAMENTO
+   ALERTAS PREDITIVOS
    ========================================================= */
 
-if ($receitasMes > 0) {
+// Busca os alertas preditivos do usuário
+$stmtAlertas = $conn->prepare("
+    SELECT
+        titulo,
+        descricao,
+        severidade
+    FROM alertas_preditivos
+    WHERE usuario_id = ?
+    ORDER BY criado_em DESC
+    LIMIT 10
+");
 
-    $percentualGasto =
-        ($despesasMes / $receitasMes) * 100;
+if ($stmtAlertas) {
 
-    if ($percentualGasto >= 80) {
+    $stmtAlertas->bind_param("i", $usuario_id);
+    $stmtAlertas->execute();
 
-        $percentual = round($percentualGasto);
+    $resultadoAlertas = $stmtAlertas->get_result();
+
+    while ($alerta = $resultadoAlertas->fetch_assoc()) {
+
+        $tituloAlerta = trim((string)($alerta['titulo'] ?? 'Alerta financeiro'));
+
+        $descricaoAlerta = trim(
+            (string)($alerta['descricao'] ?? 'Foi identificado um possível risco financeiro.')
+        );
+
+        if ($tituloAlerta === '') {
+            $tituloAlerta = 'Alerta financeiro';
+        }
+
+        if ($descricaoAlerta === '') {
+            $descricaoAlerta = 'Foi identificado um possível risco financeiro.';
+        }
 
         criarNotificacao(
             $conn,
             $usuario_id,
             'alerta',
-            'Alerta preditivo de orçamento',
-            "Você já utilizou {$percentual}% das suas receitas deste mês em despesas. Seu ritmo atual de gastos pode comprometer o fechamento do mês."
+            $tituloAlerta,
+            $descricaoAlerta
         );
     }
+
+    $stmtAlertas->close();
 }
 
 /* =========================================================
-   ALERTAS DE GASTOS POR CATEGORIA
+   NOTIFICAÇÕES DE GASTOS
    ========================================================= */
 
-foreach ($gastosCategorias as $gasto) {
+$stmtGastosNotif = $conn->prepare("
+    SELECT
+        COALESCE(c.nome, 'Sem categoria') AS categoria_nome,
+        COALESCE(SUM(t.valor), 0) AS total
+    FROM transacoes t
+    LEFT JOIN categorias c ON c.id = t.categoria_id
+    WHERE t.usuario_id = ?
+      AND t.tipo = 'despesa'
+      AND t.status = 'aprovado'
+      AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND t.data_transacao < DATE_ADD(
+          DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+          INTERVAL 1 MONTH
+      )
+    GROUP BY c.id, c.nome
+    ORDER BY total DESC
+");
 
-    $nomeCategoria = $gasto['nome'];
-    $totalCategoria = (float) $gasto['total'];
+if ($stmtGastosNotif) {
 
-    // Só cria notificação se existir gasto
-    if ($totalCategoria > 0) {
+    $stmtGastosNotif->bind_param("i", $usuario_id);
+    $stmtGastosNotif->execute();
+
+    $resultadoGastosNotif = $stmtGastosNotif->get_result();
+
+    while ($gastoNotif = $resultadoGastosNotif->fetch_assoc()) {
+
+        $categoriaNome = trim(
+            (string) ($gastoNotif['categoria_nome'] ?? 'Sem categoria')
+        );
+
+        $totalGasto = (float) ($gastoNotif['total'] ?? 0);
+
+        if ($totalGasto <= 0) {
+            continue;
+        }
+
+        $valorFormatado = number_format(
+            $totalGasto,
+            2,
+            ',',
+            '.'
+        );
 
         criarNotificacao(
             $conn,
             $usuario_id,
             'gasto',
-            'Gasto em ' . $nomeCategoria,
-            'Você já gastou R$ ' .
-            number_format($totalCategoria, 2, ',', '.') .
-            ' na categoria ' . $nomeCategoria . ' neste mês.'
+            "Gastos: {$categoriaNome}",
+            "Você já gastou R$ {$valorFormatado} na categoria {$categoriaNome} neste mês."
         );
     }
+
+    $stmtGastosNotif->close();
 }
+
 /* =========================================================
    ALERTAS DAS METAS
    ========================================================= */
@@ -376,6 +441,11 @@ foreach ($metas as $meta) {
 
     $valorMeta = (float) $meta['valor_meta'];
     $valorGuardado = (float) $meta['valor_guardado'];
+    $nomeMeta = trim((string) $meta['nome']);
+
+    if ($nomeMeta === '') {
+        $nomeMeta = 'sem nome';
+    }
 
     if ($valorMeta <= 0) {
         continue;
@@ -390,8 +460,8 @@ foreach ($metas as $meta) {
             $conn,
             $usuario_id,
             'meta',
-            'Meta concluída!',
-            "Parabéns! Você atingiu 100% da meta \"{$meta['nome']}\"."
+            "Meta concluída: {$nomeMeta}",
+            "Parabéns! Você atingiu 100% da meta \"{$nomeMeta}\"."
         );
 
     } elseif ($percentual >= 75) {
@@ -400,8 +470,8 @@ foreach ($metas as $meta) {
             $conn,
             $usuario_id,
             'meta',
-            'Meta avançando muito bem',
-            "Sua meta \"{$meta['nome']}\" já atingiu " .
+            "Meta avançando muito bem: {$nomeMeta}",
+            "Sua meta \"{$nomeMeta}\" já atingiu " .
             round($percentual) .
             "% do valor planejado."
         );
@@ -412,8 +482,8 @@ foreach ($metas as $meta) {
         $conn,
         $usuario_id,
         'meta',
-        'Meta avançando bem',
-        "Sua meta \"{$meta['nome']}\" atingiu " .
+        "Meta avançando bem: {$nomeMeta}",
+        "Sua meta \"{$nomeMeta}\" atingiu " .
         round($percentual) .
         "% do valor planejado."
     );
@@ -424,8 +494,8 @@ foreach ($metas as $meta) {
         $conn,
         $usuario_id,
         'meta',
-        'Acompanhe sua meta',
-        "Sua meta \"{$meta['nome']}\" está em " .
+        "Acompanhe sua meta: {$nomeMeta}",
+        "Sua meta \"{$nomeMeta}\" está em " .
         round($percentual) .
         "% do valor planejado."
     );
