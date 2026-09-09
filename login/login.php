@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </label>
           </div>
 
-          <a href="#" class="forgot-link">Esqueci a senha</a>
+          <a href="esqueci-senha.php" class="forgot-link">Esqueci a senha</a>
         </div>
 
         <button type="submit" class="btn btn-success w-100 p-2 login-btn">
