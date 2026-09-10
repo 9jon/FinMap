@@ -61,7 +61,7 @@ function consultarPeriodo(string $sql): array
     foreach ($linhas as &$linha) unset($linha['descricao']);
     return $linhas;
 }
-conferirPeriodo(count($consultas) === 6, 'Cobertura das seis consultas mensais');
+conferirPeriodo(count($consultas) === 7, 'Cobertura das sete consultas mensais');
 $antes = [];
 foreach ($consultas as $nome => $sql) $antes[$nome] = consultarPeriodo($sql);
 $mensal = reset($antes)[0];
