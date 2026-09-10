@@ -718,7 +718,6 @@ $stmt->close();
         <div class="recent-transactions-panel__header">
           <div>
             <h3>Transações recentes</h3>
-            <p>Últimos lançamentos adicionados ou atualizados pelo FinMap</p>
           </div>
 
           <a href="#" class="recent-transactions-panel__link" id="openAllTransactionsModal">
@@ -768,7 +767,6 @@ $stmt->close();
         <div class="financial-goals-panel__header">
           <div>
             <h3>Metas financeiras</h3>
-            <p>Acompanhe o progresso dos seus objetivos</p>
           </div>
 
           <button class="financial-goals-panel__menu" id="openGoalsMenuModal" type="button" aria-label="Mais opções">
@@ -845,7 +843,6 @@ $stmt->close();
         <div class="category-expenses-panel__header">
           <div>
             <h3>Gastos por categoria</h3>
-            <p>Veja como as despesas aprovadas se distribuem no período selecionado</p>
           </div>
 
           <p id="categoryPeriodDescription">Do primeiro dia do mês atual até hoje</p>
