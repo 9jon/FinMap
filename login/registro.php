@@ -136,7 +136,6 @@ Lembrar de mim
 
 </div>
 
-<a href="#" class="forgot-link">Esqueci a senha</a>
 
 </div>
 

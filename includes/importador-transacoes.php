@@ -173,6 +173,20 @@ function importacaoMapearCabecalhos(array $cabecalho): array
         }
     }
 
+    // Em CSVs simples, "Despesa,Valor" usa Despesa como nome do gasto.
+    // Com descrição explícita, preserve Despesa como coluna monetária.
+    if (!isset($mapa['descricao']) && isset($mapa['valor'])) {
+        foreach ($cabecalho as $indice => $titulo) {
+            if (in_array(importacaoChave($titulo), ['despesa', 'despesas'], true)) {
+                $mapa['descricao'] = $indice;
+                if (($mapa['debito'] ?? null) === $indice) {
+                    unset($mapa['debito']);
+                }
+                break;
+            }
+        }
+    }
+
     return $mapa;
 }
 

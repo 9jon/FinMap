@@ -50,6 +50,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt->execute();
         }
 
+        $stmtConcluir = $conn->prepare("UPDATE usuarios SET onboarding_concluido = 1 WHERE id = ?");
+        $stmtConcluir->bind_param("i", $id_usuario);
+        $stmtConcluir->execute();
+        $stmtConcluir->close();
+
         header("Location: dashboard.php");
         exit();
     }

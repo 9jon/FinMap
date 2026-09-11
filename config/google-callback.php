@@ -98,6 +98,7 @@ $stmt->execute();
 $oauthExistente = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
+$contaCriadaAgora = false;
 if ($oauthExistente) {
     // Já logou com Google antes -> só recupera o usuário
     $usuarioId = $oauthExistente['usuario_id'];
@@ -118,6 +119,7 @@ if ($oauthExistente) {
         $stmt->bind_param("sss", $nome, $email, $iniciais);
         $stmt->execute();
         $usuarioId = $stmt->insert_id;
+        $contaCriadaAgora = true;
         $stmt->close();
     }
 
@@ -128,7 +130,7 @@ if ($oauthExistente) {
     $stmt->close();
 }
 
-// --- PASSO 4: verifica se já terminou o onboarding, pra saber pra onde mandar ---
+// --- PASSO 4: inicia a sessão; somente contas novas passam pela configuração ---
 $stmt = $conn->prepare("SELECT nome, onboarding_concluido FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuarioId);
 $stmt->execute();
@@ -141,7 +143,7 @@ $_SESSION['autenticado'] = true;
 $_SESSION['usuario_id'] = $usuarioId;
 $_SESSION['usuario_nome'] = $usuario['nome'];
 
-if (!$usuario['onboarding_concluido']) {
+if ($contaCriadaAgora) {
     header('Location: ../pages/config-renda.php');
 } else {
     header('Location: ../pages/dashboard.php');

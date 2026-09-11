@@ -137,12 +137,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 </head>
 <body>
 
-<?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'sucesso'): ?>
-  <div class="import-review-feedback" role="status">
-    <i class="bi bi-check2-circle"></i>
-    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'Importação concluída.')) ?></span>
-  </div>
-<?php endif; ?>
 
   <header class="topbar">
     <div class="topbar-left">
@@ -233,7 +227,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
               <article class="review-item" data-id="<?= $l['id'] ?>" data-source="<?= htmlspecialchars($l['source']) ?>" data-status="<?= htmlspecialchars($l['status']) ?>" data-confidence="<?= $l['confidence'] ?>">
                 <div class="review-item__select">
                   <label class="review-check">
-                    <input type="checkbox" class="launch-checkbox" <?= $l['scheduledFuture'] ? 'disabled title="Disponível para aprovação na data agendada"' : '' ?>>
+                    <input type="checkbox" class="launch-checkbox" <?= $l['scheduledFuture'] || $l['status'] !== 'pending' ? 'disabled' : '' ?>>
                     <span></span>
                   </label>
                 </div>
@@ -1045,7 +1039,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         }
 
         closeReviewModal("editModal");
-        updateUI();
+        window.location.reload();
       });
     }
 

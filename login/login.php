@@ -34,13 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['usuario_nome'] = $usuario['nome'];
             $conn->close();
 
-            // Se o usuário ainda não terminou o onboarding, manda pra config-renda.
-            // Se já terminou, manda direto pro dashboard.
-            if (!$usuario['onboarding_concluido']) {
-                header('Location: ../pages/config-renda.php');
-            } else {
-                header('Location: ../pages/dashboard.php');
-            }
+            // A configuração inicial pertence ao cadastro, não ao login.
+            header('Location: ../pages/dashboard.php');
             exit;
         }
     }

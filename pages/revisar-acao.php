@@ -94,9 +94,7 @@ if (!$transacaoAtual) {
 
 switch ($acao) {
     case 'aprovar':
-        $agendamentoFuturo = $transacaoAtual['status'] === 'pendente'
-            && in_array($transacaoAtual['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true)
-            && $transacaoAtual['data_transacao'] > date('Y-m-d');
+        $agendamentoFuturo = $transacaoAtual['data_transacao'] > date('Y-m-d');
         if ($agendamentoFuturo) {
             $conn->rollback();
             http_response_code(400);
@@ -189,13 +187,19 @@ switch ($acao) {
             }
         }
 
-        $stmt = $conn->prepare("UPDATE transacoes SET descricao = ?, valor = ?, categoria_id = ?, data_transacao = ? WHERE id = ? AND usuario_id = ?");
-        $stmt->bind_param("sdisii", $descricao, $valor, $categoriaId, $dataTransacao, $id, $usuario_id);
+        $novoStatus = $transacaoAtual['status'];
+        $observacao = $transacaoAtual['observacao_captura'];
+        if ($dataTransacao > date('Y-m-d') && $novoStatus !== 'rejeitado') {
+            $novoStatus = 'pendente';
+            $observacao = $transacaoAtual['tipo'] === 'receita' ? 'Receita agendada' : 'Fatura agendada';
+        }
+        $stmt = $conn->prepare("UPDATE transacoes SET descricao = ?, valor = ?, categoria_id = ?, data_transacao = ?, status = ?, observacao_captura = ? WHERE id = ? AND usuario_id = ?");
+        $stmt->bind_param("sdisssii", $descricao, $valor, $categoriaId, $dataTransacao, $novoStatus, $observacao, $id, $usuario_id);
         $sucesso = $stmt->execute();
         $stmt->close();
 
         if ($sucesso && $transacaoAtual['status'] === 'aprovado') {
-            $variacaoSaldo = valorComSinal($transacaoAtual['tipo'], $valor)
+            $variacaoSaldo = ($novoStatus === 'aprovado' ? valorComSinal($transacaoAtual['tipo'], $valor) : 0)
                 - valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor']);
             $sucesso = aplicarVariacaoNoSaldo($conn, $usuario_id, $variacaoSaldo);
         }

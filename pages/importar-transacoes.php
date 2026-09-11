@@ -95,11 +95,13 @@ try {
     $stmtTransacao = $conn->prepare(
         "INSERT INTO transacoes\n"
         . "(usuario_id, importacao_id, categoria_id, descricao, valor, tipo, origem, status, confianca_percentual, observacao_captura, data_transacao, hash_importacao)\n"
-        . "VALUES (?, ?, ?, ?, ?, ?, 'importacao', 'pendente', ?, ?, ?, ?)"
+        . "VALUES (?, ?, ?, ?, ?, ?, 'importacao', ?, ?, ?, ?, ?)"
     );
 
     $importadas = 0;
     $duplicadas = 0;
+    $aprovadas = 0;
+    $variacaoSaldo = 0.0;
     foreach ($normalizadas as $linha) {
         $hash = $linha['hash'];
         $stmtDuplicado->bind_param('is', $usuarioId, $hash);
@@ -116,14 +118,21 @@ try {
         $confianca = $linha['confianca'];
         $observacao = $linha['observacao'];
         $data = $linha['data'];
+        $status = 'pendente';
+        if ($data > date('Y-m-d')) {
+            $observacao = $tipo === 'receita' ? 'Receita agendada' : 'Fatura agendada';
+        } elseif ($extensao === 'csv' && $tipo === 'despesa') {
+            $status = 'aprovado';
+        }
         $stmtTransacao->bind_param(
-            'iiisdsisss',
+            'iiisdssisss',
             $usuarioId,
             $importacaoId,
             $categoriaId,
             $descricao,
             $valor,
             $tipo,
+            $status,
             $confianca,
             $observacao,
             $data,
@@ -133,9 +142,20 @@ try {
             throw new RuntimeException('Não foi possível salvar os lançamentos importados.');
         }
         $importadas++;
+        if ($status === 'aprovado') {
+            $aprovadas++;
+            $variacaoSaldo -= $valor;
+        }
     }
     $stmtDuplicado->close();
     $stmtTransacao->close();
+
+    $stmtSaldo = $conn->prepare('UPDATE usuarios SET saldo_total = COALESCE(saldo_total, 0) + ? WHERE id = ?');
+    $stmtSaldo->bind_param('di', $variacaoSaldo, $usuarioId);
+    if (!$stmtSaldo->execute()) {
+        throw new RuntimeException('Não foi possível atualizar o saldo da importação.');
+    }
+    $stmtSaldo->close();
 
     $stmtAtualizar = $conn->prepare('UPDATE importacoes SET total_importados = ?, total_duplicados = ? WHERE id = ?');
     $stmtAtualizar->bind_param('iii', $importadas, $duplicadas, $importacaoId);
@@ -146,7 +166,7 @@ try {
 
     $_SESSION['importacao_feedback'] = [
         'tipo' => 'sucesso',
-        'mensagem' => sprintf('%d lançamento(s) foram enviados para revisão. %d duplicado(s) e %d linha(s) inválida(s) foram ignorados.', $importadas, $duplicadas, $invalidas),
+        'mensagem' => sprintf('%d lançamento(s) disponíveis na revisão para editar ou excluir. %d despesa(s) aprovadas automaticamente com saldo atualizado. Datas futuras permanecem agendadas. %d duplicado(s) e %d linha(s) inválida(s) foram ignorados.', $importadas, $aprovadas, $duplicadas, $invalidas),
     ];
     header('Location: revisar-lancamentos.php?importacao=' . $importacaoId);
     exit;
