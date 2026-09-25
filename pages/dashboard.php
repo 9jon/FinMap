@@ -516,7 +516,7 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=<?= filemtime(__DIR__ . '/../assets/css/dashboard.css') ?>">
 </head>
 <body>
 
@@ -1459,7 +1459,7 @@ $stmt->close();
               </span>
               <div>
                 <h4>Notificações</h4>
-                <p>Alertas mais importantes do sistema</p>
+                <p>Avisos sobre seus gastos, metas e lançamentos.</p>
               </div>
             </div>
 
@@ -1472,33 +1472,66 @@ $stmt->close();
             <div class="settings-list">
               <div class="settings-row">
                 <div class="settings-row__info">
-                  <h5>Alertas preditivos</h5>
-                  <p>Avisos quando houver risco no orçamento.</p>
+                  <h5 id="notification-budget-label">Risco no orçamento</h5>
+                  <p id="notification-budget-description">Alertas quando os gastos comprometerem a renda do mês.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" checked>
+                  <input type="checkbox" name="notificar_orcamento" aria-labelledby="notification-budget-label" aria-describedby="notification-budget-description" checked>
                   <span class="switch-slider"></span>
                 </label>
               </div>
 
               <div class="settings-row">
                 <div class="settings-row__info">
-                  <h5>Metas financeiras</h5>
-                  <p>Notificações de progresso e conclusão.</p>
+                  <h5 id="notification-goals-label">Progresso das metas</h5>
+                  <p id="notification-goals-description">Avisos ao atingir 50%, 75% e 100% do valor de uma meta.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" checked>
+                  <input type="checkbox" name="notificar_metas" aria-labelledby="notification-goals-label" aria-describedby="notification-goals-description" checked>
                   <span class="switch-slider"></span>
                 </label>
               </div>
 
               <div class="settings-row">
                 <div class="settings-row__info">
-                  <h5>Sugestões da IA</h5>
-                  <p>Recomendações rápidas do assistente.</p>
+                  <h5 id="notification-spending-label">Gastos por categoria</h5>
+                  <p id="notification-spending-description">Atualizações dos totais gastos em alimentação, moradia e outras categorias no mês.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" checked>
+                  <input type="checkbox" name="notificar_gastos" aria-labelledby="notification-spending-label" aria-describedby="notification-spending-description" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <h5 id="notification-review-label">Lançamentos para revisar</h5>
+                  <p id="notification-review-description">Lembretes de transações pendentes de aprovação ou com categoria ainda não definida.</p>
+                </div>
+                <label class="switch switch--green">
+                  <input type="checkbox" name="notificar_revisao" aria-labelledby="notification-review-label" aria-describedby="notification-review-description" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <h5 id="notification-scheduled-label">Despesas e receitas agendadas</h5>
+                  <p id="notification-scheduled-description">Lembretes na data do lançamento para você revisar e aprovar a movimentação.</p>
+                </div>
+                <label class="switch switch--green">
+                  <input type="checkbox" name="notificar_agendamentos" aria-labelledby="notification-scheduled-label" aria-describedby="notification-scheduled-description" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row__info">
+                  <h5 id="notification-savings-label">Oportunidades de economia</h5>
+                  <p id="notification-savings-description">Sugestões da Poupança Invisível para reduzir gastos com assinaturas, lanches, compras e transporte por aplicativo.</p>
+                </div>
+                <label class="switch switch--green">
+                  <input type="checkbox" name="notificar_economia" aria-labelledby="notification-savings-label" aria-describedby="notification-savings-description" checked>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1965,10 +1998,8 @@ $stmt->close();
     activateSidebarItemById(groupId);
 
     if (scrollToSection) {
-      targetSection.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+      // Role somente o conteúdo, preservando cabeçalho, menu e rodapé.
+      targetSection.closest(".settings-content").scrollTop = 0;
     }
   }
 

@@ -3549,6 +3549,8 @@ body {
 .settings-group {
   display: none;
   flex-direction: column;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .settings-group.is-active {
@@ -3665,24 +3667,19 @@ body {
 }
 
 .settings-group__content {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.25s ease,
-    margin-top 0.25s ease;
+  display: none;
   margin-top: 0;
 }
 
 .settings-group__content > * {
-  overflow: hidden;
+  min-width: 0;
 }
 
 .settings-group__content.open {
-  grid-template-rows: 1fr;
-  opacity: 1;
-  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 /* =========================
@@ -4923,9 +4920,115 @@ body {
   color: #15803d;
   border-color: rgba(36, 187, 69, 0.18);
 }
-/* Destaque da alteração de e-mail */
-.settings-modal #settings-account .settings-profile-card .settings-action-btn--red-soft {
-  background: rgba(239, 68, 68, 0.10);
-  color: #dc2626;
-  border-color: rgba(239, 68, 68, 0.18);
+/* Ajustes restritos ao menu: não alteram os outros formulários do dashboard. */
+.settings-modal {
+  width: min(1040px, 100%);
+  height: min(760px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+}
+
+.settings-modal .settings-content {
+  min-width: 0;
+  padding: 20px;
+  overflow-x: hidden;
+}
+
+.settings-modal .settings-account-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-modal .settings-action-btn {
+  min-height: 44px;
+  height: auto;
+  padding: 10px 14px;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.settings-modal .settings-profile-card .settings-action-btn {
+  margin-top: auto;
+}
+
+.settings-modal .settings-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.settings-modal .switch {
+  display: inline-block;
+  margin: 0;
+}
+
+.settings-modal button:focus-visible,
+.settings-modal .switch input:focus-visible + .switch-slider {
+  outline: 3px solid #15803d;
+  outline-offset: 3px;
+}
+
+@media (max-width: 980px) {
+  .settings-modal .settings-modal__body {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-sidebar {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .settings-modal .settings-sidebar__item {
+    flex: 1 0 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 48px;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 14px;
+  }
+
+  .settings-modal .settings-sidebar__icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .settings-modal-overlay { padding: 10px; align-items: center; }
+
+  .settings-modal {
+    height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 22px;
+  }
+
+  .settings-modal .settings-modal__header { padding: 16px; gap: 8px; }
+  .settings-modal .settings-content { padding: 12px; }
+  .settings-modal .settings-account-grid { grid-template-columns: 1fr; }
+  .settings-modal .settings-sidebar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .settings-modal .settings-sidebar__text { font-size: 0.82rem; text-align: left; }
+  .settings-modal .settings-row { padding: 14px; gap: 12px; }
+  .settings-modal .settings-bank-status { gap: 10px; padding: 14px; }
+  .settings-modal .settings-modal__footer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 12px;
+    gap: 8px;
+  }
+  .settings-modal .settings-footer-btn {
+    width: 100%;
+    padding: 0 12px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-modal-overlay, .settings-modal, .settings-modal * {
+    transition: none;
+  }
 }
