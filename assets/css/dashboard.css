@@ -23,6 +23,30 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #aeb4b0 transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background-color: #aeb4b0;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 0;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background-color: #747c76;
+}
 body {
   font-family: "Inter", sans-serif;
   background: var(--bg);
@@ -34,6 +58,9 @@ body {
 ========================= */
 
 .topbar {
+  position: sticky;
+  top: 12px;
+  z-index: 1000;
   width: calc(100% - 40px);
   max-width: 1450px;
   margin: 12px auto;
@@ -42,7 +69,9 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
@@ -67,24 +96,27 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
 .brand-mark {
   width: 48px;
   height: 48px;
-  border-radius: 16px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--green), var(--green-dark));
-  color: var(--white);
+  background: linear-gradient(145deg, rgba(18, 158, 81, 0.98), rgba(11, 133, 63, 0.96));
+  box-shadow: 0 8px 20px rgba(11, 133, 63, 0.18);
 }
 
-.brand-mark i {
-  font-size: 1.15rem;
+.brand-mark img {
+  display: block;
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
 }
 
 .brand-copy h1 {
@@ -368,7 +400,7 @@ body {
 }
 
 /* =========================
-   FUNÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES PRINCIPAIS
+   FUNÇÕES PRINCIPAIS
 ========================= */
 
 .main-actions {
@@ -564,7 +596,7 @@ body {
 }
 
 /* =========================
-   GRID DOS PAINÃƒÆ’Ã¢â‚¬Â°IS
+   GRID DOS PAINÉIS
 ========================= */
 
 .dashboard-panels {
@@ -583,7 +615,7 @@ body {
 }
 
 /* =========================
-   TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES RECENTES
+   TRANSAÇÕES RECENTES
 ========================= */
 
 .recent-transactions-panel {
@@ -1196,7 +1228,7 @@ body {
 }
 
 /* =========================
-   BOTÃƒÆ’Ã†â€™O FLUTUANTE DE TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
+   BOTÃO FLUTUANTE DE TRANSAÇÃO
 ========================= */
 
 .floating-transaction-btn {
@@ -1276,7 +1308,7 @@ body {
 }
 
 /* =========================
-   MODAL ADICIONAR TRANSAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
+   MODAL ADICIONAR TRANSAÇÃO
 ========================= */
 
 .transaction-modal-overlay {
@@ -1690,7 +1722,12 @@ body {
   .brand-mark {
     width: 44px;
     height: 44px;
-    border-radius: 14px;
+    border-radius: 13px;
+  }
+
+  .brand-mark img {
+    width: 25px;
+    height: 25px;
   }
 
   .brand-copy h1 {
@@ -1810,7 +1847,7 @@ body {
 
 
 /* =========================
-   EDIÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O DO SALDO TOTAL
+   EDIÇÃO DO SALDO TOTAL
 ========================= */
 
 .finance-card__main {
@@ -2020,7 +2057,7 @@ body {
 }
 
 /* =========================
-   BOTÃƒÆ’Ã†â€™O NOTIFICAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã†â€™O
+   BOTÃO NOTIFICAÇÃO
 ========================= */
 
 .notification-btn {
@@ -2039,7 +2076,7 @@ body {
 }
 
 /* =========================
-   PAINEL DE NOTIFICAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
+   PAINEL DE NOTIFICAÇÕES
 ========================= */
 
 .notif-overlay {
@@ -2748,11 +2785,11 @@ body {
 
 
 
-/* Estilos legados do modal: mantidos temporariamente como referÃƒÆ’Ã‚Âªncia,
-   mas desativados para nÃƒÆ’Ã‚Â£o concorrerem com a versÃƒÆ’Ã‚Â£o abaixo. */
+/* Estilos legados do modal: mantidos temporariamente como referência,
+   mas desativados para não concorrerem com a versão abaixo. */
 @media not all {
 /* =========================
-   MODAL DE CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
+   MODAL DE CONFIGURAÇÕES
 ========================= */
 
 .settings-modal-overlay {
@@ -3192,7 +3229,7 @@ body {
 }
 
 /* =========================
-   RESPONSIVO CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
+   RESPONSIVO CONFIGURAÇÕES
 ========================= */
 
 @media (max-width: 1200px) {
@@ -3315,7 +3352,7 @@ body {
 }
 
 /* =========================
-   MODAL DE CONFIGURAÃƒÆ’Ã¢â‚¬Â¡ÃƒÆ’Ã¢â‚¬Â¢ES
+   MODAL DE CONFIGURAÇÕES
 ========================= */
 
 .settings-modal-overlay {
@@ -4267,7 +4304,7 @@ body {
   font-weight: 800;
 }
 
-/* ImportaÃ§Ã£o: composiÃ§Ã£o mais leve, alinhada aos cards do dashboard. */
+/* Importação: composição mais leve, alinhada aos cards do dashboard. */
 .import-popout {
   width: min(500px, 100%);
   max-height: none;
@@ -4887,39 +4924,6 @@ body {
 }
 
 
-/* Padronização verde do modal de configurações */
-.settings-modal .settings-sidebar__icon--yellow,
-.settings-modal .settings-sidebar__icon--blue,
-.settings-modal .settings-sidebar__icon--purple,
-.settings-modal .settings-sidebar__icon--red,
-.settings-modal .settings-group__badge--yellow,
-.settings-modal .settings-group__badge--blue,
-.settings-modal .settings-group__badge--purple,
-.settings-modal .settings-group__badge--red {
-  background: rgba(36, 187, 69, 0.14);
-  color: #16a34a;
-}
-
-.settings-modal .switch--yellow input:checked + .switch-slider,
-.settings-modal .switch--green input:checked + .switch-slider,
-.settings-modal .switch--purple input:checked + .switch-slider,
-.settings-modal .switch--blue input:checked + .switch-slider,
-.settings-modal .switch--red input:checked + .switch-slider {
-  background: linear-gradient(135deg, #24bb45, #16a34a);
-}
-
-.settings-modal .settings-action-btn--blue,
-.settings-modal .settings-action-btn--purple {
-  background: linear-gradient(135deg, #24bb45, #16a34a);
-  color: #ffffff;
-}
-
-.settings-modal .settings-action-btn--blue-soft,
-.settings-modal .settings-action-btn--red-soft {
-  background: rgba(36, 187, 69, 0.10);
-  color: #15803d;
-  border-color: rgba(36, 187, 69, 0.18);
-}
 /* Ajustes restritos ao menu: não alteram os outros formulários do dashboard. */
 .settings-modal {
   width: min(1040px, 100%);

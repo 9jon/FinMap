@@ -397,3 +397,21 @@ a {
     width: 100%;
   }
 }
+/* Marca unificada nas etapas de configuração */
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;
+  background: linear-gradient(145deg, rgba(18, 158, 81, 0.98), rgba(11, 133, 63, 0.96));
+  box-shadow: 0 8px 20px rgba(11, 133, 63, 0.18);
+}
+.brand-mark img {
+  display: block;
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+}

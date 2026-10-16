@@ -55,7 +55,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmtConcluir->execute();
         $stmtConcluir->close();
 
-        header("Location: dashboard.php");
+        header("Location: onboarding-concluido.php");
         exit();
     }
 }
@@ -86,8 +86,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
       <div class="topbar">
         <a href="../index.php" class="brand">
-          <span class="brand-mark"></span>
-          <span class="brand-text">FinMap</span>
+          <span class="brand-mark"><img src="../assets/img/finmap-icone-branco.png" alt=""></span>
+          
         </a>
 
         <div class="step-pill">Etapa 2 de 2</div>

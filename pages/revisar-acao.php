@@ -98,7 +98,7 @@ switch ($acao) {
         if ($agendamentoFuturo) {
             $conn->rollback();
             http_response_code(400);
-            echo json_encode(['sucesso' => false, 'erro' => 'Este lanÃ§amento sÃ³ pode ser aprovado na data agendada']);
+            echo json_encode(['sucesso' => false, 'erro' => 'Este lançamento só pode ser aprovado na data agendada']);
             exit;
         }
 
@@ -182,7 +182,7 @@ switch ($acao) {
             if (!$categoriaValida) {
                 $conn->rollback();
                 http_response_code(400);
-                echo json_encode(['sucesso' => false, 'erro' => 'Categoria invÃ¡lida para este lanÃ§amento']);
+                echo json_encode(['sucesso' => false, 'erro' => 'Categoria inválida para este lançamento']);
                 exit;
             }
         }

@@ -146,6 +146,6 @@ $_SESSION['usuario_nome'] = $usuario['nome'];
 if ($contaCriadaAgora) {
     header('Location: ../pages/config-renda.php');
 } else {
-    header('Location: ../pages/dashboard.php');
+    header('Location: ../pages/onboarding-concluido.php');
 }
 exit;

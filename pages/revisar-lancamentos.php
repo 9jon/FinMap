@@ -142,12 +142,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
     <div class="topbar-left">
       <div class="brand">
         <div class="brand-mark">
-          <i class="bi bi-graph-up-arrow"></i>
-        </div>
-
-        <div class="brand-copy">
-          <h1>FinMap</h1>
-          <p>Revisão inteligente de lançamentos</p>
+          <img src="../assets/img/finmap-icone-branco.png" alt="">
         </div>
       </div>
     </div>
@@ -157,7 +152,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
         <i class="bi bi-stars"></i>
         <span>Assistente IA</span>
       </button>
-
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
         <i class="bi bi-bell"></i>
         <span class="notification-dot"></span>

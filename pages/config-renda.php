@@ -150,8 +150,8 @@ $labelsOrigemExtra = [
 
       <div class="income-topbar">
         <a href="../index.php" class="brand">
-          <span class="brand-mark"></span>
-          <span class="brand-text">FinMap</span>
+          <span class="brand-mark"><img src="../assets/img/finmap-icone-branco.png" alt=""></span>
+          
         </a>
 
         <div class="topbar-pill">Etapa 1 de 2</div>

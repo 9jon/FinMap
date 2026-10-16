@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->close();
 
             // A configuração inicial pertence ao cadastro, não ao login.
-            header('Location: ../pages/dashboard.php');
+            header('Location: ../pages/onboarding-concluido.php');
             exit;
         }
     }

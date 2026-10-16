@@ -1,4 +1,4 @@
-﻿<?php
+<?php
   
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
@@ -516,7 +516,7 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css?v=<?= filemtime(__DIR__ . '/../assets/css/dashboard.css') ?>">
+  <link rel="stylesheet" href="../assets/css/dashboard.css">
 </head>
 <body>
 
@@ -530,14 +530,7 @@ foreach ($metas as $meta) {
   <header class="topbar">
     <div class="topbar-left">
       <div class="brand">
-        <div class="brand-mark">
-          <i class="bi bi-graph-up-arrow"></i>
-        </div>
-
-        <div class="brand-copy">
-          <h1>FinMap</h1>
-          <p>Dashboard principal inteligente</p>
-        </div>
+        <span class="brand-mark"><img src="../assets/img/finmap-icone-branco.png" alt=""></span>
       </div>
     </div>
 
@@ -547,7 +540,7 @@ foreach ($metas as $meta) {
         <span>Assistente IA</span>
       </button>
 
-      <button class="icon-plain" id="openSettingsModal" type="button" aria-label="Configurações">
+      <button class="icon-plain" id="openSettingsModal" type="button" aria-label="Configurações" title="Configurações">
   <i class="bi bi-gear"></i>
 </button>
 
@@ -569,13 +562,12 @@ $stmt->fetch();
 $stmt->close();
 
 ?>
-
-<button
+      <button
     class="icon-plain notification-btn"
     id="openNotificationsPanel"
     type="button"
-    aria-label="Notificações"
->
+    aria-label="Notificações" title="Abrir notificações">
+
 
     <i class="bi bi-bell"></i>
 
@@ -586,7 +578,7 @@ $stmt->close();
     <?php endif; ?>
 
 </button>
-      <button class="profile-avatar" type="button" aria-label="Perfil">
+      <button class="profile-avatar" type="button" aria-label="Perfil" title="Abrir perfil">
         <?= htmlspecialchars($iniciais) ?>
       </button>
     </div>
@@ -721,7 +713,7 @@ $stmt->close();
           </div>
 
           <a href="#" class="recent-transactions-panel__link" id="openAllTransactionsModal">
-            Ver todas
+            Ver todas as transações
             <i class="bi bi-arrow-right"></i>
           </a>
         </div>
@@ -769,7 +761,7 @@ $stmt->close();
             <h3>Metas financeiras</h3>
           </div>
 
-          <button class="financial-goals-panel__menu" id="openGoalsMenuModal" type="button" aria-label="Mais opções">
+          <button class="financial-goals-panel__menu" id="openGoalsMenuModal" type="button" aria-label="Mais opções" title="Opções das metas">
             <i class="bi bi-three-dots-vertical"></i>
           </button>
         </div>
@@ -833,7 +825,7 @@ $stmt->close();
 
         <button class="new-goal-btn" id="goToGoalsPageBtn" type="button">
           <i class="bi bi-plus-lg"></i>
-          Nova meta
+          Criar meta
         </button>
       </section>
     </div>
@@ -895,8 +887,7 @@ $stmt->close();
       <i class="bi bi-plus-lg"></i>
     </span>
     <span class="floating-transaction-btn__content">
-      <strong>Nova transação</strong>
-      <small>Adicionar rapidamente</small>
+      <strong>Adicionar transação</strong>
     </span>
   </button>
 
@@ -1440,8 +1431,7 @@ $stmt->close();
           </span>
           <span class="settings-sidebar__text">Proteção</span>
         </button>
-
-        <button class="settings-sidebar__item" type="button" data-target="settings-account">
+<button class="settings-sidebar__item" type="button" data-target="settings-account">
           <span class="settings-sidebar__icon settings-sidebar__icon--red">
             <i class="bi bi-person-circle"></i>
           </span>
@@ -1656,8 +1646,7 @@ $stmt->close();
             </div>
           </div>
         </section>
-
-        <!-- CONTA -->
+<!-- CONTA -->
         <section class="settings-group" id="settings-account">
           <button class="settings-group__trigger" type="button">
             <div class="settings-group__trigger-left">
