@@ -23,9 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // -----------------------------------------------------------
         // Por segurança, SEMPRE mostramos a mesma mensagem de sucesso,
-        // exista ou não o e-mail no banco. Se disséssemos "e-mail não
-        // encontrado", qualquer pessoa poderia usar esse formulário
-        // pra descobrir quais e-mails estão cadastrados no sistema.
+        // exista ou não o e-mail no banco. Se dissÃ©ssemos "e-mail não
+        // encontrado", qualquer pessoa poderia usar esse formulÃ¡rio
+        // pra descobrir quais e-mails estÃ£o cadastrados no sistema.
         // -----------------------------------------------------------
         if ($usuario) {
             $token = bin2hex(random_bytes(32));
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $mail->send();
             } catch (Exception $e) {
-                // Não mostramos o erro técnico pro usuário (por segurança
+                // NÃ£o mostramos o erro tÃ©cnico pro usuÃ¡rio (por segurança
                 // e porque não ajudaria em nada), mas registramos no log
                 // do servidor pra você conseguir debugar se precisar.
                 error_log('Erro ao enviar e-mail de redefinição de senha: ' . $mail->ErrorInfo);
