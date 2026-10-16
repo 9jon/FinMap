@@ -2,7 +2,9 @@
   
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
-include '../config/conn.php';
+include '../config/conn.php';
+require_once __DIR__ . '/../includes/insights-financeiros.php';
+$insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
 require_once __DIR__ . '/../includes/percentuais-categorias.php';
 
 
@@ -891,6 +893,26 @@ $stmt->close();
     </span>
   </button>
 
+  <script>
+  (() => {
+    const toast = document.getElementById("weeklyInsightToast");
+    if (!toast) return;
+
+    const key = "finmap-insight-fechado:" + (toast.dataset.insightKey || "semana");
+    try {
+      if (window.localStorage.getItem(key) === "1") {
+        toast.remove();
+        return;
+      }
+    } catch (error) {}
+
+    toast.querySelector(".weekly-insight-toast__close")?.addEventListener("click", () => {
+      try { window.localStorage.setItem(key, "1"); } catch (error) {}
+      toast.classList.add("is-closing");
+      window.setTimeout(() => toast.remove(), 220);
+    });
+  })();
+  </script>
   <!-- MODAL EDITAR SALDO  --> 
   <div class="balance-modal-overlay" id="balanceModal">
     <div class="balance-modal">

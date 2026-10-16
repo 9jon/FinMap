@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
-require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+require_once __DIR__ . '/../includes/insights-financeiros.php';
 
 
 
@@ -116,7 +117,8 @@ $stmtConfig->close();
 
 $sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
 $alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
-$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+$insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
 
 // -----------------------------------------------------------------
 // ANÁLISE REAL DOS GASTOS DO MÊS
@@ -440,6 +442,24 @@ $dadosSensibilidade = [
         </div>
       </section>
 
+      <?php if (!empty($insightSemanal)): ?>
+      <section class="alerts-panel" style="margin-bottom: 22px;">
+        <div class="alerts-panel__header">
+          <div>
+            <h3><i class="bi bi-stars"></i> Insight da semana</h3>
+            <p><?= htmlspecialchars($insightSemanal['horizonte'] ?? '', ENT_QUOTES, 'UTF-8') ?> · <?= ($insightSemanal['fonte'] ?? '') === 'ia' ? 'Gerado por IA local' : 'Análise automática' ?></p>
+          </div>
+          <span class="alert-badge alert-badge--<?= severidadeParaClasse($insightSemanal['severidade'] ?? 'baixo') ?>"><?= severidadeParaLabel($insightSemanal['severidade'] ?? 'baixo') ?></span>
+        </div>
+        <div style="padding: 0 20px 20px;">
+          <h4><?= htmlspecialchars($insightSemanal['titulo'] ?? '', ENT_QUOTES, 'UTF-8') ?></h4>
+          <p class="mb-2"><?= htmlspecialchars($insightSemanal['descricao'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+          <?php if ((float)($insightSemanal['impacto_estimado'] ?? 0) > 0): ?>
+            <small>Variação de despesas: R$ <?= number_format((float)$insightSemanal['impacto_estimado'], 2, ',', '.') ?></small>
+          <?php endif; ?>
+        </div>
+      </section>
+      <?php endif; ?>
       <section class="alerts-summary-grid">
         <article class="summary-card summary-card--risk">
           <div class="summary-card__icon summary-card__icon--red">
