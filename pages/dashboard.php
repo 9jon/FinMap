@@ -1964,11 +1964,34 @@ $stmt->close();
     unlockBody();
   }
 
-  function openNotifications() {
+  async function openNotifications() {
     if (!notifPanel || !notifOverlay) return;
     notifPanel.classList.add("active");
     notifOverlay.classList.add("active");
     lockBody();
+
+    const notificacaoNaoLida = document.querySelector(".notification-dot");
+    if (!notificacaoNaoLida) return;
+
+    const dados = new FormData();
+    dados.append("todas", "1");
+
+    try {
+      const resposta = await fetch("marcar-notificacao.php", {
+        method: "POST",
+        body: dados
+      });
+      const resultado = await resposta.json();
+
+      if (resultado.sucesso) {
+        notificacaoNaoLida.remove();
+        document.querySelectorAll(".notif-card").forEach((card) => {
+          card.style.opacity = "0.6";
+        });
+      }
+    } catch (erro) {
+      console.error("Erro ao marcar notificações como lidas:", erro);
+    }
   }
 
   function closeNotifications() {
