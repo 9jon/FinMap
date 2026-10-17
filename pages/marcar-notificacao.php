@@ -7,35 +7,29 @@ include '../config/conn.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+if (($_POST['todas'] ?? '') === '1') {
+    $stmt = $conn->prepare("UPDATE notificacoes SET lida = 1 WHERE usuario_id = ? AND lida = 0");
+    $stmt->bind_param("i", $usuario_id);
+    $sucesso = $stmt->execute();
+    $stmt->close();
 
+    echo json_encode(['sucesso' => $sucesso]);
+    exit;
+}
 
 $id = (int) ($_POST['id'] ?? 0);
 
 if ($id <= 0) {
-
     echo json_encode([
         'sucesso' => false,
         'erro' => 'Notificação inválida.'
     ]);
-
     exit;
 }
 
-$stmt = $conn->prepare("
-    UPDATE notificacoes
-    SET lida = 1
-    WHERE id = ?
-      AND usuario_id = ?
-");
-
-$stmt->bind_param(
-    "ii",
-    $id,
-    $usuario_id
-);
-
+$stmt = $conn->prepare("UPDATE notificacoes SET lida = 1 WHERE id = ? AND usuario_id = ?");
+$stmt->bind_param("ii", $id, $usuario_id);
 $sucesso = $stmt->execute();
-
 $stmt->close();
 
 echo json_encode([
