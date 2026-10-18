@@ -70,6 +70,7 @@ if ($tokenValido && $_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
   <link rel="stylesheet" href="../assets/css/login.css">
+  <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
 </head>
 <body>
 
@@ -123,5 +124,6 @@ if ($tokenValido && $_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </div>
 
+  <script src="../assets/js/page-entrance.js?v=3" defer></script>
 </body>
 </html>

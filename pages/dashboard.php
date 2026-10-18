@@ -518,7 +518,9 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-14">
+  <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
+  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
 </head>
 <body>
 
@@ -533,8 +535,11 @@ foreach ($metas as $meta) {
     <div class="topbar-left">
       <div class="brand">
         <span class="brand-mark"><img src="../assets/img/finmap-icone-branco.png" alt=""></span>
+        <span class="brand-name">FinMap</span>
       </div>
     </div>
+
+    <?php require __DIR__ . '/../components/finmap-app-nav.php'; ?>
 
     <div class="topbar-right">
       <button class="ai-btn" id="openAiModal" type="button" aria-label="Abrir Assistente IA">
@@ -669,45 +674,7 @@ $stmt->close();
     </div>
   </section>
 
-  <section class="main-actions">
-    <div class="main-actions__grid">
-  <a class="action-card action-card--green" href="orcamento-mensal.php">
-    <div class="action-icon">
-      <i class="bi bi-calendar2-week"></i>
-    </div>
-    <div class="action-card__title-row"><h4>Orçamento mensal</h4><span class="action-card__help" tabindex="0" role="button" aria-expanded="false" aria-label="Para que serve o Orçamento mensal?">?</span><span class="action-card__tooltip" role="tooltip">Acompanhe quanto da sua renda mensal já está comprometido e quanto ainda está disponível.</span></div>
-  </a>
-
-  <a class="action-card action-card--purple" href="metas-financeiras.php">
-    <div class="action-icon">
-      <i class="bi bi-bullseye"></i>
-    </div>
-    <div class="action-card__title-row"><h4>Metas financeiras</h4><span class="action-card__help" tabindex="0" role="button" aria-expanded="false" aria-label="Para que servem as Metas financeiras?">?</span><span class="action-card__tooltip" role="tooltip">Crie objetivos financeiros, defina valores e acompanhe seu progresso.</span></div>
-  </a>
-
-  <a class="action-card action-card--orange" href="poupanca-invisivel.php">
-    <div class="action-icon">
-      <i class="bi bi-piggy-bank"></i>
-    </div>
-    <div class="action-card__title-row"><h4>Poupança invisível</h4><span class="action-card__help" tabindex="0" role="button" aria-expanded="false" aria-label="Para que serve a Poupança invisível?">?</span><span class="action-card__tooltip" role="tooltip">Encontre pequenos desperdícios recorrentes e transforme-os em reserva.</span></div>
-  </a>
-
-  <a class="action-card action-card--red" href="alertas-preditivos.php">
-    <div class="action-icon">
-      <i class="bi bi-exclamation-triangle"></i>
-    </div>
-    <div class="action-card__title-row"><h4>Alertas preditivos</h4><span class="action-card__help" tabindex="0" role="button" aria-expanded="false" aria-label="Para que servem os Alertas preditivos?">?</span><span class="action-card__tooltip" role="tooltip">Receba avisos antecipados quando seus gastos indicarem risco de desequilíbrio.</span></div>
-  </a>
-
-  <a class="action-card action-card--blue" href="revisar-lancamentos.php">
-    <div class="action-icon">
-      <i class="bi bi-check2-square"></i>
-    </div>
-    <div class="action-card__title-row"><h4>Revisar lançamentos</h4><span class="action-card__help" tabindex="0" role="button" aria-expanded="false" aria-label="Para que serve Revisar lançamentos?">?</span><span class="action-card__tooltip" role="tooltip">Confira lançamentos importados ou capturados antes de confirmar no seu saldo.</span></div>
-  </a>
-</div>
-
-    <div class="dashboard-panels">
+  <div class="dashboard-panels">
       <section class="recent-transactions-panel">
         <div class="recent-transactions-panel__header">
           <div>
@@ -715,7 +682,8 @@ $stmt->close();
           </div>
 
           <a href="#" class="recent-transactions-panel__link" id="openAllTransactionsModal">
-            Ver todas as transações
+            <span class="recent-transactions-panel__link-desktop">Ver todas as transações</span>
+            <span class="recent-transactions-panel__link-mobile">Ver todas</span>
             <i class="bi bi-arrow-right"></i>
           </a>
         </div>
@@ -1033,16 +1001,9 @@ $stmt->close();
 
 <?php if (empty($notificacoes)): ?>
 
-    <div class="notif-empty">
-
-        <i class="bi bi-bell-slash"></i>
-
-        <h4>Nenhuma notificação</h4>
-
-        <p>
-            Você está em dia! Novos alertas aparecerão aqui.
-        </p>
-
+    <div class="notif-empty" role="status" aria-live="polite">
+        <h4>Tudo em dia</h4>
+        <p>Quando surgir algo importante nas suas finanças, você encontra aqui.</p>
     </div>
 
 <?php else: ?>
@@ -2498,40 +2459,6 @@ $stmt->close();
     tipoDespesaRadio.addEventListener("change", toggleCategoriaWrapper);
     tipoReceitaRadio.addEventListener("change", toggleCategoriaWrapper);
   }
-
-  const actionCardHelpButtons = document.querySelectorAll(".action-card__help");
-
-  function closeActionCardHelp(except = null) {
-    actionCardHelpButtons.forEach((help) => {
-      if (help === except) return;
-      help.classList.remove("is-open");
-      help.setAttribute("aria-expanded", "false");
-    });
-  }
-
-  actionCardHelpButtons.forEach((help) => {
-    help.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const isOpen = help.classList.contains("is-open");
-      closeActionCardHelp(help);
-      help.classList.toggle("is-open", !isOpen);
-      help.setAttribute("aria-expanded", String(!isOpen));
-    });
-
-    help.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      help.click();
-    });
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!event.target.closest(".action-card__help")) {
-      closeActionCardHelp();
-    }
-  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
