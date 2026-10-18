@@ -518,11 +518,11 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-14">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-30">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
 </head>
-<body>
+<body class="dashboard-page">
 
 <?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'erro'): ?>
   <div class="import-feedback import-feedback--error" role="alert">
