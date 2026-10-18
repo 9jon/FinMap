@@ -36,6 +36,7 @@ exigirUsuarioAutenticado();
     @keyframes leave { to { opacity: 0; transform: translateY(-5px); } }
     @media (prefers-reduced-motion: reduce) { .route-draw { stroke-dashoffset: 0; animation: none; } .end-dot { animation: none; } body.leaving main { animation: none; } }
   </style>
+  <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
 </head>
 <body>
   <main aria-labelledby="transition-title">
@@ -61,5 +62,6 @@ exigirUsuarioAutenticado();
     const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 500 : 1350;
     window.setTimeout(goToDashboard, delay);
   </script>
+  <script src="../assets/js/page-entrance.js?v=3" defer></script>
 </body>
 </html>

@@ -1,0 +1,63 @@
+/* Smooth handoff when navigating between FinMap screens (supported browsers). */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: finmap-screen-out 180ms ease both;
+}
+
+::view-transition-new(root) {
+  animation: finmap-screen-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes finmap-screen-out {
+  to {
+    opacity: 0;
+    transform: scale(0.992);
+  }
+}
+
+@keyframes finmap-screen-in {
+  from {
+    opacity: 0;
+    transform: scale(1.008);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.page-enter-item {
+  animation: finmap-content-enter 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--page-enter-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+@keyframes finmap-content-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  .page-enter-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+}

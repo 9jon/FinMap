@@ -391,6 +391,8 @@ $dadosSensibilidade = [
 
   <link rel="stylesheet" href="../assets/css/dashboard.css">
   <link rel="stylesheet" href="../assets/css/alertas-preditivos.css">
+  <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
+  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
 </head>
 <body>
 
@@ -400,8 +402,11 @@ $dadosSensibilidade = [
         <div class="brand-mark">
           <img src="../assets/img/finmap-icone-branco.png" alt="">
         </div>
+        <span class="brand-name">FinMap</span>
       </div>
     </div>
+
+    <?php require __DIR__ . '/../components/finmap-app-nav.php'; ?>
 
     <div class="topbar-right">
       <button class="ai-btn" id="openAiModal" type="button" aria-label="Abrir Assistente IA">
@@ -1262,5 +1267,6 @@ if ($sensibilidade === 'baixo') {
     
   </script>
 
+  <script src="../assets/js/page-entrance.js?v=3" defer></script>
 </body>
 </html>

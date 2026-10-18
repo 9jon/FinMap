@@ -1,0 +1,284 @@
+.topbar {
+  position: sticky;
+  top: 12px;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(190px, 1fr);
+  align-items: center;
+  gap: 18px;
+  width: calc(100% - 40px);
+  max-width: 1450px;
+  min-height: 68px;
+  margin: 12px auto 20px;
+  padding: 10px 15px;
+  border: 1px solid rgba(226, 232, 230, 0.92);
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 7px 24px rgba(22, 42, 32, 0.07);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.topbar-left .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #202a26;
+  text-decoration: none;
+}
+
+.topbar-left .brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.topbar-left .brand-mark img {
+  width: 25px;
+  height: 25px;
+}
+
+.brand-name {
+  color: #222b27;
+  font-size: 0.92rem;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.finmap-app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 5px;
+  border: 1px solid #e9eeeb;
+  border-radius: 999px;
+  background: #f5f7f6;
+}
+
+.finmap-app-nav__link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #65716a;
+  font-size: 0.79rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.finmap-app-nav__link:hover {
+  color: #1d5738;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.finmap-app-nav__link:focus-visible {
+  outline: 2px solid #39835a;
+  outline-offset: 2px;
+}
+
+.finmap-app-nav__link i {
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.finmap-app-nav__link.is-current {
+  color: #155b37;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(20, 37, 29, 0.12), inset 0 0 0 1px rgba(28, 116, 67, 0.12);
+}
+
+.finmap-app-nav__link.is-current i {
+  opacity: 1;
+}
+
+.finmap-app-nav__link--overview { --nav-accent: #16834f; --nav-tint: #eaf6ef; }
+.finmap-app-nav__link--budget { --nav-accent: #3478c9; --nav-tint: #eaf2ff; }
+.finmap-app-nav__link--goals { --nav-accent: #7842c8; --nav-tint: #f1eafd; }
+.finmap-app-nav__link--savings { --nav-accent: #c86b19; --nav-tint: #fff1e4; }
+.finmap-app-nav__link--alerts { --nav-accent: #d84b50; --nav-tint: #ffeded; }
+.finmap-app-nav__link--entries { --nav-accent: #07858a; --nav-tint: #e6f6f5; }
+
+.finmap-app-nav__link--overview i,
+.finmap-app-nav__link--budget i,
+.finmap-app-nav__link--goals i,
+.finmap-app-nav__link--savings i,
+.finmap-app-nav__link--alerts i,
+.finmap-app-nav__link--entries i {
+  color: var(--nav-accent);
+  opacity: 0.88;
+}
+
+.finmap-app-nav__link.is-current.finmap-app-nav__link--overview,
+.finmap-app-nav__link.is-current.finmap-app-nav__link--budget,
+.finmap-app-nav__link.is-current.finmap-app-nav__link--goals,
+.finmap-app-nav__link.is-current.finmap-app-nav__link--savings,
+.finmap-app-nav__link.is-current.finmap-app-nav__link--alerts,
+.finmap-app-nav__link.is-current.finmap-app-nav__link--entries {
+  color: var(--nav-accent);
+  background: var(--nav-tint);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-accent) 16%, transparent);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.topbar-right .ai-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #66716c;
+  box-shadow: none;
+}
+
+.topbar-right .ai-btn span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.topbar-right .ai-btn:hover,
+.topbar-right .icon-plain:hover {
+  color: #11814c;
+  background: #f0f7f3;
+}
+
+.topbar-right .icon-plain {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #69736f;
+}
+
+.topbar-right .profile-avatar {
+  width: 35px;
+  height: 35px;
+  margin-left: 3px;
+  border: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 1080px) {
+  .topbar {
+    grid-template-columns: minmax(110px, 1fr) auto minmax(130px, 1fr);
+    gap: 10px;
+  }
+
+  .finmap-app-nav__link {
+    padding-inline: 8px;
+    font-size: 0.71rem;
+  }
+}
+
+@media (max-width: 840px) {
+  /* Keep the fixed bottom navigation relative to the viewport, not the animated header. */
+  .topbar.page-enter-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto;
+    width: calc(100% - 24px);
+    min-height: 0;
+    gap: 0 12px;
+    padding: 10px 12px;
+    border-radius: 21px;
+    background: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .topbar-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .topbar-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .finmap-app-nav {
+    position: fixed;
+    left: 50%;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 1800;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2px;
+    width: calc(100% - 24px);
+    max-width: 560px;
+    padding: 7px;
+    border: 1px solid rgba(226, 232, 230, 0.96);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 8px 28px rgba(22, 42, 32, 0.14);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    transform: translateX(-50%);
+  }
+
+  .finmap-app-nav__link {
+    flex-direction: column;
+    min-width: 0;
+    min-height: 56px;
+    gap: 4px;
+    padding: 6px 2px;
+    border-radius: 15px;
+    font-size: 0.59rem;
+    line-height: 1.05;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .finmap-app-nav__link i {
+    font-size: 1rem;
+  }
+
+  body { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+
+  .floating-transaction-btn { bottom: calc(88px + env(safe-area-inset-bottom)); }
+
+  .weekly-insight-toast { bottom: calc(168px + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 420px) {
+  .brand-name {
+    font-size: 0.86rem;
+  }
+
+  .finmap-app-nav__link {
+    padding-inline: 1px;
+    font-size: 0.56rem;
+  }
+}

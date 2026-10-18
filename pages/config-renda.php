@@ -142,6 +142,7 @@ $labelsOrigemExtra = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
   <link rel="stylesheet" href="../assets/css/config-renda.css">
+  <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
 </head>
 <body>
 
@@ -452,5 +453,6 @@ $labelsOrigemExtra = [
     });
   </script>
 
+  <script src="../assets/js/page-entrance.js?v=3" defer></script>
 </body>
 </html>
