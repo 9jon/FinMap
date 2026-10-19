@@ -5,6 +5,12 @@ $usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
 require_once __DIR__ . '/../includes/insights-financeiros.php';
 $insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
+<<<<<<< Updated upstream
+=======
+$insightPrevisaoSaldo = finmapBuscarOuGerarPrevisaoSaldo($conn, (int)$usuario_id);
+if ($insightPrevisaoSaldo) { $insightSemanal = $insightPrevisaoSaldo; }
+$rotuloInsightToast = $insightPrevisaoSaldo ? 'Previsão de saldo' : 'Resumo financeiro';
+>>>>>>> Stashed changes
 require_once __DIR__ . '/../includes/percentuais-categorias.php';
 
 
@@ -852,6 +858,25 @@ $stmt->close();
     </div>
   </section>
 
+  <?php if (!empty($insightSemanal)): ?>
+  <aside
+    class="weekly-insight-toast"
+    id="weeklyInsightToast"
+    data-insight-key="<?= htmlspecialchars((string)($insightSemanal['periodo_inicio'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+    aria-labelledby="weeklyInsightToastTitle"
+    role="status"
+  >
+    <div class="weekly-insight-toast__icon" aria-hidden="true"><i class="bi bi-graph-up-arrow"></i></div>
+    <div class="weekly-insight-toast__content">
+      <p class="weekly-insight-toast__eyebrow"><?= htmlspecialchars($rotuloInsightToast, ENT_QUOTES, 'UTF-8') ?></p>
+      <h2 id="weeklyInsightToastTitle"><?= htmlspecialchars((string)($insightSemanal['titulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></h2>
+      <p class="weekly-insight-toast__message"><?= htmlspecialchars((string)($insightSemanal['descricao'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+    </div>
+    <button class="weekly-insight-toast__close" type="button" aria-label="Fechar insight">
+      <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+  </aside>
+  <?php endif; ?>
   <button class="floating-transaction-btn" id="openTransactionModal" type="button" aria-label="Adicionar transação">
     <span class="floating-transaction-btn__icon">
       <i class="bi bi-plus-lg"></i>
@@ -861,6 +886,7 @@ $stmt->close();
     </span>
   </button>
 
+<<<<<<< Updated upstream
   <script>
   (() => {
     const toast = document.getElementById("weeklyInsightToast");
@@ -881,6 +907,28 @@ $stmt->close();
     });
   })();
   </script>
+=======
+  <script>
+  (() => {
+    const toast = document.getElementById("weeklyInsightToast");
+    if (!toast) return;
+
+    const key = "finmap-insight-fechado:" + (toast.dataset.insightKey || "semana") + ":" + (toast.querySelector("h2")?.textContent || "resumo");
+    try {
+      if (window.localStorage.getItem(key) === "1") {
+        toast.remove();
+        return;
+      }
+    } catch (error) {}
+
+    toast.querySelector(".weekly-insight-toast__close")?.addEventListener("click", () => {
+      try { window.localStorage.setItem(key, "1"); } catch (error) {}
+      toast.classList.add("is-closing");
+      window.setTimeout(() => toast.remove(), 220);
+    });
+  })();
+  </script>
+>>>>>>> Stashed changes
   <!-- MODAL EDITAR SALDO  --> 
   <div class="balance-modal-overlay" id="balanceModal">
     <div class="balance-modal">
@@ -1072,89 +1120,43 @@ $stmt->close();
 </div>
   </aside>
 
-  <!-- MODAL CENTRALIZADO DA IA -->
+  <!-- ASSISTENTE FINANCEIRO -->
   <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
+    <section class="ai-modal" role="dialog" aria-modal="true" aria-labelledby="aiAssistantTitle">
+      <header class="ai-modal__header">
         <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
+          <div class="ai-modal__icon" aria-hidden="true">
+            <i class="bi bi-chat-square-text"></i>
           </div>
-
           <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
+            <h3 id="aiAssistantTitle">Assistente financeiro</h3>
+            <p>Pergunte sobre seus gastos, seu orçamento ou suas metas.</p>
           </div>
         </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
+        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente">
           <i class="bi bi-x-lg"></i>
         </button>
-      </div>
+      </header>
 
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Análise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong>Saúde financeira estável</strong>
-            <p>Seu saldo segue positivo, mas moradia e alimentação concentram grande parte das despesas.</p>
-          </div>
-
-          <div class="ai-summary-card ai-summary-card--soft">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Sugestão principal</span>
-              <i class="bi bi-lightbulb"></i>
-            </div>
-            <strong>Reduzir gastos variáveis</strong>
-            <p>Uma redução de 8% nos gastos variáveis pode acelerar sua reserva de emergência.</p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar meu mês</button>
-            <button class="ai-shortcut" type="button">Onde posso economizar?</button>
-            <button class="ai-shortcut" type="button">Revisar minhas metas</button>
-            <button class="ai-shortcut" type="button">Criar plano rápido</button>
-          </div>
+      <div class="ai-modal__body ai-workspace">
+        <aside class="ai-modal__sidebar ai-workspace__sidebar" aria-label="Histórico e sugestões">
+          <button class="ai-new-chat" id="aiNewChat" type="button"><i class="bi bi-plus-lg"></i> Nova conversa</button>
+          <div class="ai-history"><div class="ai-workspace__section-label">RECENTES</div><div id="aiHistoryList" class="ai-history__list" aria-live="polite"><p class="ai-history__empty">Suas conversas salvas aparecerão aqui.</p></div></div>
+          <div class="ai-shortcut-group"><div class="ai-workspace__section-label">COMECE POR AQUI</div><div class="ai-shortcuts">
+            <button class="ai-shortcut" type="button" data-prompt="Analise meus gastos deste mês e destaque os principais pontos."><i class="bi bi-calendar3"></i><span>Analisar meus gastos</span></button>
+            <button class="ai-shortcut" type="button" data-prompt="Onde posso economizar com base nas minhas despesas recentes?"><i class="bi bi-piggy-bank"></i><span>Onde posso economizar?</span></button>
+            <button class="ai-shortcut" type="button" data-prompt="Faça uma previsão do meu saldo considerando meu ritmo recente de receitas e despesas."><i class="bi bi-graph-up-arrow"></i><span>Prever meu saldo</span></button>
+            <button class="ai-shortcut" type="button" data-prompt="Como está o andamento das minhas metas financeiras?"><i class="bi bi-bullseye"></i><span>Acompanhar minhas metas</span></button>
+          </div></div>
         </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages">
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Olá, <?= htmlspecialchars($primeiroNome) ?>. Fiz uma leitura geral das suas finanças e identifiquei bons sinais de estabilidade. Quer que eu te mostre onde estão suas melhores oportunidades de economia?
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--user">
-              <div class="ai-message__bubble">
-                Sim, quero ver os principais pontos.
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Perfeito. Hoje seus maiores focos de atenção estão em alimentação, moradia e despesas recorrentes menores que, somadas, têm bastante impacto no mês.
-              </div>
-            </div>
-          </div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
+        <section class="ai-chat-area ai-workspace__chat" aria-label="Conversa com o assistente">
+          <div class="ai-chat-toolbar"><span id="aiCurrentChatTitle">Nova conversa</span><button id="aiDeleteChat" class="ai-delete-chat" type="button" aria-label="Excluir conversa" title="Excluir conversa" hidden><i class="bi bi-trash3"></i></button></div>
+          <div class="ai-chat-area__messages" id="aiMessages" aria-live="polite"><div class="ai-empty-state"><h4>Como posso ajudar com suas finanças?</h4><p>Pergunte sobre seus gastos, orçamento, saldo ou metas. Seu histórico fica salvo nesta conta.</p></div></div>
+          <form class="ai-chat-area__input" id="aiChatForm"><textarea id="aiChatInput" rows="1" aria-label="Escreva sua pergunta" placeholder="Pergunte sobre suas finanças..."></textarea><button class="ai-send-btn" type="submit" aria-label="Enviar pergunta"><i class="bi bi-arrow-up"></i></button></form>
+          <p class="ai-chat-area__hint" id="aiChatStatus">As respostas usam os dados financeiros registrados no FinMap.</p>
         </section>
       </div>
-    </div>
+    </section>
   </div>
 
   <!-- MODAL DE TRANSAÇÃO -->
@@ -2700,6 +2702,23 @@ notifCards.forEach((card) => {
 
 });
 
+(() => {
+ const root=document.getElementById('aiModal'); if(!root) return;
+ const csrf=<?= json_encode($csrfImportacao) ?>, api='assistente-chat-api.php';
+ const history=document.getElementById('aiHistoryList'), messages=document.getElementById('aiMessages'), form=document.getElementById('aiChatForm'), input=document.getElementById('aiChatInput'), status=document.getElementById('aiChatStatus'), title=document.getElementById('aiCurrentChatTitle'), del=document.getElementById('aiDeleteChat');
+ let current=null, busy=false;
+ async function call(action, extra={}) { const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),155000); try { const r=await fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,csrf,...extra}),signal:controller.signal}); const d=await r.json(); if(!r.ok){const error=new Error(d.erro||'Ocorreu um erro.');error.id=d.id;throw error;} return d; } catch(error) { if(error.name==='AbortError') throw new Error('A IA demorou demais para responder. Confira se o serviço está ativo e tente novamente.'); throw error; } finally { clearTimeout(timer); } }
+ function bubble(role,text){ const row=document.createElement('div'); row.className='ai-message '+(role==='assistant'?'ai-message--bot':'ai-message--user'); const b=document.createElement('div'); b.className='ai-message__bubble'; b.textContent=text; row.appendChild(b); messages.appendChild(row); }
+ function render(items){ messages.replaceChildren(); if(!items.length){ messages.innerHTML='<div class="ai-empty-state"><h4>Como posso ajudar com suas finanças?</h4><p>Envie uma pergunta ou escolha uma sugestão. Suas conversas ficam salvas nesta conta.</p></div>'; return; } items.forEach(m=>bubble(m.papel,m.conteudo)); messages.scrollTop=messages.scrollHeight; }
+ async function refresh(){ try { const d=await call('list'); history.replaceChildren(); if(!d.conversas.length){const p=document.createElement('p');p.className='ai-history__empty';p.textContent='Suas conversas salvas aparecerão aqui.';history.appendChild(p);return;} d.conversas.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='ai-history-item'+(Number(c.id)===Number(current)?' is-active':'');b.textContent=c.titulo;b.title=c.titulo;b.addEventListener('click',()=>load(c.id));history.appendChild(b);}); } catch(e){status.textContent=e.message;} }
+ async function load(id){ try { const d=await call('load',{id}); current=Number(id); title.textContent=d.conversa.titulo; del.hidden=false; render(d.mensagens); await refresh(); } catch(e){status.textContent=e.message;} }
+ function fresh(){current=null;title.textContent='Nova conversa';del.hidden=true;render([]);input.focus();refresh();}
+ async function send(text){if(busy||!text.trim())return;busy=true;input.value='';input.style.height='';status.textContent='Analisando seus dados... a primeira resposta pode levar alguns segundos.';bubble('user',text);const wait=document.createElement('div');wait.className='ai-message ai-message--bot';wait.innerHTML='<div class="ai-message__bubble"><span class="ai-typing"><i></i><i></i><i></i></span></div>';messages.appendChild(wait);messages.scrollTop=messages.scrollHeight;try{const d=await call('send',{id:current,message:text});current=Number(d.id);wait.remove();bubble('assistant',d.resposta);title.textContent=d.titulo||'Conversa';del.hidden=false;status.textContent='As respostas são geradas pelo Ollama com dados financeiros da sua conta.';await refresh();}catch(e){wait.remove();if(e.id){current=Number(e.id);title.textContent='Conversa';del.hidden=false;}status.textContent=e.message;await refresh();}finally{busy=false;input.focus();}}
+ form.addEventListener('submit',e=>{e.preventDefault();send(input.value);}); input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,140)+'px';}); input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});
+ document.getElementById('aiNewChat').addEventListener('click',fresh); del.addEventListener('click',async()=>{if(!current||!confirm('Excluir esta conversa e todas as mensagens?'))return;try{await call('delete',{id:current});fresh();}catch(e){status.textContent=e.message;}});
+ root.querySelectorAll('.ai-shortcut[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
+ document.getElementById('openAiModal')?.addEventListener('click',refresh); refresh();
+})();
 </script>
 
 
