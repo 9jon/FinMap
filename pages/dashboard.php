@@ -5,13 +5,9 @@ $usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
 require_once __DIR__ . '/../includes/insights-financeiros.php';
 $insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
-<<<<<<< Updated upstream
-=======
-$insightPrevisaoSaldo = finmapBuscarOuGerarPrevisaoSaldo($conn, (int)$usuario_id);
-if ($insightPrevisaoSaldo) { $insightSemanal = $insightPrevisaoSaldo; }
-$rotuloInsightToast = $insightPrevisaoSaldo ? 'Previsão de saldo' : 'Resumo financeiro';
->>>>>>> Stashed changes
+$rotuloInsightToast = 'Resumo financeiro';
 require_once __DIR__ . '/../includes/percentuais-categorias.php';
+require_once __DIR__ . '/../includes/cores-categorias.php';
 
 
 
@@ -33,6 +29,20 @@ $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = (float) ($usuario['saldo_total'] ?? 0);
 
+$stmt = $conn->prepare("SELECT renda_mensal FROM configuracoes_renda WHERE usuario_id = ? LIMIT 1");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$configuracaoRenda = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$rendaMensalConfigurada = (float) ($configuracaoRenda['renda_mensal'] ?? 0);
+$rendaConsumida = $rendaMensalConfigurada > 0
+    ? max(0, $rendaMensalConfigurada - $saldoTotal)
+    : 0;
+$percentualRendaConsumida = $rendaMensalConfigurada > 0
+    ? min(100, ($rendaConsumida / $rendaMensalConfigurada) * 100)
+    : 0;
+
 function formatarDataCurta(string $data): string
 {
     $timestamp = strtotime($data);
@@ -47,7 +57,6 @@ function formatarDataCurta(string $data): string
 
     return date('d', $timestamp) . ' ' . $meses[(int) date('n', $timestamp)];
 }
-
 
 $stmt = $conn->prepare("
     SELECT
@@ -125,7 +134,6 @@ function iconeVariacaoMensal(?float $variacao): string
     return 'dash-lg';
 }
 
-$movimentacaoMes = $receitasMes - $despesasMes;
 $variacaoReceitas = calcularVariacaoMensal($receitasMes, $receitasMesAnterior, $temRegistroMesAnterior);
 $variacaoDespesas = calcularVariacaoMensal($despesasMes, $despesasMesAnterior, $temRegistroMesAnterior);
 
@@ -136,28 +144,21 @@ $classeVariacaoDespesas = $variacaoDespesas === null
     ? 'neutral'
     : ($variacaoDespesas > 0 ? 'negative' : 'positive');
 
-function textoMovimentacaoMensal(float $valor): string
-{
-    if (abs($valor) < 0.005) {
-        return 'Nenhuma movimentação neste mês';
-    }
-
-    $sinal = $valor > 0 ? '+' : '−';
-    return 'Movimentação do mês: ' . $sinal . ' R$ ' . number_format(abs($valor), 2, ',', '.');
-}
-
-function iconeMovimentacaoMensal(float $valor): string
-{
-    if ($valor > 0.005) {
-        return 'arrow-up-right';
-    }
-
-    if ($valor < -0.005) {
-        return 'arrow-down-right';
-    }
-
-    return 'dash-lg';
-}
+$maiorReceitaComparativo = max($receitasMes, $receitasMesAnterior);
+$maiorDespesaComparativo = max($despesasMes, $despesasMesAnterior);
+$alturaMaximaComparativo = 36;
+$alturaReceitaAnterior = $maiorReceitaComparativo > 0
+    ? max(4, (int) round(($receitasMesAnterior / $maiorReceitaComparativo) * $alturaMaximaComparativo))
+    : 4;
+$alturaReceitaAtual = $maiorReceitaComparativo > 0
+    ? max(4, (int) round(($receitasMes / $maiorReceitaComparativo) * $alturaMaximaComparativo))
+    : 4;
+$alturaDespesaAnterior = $maiorDespesaComparativo > 0
+    ? max(4, (int) round(($despesasMesAnterior / $maiorDespesaComparativo) * $alturaMaximaComparativo))
+    : 4;
+$alturaDespesaAtual = $maiorDespesaComparativo > 0
+    ? max(4, (int) round(($despesasMes / $maiorDespesaComparativo) * $alturaMaximaComparativo))
+    : 4;
 
 
 $stmt = $conn->prepare("
@@ -176,7 +177,6 @@ $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $transacoes = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
-
 
 $stmt = $conn->prepare("
     SELECT t.id, t.descricao, t.valor, t.tipo, t.status, t.observacao_captura,
@@ -223,6 +223,15 @@ $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $gastosCategorias = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+foreach ($gastosCategorias as &$categoriaGasto) {
+    $categoriaGasto['cor'] = finmapCorVisualCategoria(
+        (int) $categoriaGasto['id'],
+        (string) $categoriaGasto['nome'],
+        $categoriaGasto['cor'] !== null ? (string) $categoriaGasto['cor'] : null
+    );
+}
+unset($categoriaGasto);
 
 aplicarPercentuaisInteiros($gastosCategorias, 'total', 'percentual');
 
@@ -622,7 +631,7 @@ $stmt->close();
               </button>
             </div>
 
-            <strong class="finance-card__value">R$ <?= number_format($saldoTotal, 2, ',', '.') ?></strong>
+            <strong class="finance-card__value" data-count-up="<?= number_format($saldoTotal, 2, '.', '') ?>">R$ <?= number_format($saldoTotal, 2, ',', '.') ?></strong>
           </div>
 
           <div class="finance-card__icon finance-card__icon--glass">
@@ -630,23 +639,49 @@ $stmt->close();
           </div>
         </div>
 
-        <div class="finance-card__bottom">
-          <span class="finance-card__trend finance-card__trend--light">
-            <i class="bi bi-<?= iconeMovimentacaoMensal($movimentacaoMes) ?>"></i>
-            <?= textoMovimentacaoMensal($movimentacaoMes) ?>
-          </span>
-        </div>
+        <?php if ($rendaMensalConfigurada > 0): ?>
+          <div class="finance-card__progress">
+            <div class="finance-card__progress-heading">
+              <span>Renda já consumida</span>
+              <strong id="incomeUsagePercent"><?= number_format($percentualRendaConsumida, 0, ',', '.') ?>%</strong>
+            </div>
+            <div
+              class="finance-card__progress-track"
+              id="incomeUsageProgress"
+              role="progressbar"
+              aria-label="Progresso da renda mensal consumida"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="<?= number_format($percentualRendaConsumida, 1, '.', '') ?>"
+              aria-valuetext="R$ <?= number_format($rendaConsumida, 2, ',', '.') ?> de R$ <?= number_format($rendaMensalConfigurada, 2, ',', '.') ?>"
+              data-renda-mensal="<?= number_format($rendaMensalConfigurada, 2, '.', '') ?>"
+            >
+              <span class="finance-card__progress-fill" style="width: <?= number_format($percentualRendaConsumida, 2, '.', '') ?>%"></span>
+            </div>
+          </div>
+        <?php else: ?>
+          <a class="finance-card__progress-empty" href="config-renda.php">Configure sua renda mensal para acompanhar o consumo</a>
+        <?php endif; ?>
       </article>
 
       <article class="finance-card">
         <div class="finance-card__top">
           <div>
             <span class="finance-card__label">Receitas</span>
-            <strong class="finance-card__value">R$ <?= number_format($receitasMes, 2, ',', '.') ?></strong>
+            <strong class="finance-card__value" data-count-up="<?= number_format($receitasMes, 2, '.', '') ?>">R$ <?= number_format($receitasMes, 2, ',', '.') ?></strong>
           </div>
 
-          <div class="finance-card__icon finance-card__icon--green-soft">
-            <i class="bi bi-arrow-up-right"></i>
+          <div
+            class="finance-card__mini-chart finance-card__mini-chart--income"
+            role="group"
+            aria-label="Comparação das receitas: mês anterior R$ <?= number_format($receitasMesAnterior, 2, ',', '.') ?>; este mês R$ <?= number_format($receitasMes, 2, ',', '.') ?>"
+          >
+            <button class="finance-card__mini-hit" type="button" aria-expanded="false" aria-label="Receitas no mês anterior: R$ <?= number_format($receitasMesAnterior, 2, ',', '.') ?>" data-tooltip="Mês anterior · R$ <?= number_format($receitasMesAnterior, 2, ',', '.') ?>">
+              <span class="finance-card__mini-bar finance-card__mini-bar--previous" style="height: <?= $alturaReceitaAnterior ?>px" aria-hidden="true"></span>
+            </button>
+            <button class="finance-card__mini-hit" type="button" aria-expanded="false" aria-label="Receitas neste mês: R$ <?= number_format($receitasMes, 2, ',', '.') ?>" data-tooltip="Este mês · R$ <?= number_format($receitasMes, 2, ',', '.') ?>">
+              <span class="finance-card__mini-bar finance-card__mini-bar--current" style="height: <?= $alturaReceitaAtual ?>px" aria-hidden="true"></span>
+            </button>
           </div>
         </div>
 
@@ -662,11 +697,20 @@ $stmt->close();
         <div class="finance-card__top">
           <div>
             <span class="finance-card__label">Despesas</span>
-            <strong class="finance-card__value">R$ <?= number_format($despesasMes, 2, ',', '.') ?></strong>
+            <strong class="finance-card__value" data-count-up="<?= number_format($despesasMes, 2, '.', '') ?>">R$ <?= number_format($despesasMes, 2, ',', '.') ?></strong>
           </div>
 
-          <div class="finance-card__icon finance-card__icon--red-soft">
-            <i class="bi bi-arrow-down-right"></i>
+          <div
+            class="finance-card__mini-chart finance-card__mini-chart--expense"
+            role="group"
+            aria-label="Comparação das despesas: mês anterior R$ <?= number_format($despesasMesAnterior, 2, ',', '.') ?>; este mês R$ <?= number_format($despesasMes, 2, ',', '.') ?>"
+          >
+            <button class="finance-card__mini-hit" type="button" aria-expanded="false" aria-label="Despesas no mês anterior: R$ <?= number_format($despesasMesAnterior, 2, ',', '.') ?>" data-tooltip="Mês anterior · R$ <?= number_format($despesasMesAnterior, 2, ',', '.') ?>">
+              <span class="finance-card__mini-bar finance-card__mini-bar--previous" style="height: <?= $alturaDespesaAnterior ?>px" aria-hidden="true"></span>
+            </button>
+            <button class="finance-card__mini-hit" type="button" aria-expanded="false" aria-label="Despesas neste mês: R$ <?= number_format($despesasMes, 2, ',', '.') ?>" data-tooltip="Este mês · R$ <?= number_format($despesasMes, 2, ',', '.') ?>">
+              <span class="finance-card__mini-bar finance-card__mini-bar--current" style="height: <?= $alturaDespesaAtual ?>px" aria-hidden="true"></span>
+            </button>
           </div>
         </div>
 
@@ -828,7 +872,7 @@ $stmt->close();
             <?php foreach ($gastosCategorias as $g):
               $percentualCat = (int) ($g['percentual'] ?? 0);
             ?>
-              <article class="category-expense-card">
+              <article class="category-expense-card" data-category-id="<?= (int) $g['id'] ?>">
                 <div class="category-expense-card__top">
                   <div class="category-expense-card__left">
                     <div class="category-expense-card__icon category-expense-card__icon--<?= htmlspecialchars($g['cor'] ?: 'green') ?>">
@@ -842,14 +886,20 @@ $stmt->close();
                   </div>
 
                   <div class="category-expense-card__right">
-                    <strong>R$ <?= number_format($g['total'], 2, ',', '.') ?></strong>
-                    <span><?= $percentualCat ?>%</span>
+                    <div class="category-expense-card__numbers">
+                      <strong>R$ <?= number_format($g['total'], 2, ',', '.') ?></strong>
+                      <span><?= $percentualCat ?>%</span>
+                    </div>
+                    <button class="category-expense-card__details-toggle" type="button" aria-expanded="false" aria-label="Ver movimentações de <?= htmlspecialchars($g['nome'], ENT_QUOTES) ?>">
+                      <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
                   </div>
                 </div>
 
                 <div class="category-expense-card__bar">
                   <div class="category-expense-card__fill category-expense-card__fill--<?= htmlspecialchars($g['cor'] ?: 'green') ?>" style="width: <?= $percentualCat ?>%;"></div>
                 </div>
+                <div class="category-expense-card__details" hidden></div>
               </article>
             <?php endforeach; ?>
           <?php endif; ?>
@@ -886,7 +936,6 @@ $stmt->close();
     </span>
   </button>
 
-<<<<<<< Updated upstream
   <script>
   (() => {
     const toast = document.getElementById("weeklyInsightToast");
@@ -907,28 +956,6 @@ $stmt->close();
     });
   })();
   </script>
-=======
-  <script>
-  (() => {
-    const toast = document.getElementById("weeklyInsightToast");
-    if (!toast) return;
-
-    const key = "finmap-insight-fechado:" + (toast.dataset.insightKey || "semana") + ":" + (toast.querySelector("h2")?.textContent || "resumo");
-    try {
-      if (window.localStorage.getItem(key) === "1") {
-        toast.remove();
-        return;
-      }
-    } catch (error) {}
-
-    toast.querySelector(".weekly-insight-toast__close")?.addEventListener("click", () => {
-      try { window.localStorage.setItem(key, "1"); } catch (error) {}
-      toast.classList.add("is-closing");
-      window.setTimeout(() => toast.remove(), 220);
-    });
-  })();
-  </script>
->>>>>>> Stashed changes
   <!-- MODAL EDITAR SALDO  --> 
   <div class="balance-modal-overlay" id="balanceModal">
     <div class="balance-modal">
@@ -2007,6 +2034,16 @@ $stmt->close();
     });
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[character]);
+  }
+
   function getGoalColorClass(color) {
     return {
       green: "green",
@@ -2088,6 +2125,8 @@ $stmt->close();
   }
 
 
+  let categoryActivePeriod = { periodo: "this-month", inicio: "", fim: "" };
+
   async function renderCategoryExpenses(periodKey, inicio = "", fim = "") {
     const panelList = document.getElementById("categoryExpensesList");
     if (!panelList) return;
@@ -2103,6 +2142,8 @@ $stmt->close();
 
       if (!resultado.sucesso) return;
 
+      categoryActivePeriod = { periodo: periodKey, inicio, fim };
+
       categoryPeriodLabel.textContent = resultado.label;
       const categoryPeriodDescription = document.getElementById("categoryPeriodDescription");
       if (categoryPeriodDescription) {
@@ -2113,27 +2154,33 @@ $stmt->close();
         panelList.innerHTML = `<p style="padding: 16px 0; color: #888;">Nenhum gasto registrado neste período ainda.</p>`;
       } else {
         panelList.innerHTML = resultado.categorias.map((item) => `
-          <article class="category-expense-card">
+          <article class="category-expense-card" data-category-id="${Number(item.id) || 0}">
             <div class="category-expense-card__top">
               <div class="category-expense-card__left">
                 <div class="category-expense-card__icon category-expense-card__icon--${item.cor}">
                   <i class="bi bi-${item.icone}"></i>
                 </div>
                 <div class="category-expense-card__info">
-                  <h4>${item.nome}</h4>
+                  <h4>${escapeHtml(item.nome)}</h4>
                   <p>Total de gastos nesta categoria no período</p>
                 </div>
               </div>
 
               <div class="category-expense-card__right">
-                <strong>${formatBRL(item.valor)}</strong>
-                <span>${item.percent}%</span>
+                <div class="category-expense-card__numbers">
+                  <strong>${formatBRL(item.valor)}</strong>
+                  <span>${item.percent}%</span>
+                </div>
+                <button class="category-expense-card__details-toggle" type="button" aria-expanded="false" aria-label="Ver movimentações de ${escapeHtml(item.nome)}">
+                  <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                </button>
               </div>
             </div>
 
             <div class="category-expense-card__bar">
               <div class="category-expense-card__fill category-expense-card__fill--${item.cor}" style="width: ${item.percent}%;"></div>
             </div>
+            <div class="category-expense-card__details" hidden></div>
           </article>
         `).join("");
       }
@@ -2143,6 +2190,67 @@ $stmt->close();
 
     document.querySelectorAll(".dashboard-period-option").forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-period") === periodKey);
+    });
+  }
+
+  const categoryExpensesList = document.getElementById("categoryExpensesList");
+  if (categoryExpensesList) {
+    categoryExpensesList.addEventListener("click", async (event) => {
+      const toggle = event.target.closest(".category-expense-card__details-toggle");
+      if (!toggle) return;
+
+      const card = toggle.closest(".category-expense-card");
+      const details = card?.querySelector(".category-expense-card__details");
+      if (!card || !details) return;
+
+      const wasExpanded = toggle.getAttribute("aria-expanded") === "true";
+      categoryExpensesList.querySelectorAll(".category-expense-card__details-toggle").forEach((button) => {
+        button.setAttribute("aria-expanded", "false");
+        button.innerHTML = '<i class="bi bi-chevron-down" aria-hidden="true"></i>';
+        const otherDetails = button.closest(".category-expense-card")?.querySelector(".category-expense-card__details");
+        if (otherDetails) otherDetails.hidden = true;
+      });
+
+      if (wasExpanded) return;
+
+      toggle.setAttribute("aria-expanded", "true");
+      toggle.innerHTML = '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+      details.hidden = false;
+
+      if (details.dataset.loaded === "true") return;
+
+      details.innerHTML = '<p class="category-expense-card__details-status">Carregando movimentações...</p>';
+
+      try {
+        const parametros = new URLSearchParams({
+          categoria_id: card.dataset.categoryId,
+          periodo: categoryActivePeriod.periodo
+        });
+        if (categoryActivePeriod.periodo === "custom") {
+          parametros.set("inicio", categoryActivePeriod.inicio);
+          parametros.set("fim", categoryActivePeriod.fim);
+        }
+
+        const response = await fetch(`buscar-transacoes-categoria.php?${parametros.toString()}`);
+        const resultado = await response.json();
+        if (!resultado.sucesso) throw new Error(resultado.mensagem || "Não foi possível carregar as movimentações.");
+
+        details.innerHTML = resultado.transacoes.length
+          ? resultado.transacoes.map((transacao) => `
+              <div class="category-expense-card__transaction">
+                <span>
+                  <strong>${escapeHtml(transacao.descricao)}</strong>
+                  <small>${escapeHtml(transacao.data_formatada)}</small>
+                </span>
+                <b>${formatBRL(Number(transacao.valor))}</b>
+              </div>
+            `).join("")
+          : '<p class="category-expense-card__details-status">Nenhuma movimentação neste período.</p>';
+        details.dataset.loaded = "true";
+      } catch (error) {
+        details.innerHTML = '<p class="category-expense-card__details-status">Não foi possível carregar as movimentações.</p>';
+        console.error("Não foi possível carregar as movimentações da categoria:", error);
+      }
     });
   }
 
@@ -2570,6 +2678,25 @@ if (balanceForm) {
       if (resultado.sucesso) {
         if (saldoCardValue) {
           saldoCardValue.textContent = "R$ " + resultado.novo_saldo;
+          saldoCardValue.dataset.countUp = String(valorNumerico);
+        }
+        const incomeUsageProgress = document.getElementById("incomeUsageProgress");
+        if (incomeUsageProgress) {
+          const rendaMensal = Number(incomeUsageProgress.dataset.rendaMensal || 0);
+          const saldoAtualizado = Number(resultado.novo_saldo.replace(/\./g, "").replace(",", "."));
+          const rendaUsada = Math.max(0, rendaMensal - saldoAtualizado);
+          const percentualUsado = rendaMensal > 0 ? Math.min(100, (rendaUsada / rendaMensal) * 100) : 0;
+          const progressFill = incomeUsageProgress.querySelector(".finance-card__progress-fill");
+          const percentageLabel = document.getElementById("incomeUsagePercent");
+          const formatBRL = (amount) => new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+          }).format(amount);
+
+          incomeUsageProgress.setAttribute("aria-valuenow", percentualUsado.toFixed(1));
+          incomeUsageProgress.setAttribute("aria-valuetext", `${formatBRL(rendaUsada)} de ${formatBRL(rendaMensal)}`);
+          if (progressFill) progressFill.style.width = `${percentualUsado}%`;
+          if (percentageLabel) percentageLabel.textContent = `${Math.round(percentualUsado)}%`;
         }
         closeModal(balanceModal);
       } else {
@@ -2719,10 +2846,80 @@ notifCards.forEach((card) => {
  root.querySelectorAll('.ai-shortcut[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
  document.getElementById('openAiModal')?.addEventListener('click',refresh); refresh();
 })();
+
+function animateFinanceCardValues() {
+  const counters = Array.from(document.querySelectorAll(".finance-card__value[data-count-up]"));
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!counters.length || reduceMotion) return;
+
+  const formatter = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const duration = 1200;
+  const startedAt = performance.now();
+
+  counters.forEach((counter) => {
+    const target = Number(counter.dataset.countUp);
+    if (Number.isFinite(target)) counter.textContent = formatter.format(0);
+  });
+
+  function frame(now) {
+    const linearProgress = Math.min((now - startedAt) / duration, 1);
+    const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
+
+    counters.forEach((counter) => {
+      const target = Number(counter.dataset.countUp);
+      if (!Number.isFinite(target)) return;
+      const current = target * easedProgress;
+      counter.textContent = formatter.format(Math.abs(current) < 0.005 ? 0 : current);
+    });
+
+    if (linearProgress < 1) requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+animateFinanceCardValues();
+
+const financeMiniChartButtons = document.querySelectorAll(".finance-card__mini-hit");
+function closeFinanceMiniChartDetails() {
+  financeMiniChartButtons.forEach((button) => {
+    button.classList.remove("is-active");
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+financeMiniChartButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const shouldOpen = !button.classList.contains("is-active");
+    closeFinanceMiniChartDetails();
+
+    if (shouldOpen) {
+      button.classList.add("is-active");
+      button.setAttribute("aria-expanded", "true");
+    }
+  });
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".finance-card__mini-hit")) {
+    closeFinanceMiniChartDetails();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeFinanceMiniChartDetails();
+});
+
 </script>
 
 
 
 
+  <script src="../assets/js/page-entrance.js?v=3" defer></script>
 </body>
 </html>
