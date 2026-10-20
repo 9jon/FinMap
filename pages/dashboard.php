@@ -2,15 +2,13 @@
   
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
-include '../config/conn.php';
+include '../config/conn.php';
+
 require_once __DIR__ . '/../includes/insights-financeiros.php';
 $insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
-<<<<<<< Updated upstream
-=======
 $insightPrevisaoSaldo = finmapBuscarOuGerarPrevisaoSaldo($conn, (int)$usuario_id);
 if ($insightPrevisaoSaldo) { $insightSemanal = $insightPrevisaoSaldo; }
 $rotuloInsightToast = $insightPrevisaoSaldo ? 'Previsão de saldo' : 'Resumo financeiro';
->>>>>>> Stashed changes
 require_once __DIR__ . '/../includes/percentuais-categorias.php';
 
 
@@ -49,8 +47,7 @@ function formatarDataCurta(string $data): string
 }
 
 
-$stmt = $conn->prepare("
-    SELECT
+$stmt = $conn->prepare("SELECT
         COALESCE(SUM(CASE
             WHEN tipo = 'receita'
              AND data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
