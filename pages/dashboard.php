@@ -2,7 +2,8 @@
   
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
-include '../config/conn.php';
+include '../config/conn.php';
+
 require_once __DIR__ . '/../includes/insights-financeiros.php';
 $insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
 $rotuloInsightToast = 'Resumo financeiro';
