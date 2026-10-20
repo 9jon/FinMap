@@ -37,12 +37,6 @@ $configuracaoRenda = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 $rendaMensalConfigurada = (float) ($configuracaoRenda['renda_mensal'] ?? 0);
-$rendaConsumida = $rendaMensalConfigurada > 0
-    ? max(0, $rendaMensalConfigurada - $saldoTotal)
-    : 0;
-$percentualRendaConsumida = $rendaMensalConfigurada > 0
-    ? min(100, ($rendaConsumida / $rendaMensalConfigurada) * 100)
-    : 0;
 
 function formatarDataCurta(string $data): string
 {
@@ -95,6 +89,11 @@ $stmt->close();
 
 $receitasMes = (float) $comparativoMensal['receitas_atual'];
 $despesasMes = (float) $comparativoMensal['despesas_atual'];
+$rendaBaseCalculo = $receitasMes > 0 ? $receitasMes : $rendaMensalConfigurada;
+$rendaConsumida = $despesasMes;
+$percentualRendaConsumida = $rendaBaseCalculo > 0
+    ? min(100, ($rendaConsumida / $rendaBaseCalculo) * 100)
+    : 0;
 $receitasMesAnterior = (float) $comparativoMensal['receitas_anterior'];
 $despesasMesAnterior = (float) $comparativoMensal['despesas_anterior'];
 $temRegistroMesAnterior = (int) $comparativoMensal['lancamentos_anterior'] > 0;
@@ -640,7 +639,7 @@ $stmt->close();
           </div>
         </div>
 
-        <?php if ($rendaMensalConfigurada > 0): ?>
+        <?php if ($rendaBaseCalculo > 0): ?>
           <div class="finance-card__progress">
             <div class="finance-card__progress-heading">
               <span>Renda já consumida</span>
@@ -654,8 +653,8 @@ $stmt->close();
               aria-valuemin="0"
               aria-valuemax="100"
               aria-valuenow="<?= number_format($percentualRendaConsumida, 1, '.', '') ?>"
-              aria-valuetext="R$ <?= number_format($rendaConsumida, 2, ',', '.') ?> de R$ <?= number_format($rendaMensalConfigurada, 2, ',', '.') ?>"
-              data-renda-mensal="<?= number_format($rendaMensalConfigurada, 2, '.', '') ?>"
+              aria-valuetext="R$ <?= number_format($rendaConsumida, 2, ',', '.') ?> de R$ <?= number_format($rendaBaseCalculo, 2, ',', '.') ?>"
+              data-renda-mensal="<?= number_format($rendaBaseCalculo, 2, '.', '') ?>"
             >
               <span class="finance-card__progress-fill" style="width: <?= number_format($percentualRendaConsumida, 2, '.', '') ?>%"></span>
             </div>
@@ -2680,24 +2679,6 @@ if (balanceForm) {
         if (saldoCardValue) {
           saldoCardValue.textContent = "R$ " + resultado.novo_saldo;
           saldoCardValue.dataset.countUp = String(valorNumerico);
-        }
-        const incomeUsageProgress = document.getElementById("incomeUsageProgress");
-        if (incomeUsageProgress) {
-          const rendaMensal = Number(incomeUsageProgress.dataset.rendaMensal || 0);
-          const saldoAtualizado = Number(resultado.novo_saldo.replace(/\./g, "").replace(",", "."));
-          const rendaUsada = Math.max(0, rendaMensal - saldoAtualizado);
-          const percentualUsado = rendaMensal > 0 ? Math.min(100, (rendaUsada / rendaMensal) * 100) : 0;
-          const progressFill = incomeUsageProgress.querySelector(".finance-card__progress-fill");
-          const percentageLabel = document.getElementById("incomeUsagePercent");
-          const formatBRL = (amount) => new Intl.NumberFormat("pt-BR", {
-            style: "currency",
-            currency: "BRL"
-          }).format(amount);
-
-          incomeUsageProgress.setAttribute("aria-valuenow", percentualUsado.toFixed(1));
-          incomeUsageProgress.setAttribute("aria-valuetext", `${formatBRL(rendaUsada)} de ${formatBRL(rendaMensal)}`);
-          if (progressFill) progressFill.style.width = `${percentualUsado}%`;
-          if (percentageLabel) percentageLabel.textContent = `${Math.round(percentualUsado)}%`;
         }
         closeModal(balanceModal);
       } else {
