@@ -5,6 +5,7 @@ require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado(true);
 include '../config/conn.php';
 require_once __DIR__ . '/../includes/percentuais-categorias.php';
+require_once __DIR__ . '/../includes/cores-categorias.php';
 
 header('Content-Type: application/json'); 
 
@@ -83,7 +84,11 @@ $categorias = array_map(function ($l) {
         'id'      => (int) $l['id'],
         'nome'    => $l['nome'],
         'icone'   => $l['icone'] ?: 'tag',
-        'cor'     => $l['cor'] ?: 'green',
+        'cor'     => finmapCorVisualCategoria(
+            (int) $l['id'],
+            (string) $l['nome'],
+            $l['cor'] !== null ? (string) $l['cor'] : null
+        ),
         'valor'   => $valor,
         'percent' => 0
     ];
