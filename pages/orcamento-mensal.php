@@ -14,7 +14,6 @@ function parseBRLParaFloat(string $valor): float
     return (float) $limpo;
 }
 
-$cenariosValidos = ['base', 'cauteloso', 'pressionado'];
 
 
 $erroRenda = '';
@@ -49,56 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
 
             }
         }
-    } elseif ($acao === 'atualizar_limites') {
-        $faixaIdeal = (int)($_POST['faixa_ideal'] ?? 70);
-        $faixaAlerta = (int)($_POST['faixa_alerta'] ?? 85);
-
-        if ($faixaIdeal > 0 && $faixaIdeal <= 100 && $faixaAlerta > $faixaIdeal && $faixaAlerta <= 100) {
-            $sql = "INSERT INTO orcamento_configuracao (usuario_id, faixa_ideal_percentual, faixa_alerta_percentual)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        faixa_ideal_percentual = VALUES(faixa_ideal_percentual),
-                        faixa_alerta_percentual = VALUES(faixa_alerta_percentual)";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("iii", $usuario_id, $faixaIdeal, $faixaAlerta);
-            $stmt->execute();
-            $stmt->close();
-        }
-    }
-
-    if ($acao === 'selecionar_cenario') {
-        $cenario = $_POST['cenario'] ?? 'base';
-
-        if (in_array($cenario, $cenariosValidos, true)) {
-            $sql = "INSERT INTO orcamento_configuracao (usuario_id, cenario_selecionado)
-                    VALUES (?, ?)
-                    ON DUPLICATE KEY UPDATE cenario_selecionado = VALUES(cenario_selecionado)";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("is", $usuario_id, $cenario);
-            $stmt->execute();
-            $stmt->close();
-        }
-    }
-
-    if ($acao === 'atualizar_categorias') {
-        $categoriasAtivas = $_POST['categoria_ativa'] ?? [];
-        $sqlTodas = "SELECT id FROM categorias WHERE usuario_id = ? AND tipo = 'despesa'";
-        $stmtTodas = $conn->prepare($sqlTodas);
-        $stmtTodas->bind_param("i", $usuario_id);
-        $stmtTodas->execute();
-        $todasCategorias = $stmtTodas->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmtTodas->close();
-
-        $sqlUpdate = "UPDATE categorias SET ativo_no_orcamento = ? WHERE id = ? AND usuario_id = ?";
-        $stmtUpdate = $conn->prepare($sqlUpdate);
-
-        foreach ($todasCategorias as $cat) {
-            $ativo = in_array((string)$cat['id'], $categoriasAtivas, true) ? 1 : 0;
-            $catId = (int)$cat['id'];
-            $stmtUpdate->bind_param("iii", $ativo, $catId, $usuario_id);
-            $stmtUpdate->execute();
-        }
-        $stmtUpdate->close();
     }
 
     if ($erroRenda === '') {
@@ -117,22 +66,12 @@ $stmtRenda->close();
 $renda = $rendaRow ? (float)$rendaRow['renda_mensal'] : 0.0;
 
 
-$sqlConfig = "SELECT faixa_ideal_percentual, faixa_alerta_percentual, cenario_selecionado
-              FROM orcamento_configuracao WHERE usuario_id = ?";
-$stmtConfig = $conn->prepare($sqlConfig);
-$stmtConfig->bind_param("i", $usuario_id);
-$stmtConfig->execute();
-$config = $stmtConfig->get_result()->fetch_assoc();
-$stmtConfig->close();
 
-$faixaIdeal = $config['faixa_ideal_percentual'] ?? 70;
-$faixaAlerta = $config['faixa_alerta_percentual'] ?? 85;
-$cenarioAtual = $config['cenario_selecionado'] ?? 'base';
 
 
 // Totais seguem a data do lancamento, independentemente da importacao ou edicao.
 $sqlCategorias = "
-    SELECT c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento,
+    SELECT c.id, c.nome, c.icone, c.cor,
            COALESCE(SUM(t.valor), 0) AS gasto_real
     FROM categorias c
     LEFT JOIN transacoes t
@@ -143,7 +82,7 @@ $sqlCategorias = "
        AND t.data_transacao >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
        AND t.data_transacao < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
     WHERE c.usuario_id = ? AND c.tipo = 'despesa'
-    GROUP BY c.id, c.nome, c.icone, c.cor, c.ativo_no_orcamento
+    GROUP BY c.id, c.nome, c.icone, c.cor
     ORDER BY gasto_real DESC
 ";
 $stmtCategorias = $conn->prepare($sqlCategorias);
@@ -168,111 +107,83 @@ $gastoSemCategoria = (float) ($stmtSemCategoria->get_result()->fetch_assoc()['ga
 $stmtSemCategoria->close();
 
 
-$mapaCategoriaParaChave = [
-    'Moradia'              => 'housing',
-    'Alimentação'          => 'food',
-    'Transporte'           => 'transport',
-    'Contas e utilidades'  => 'utilities',
-    'Lazer e extras'       => 'extras',
-];
-
-$multiplicadores = [
-    'base'        => ['housing' => 1,    'food' => 1,    'transport' => 1,    'utilities' => 1,    'extras' => 1],
-    'cauteloso'   => ['housing' => 1,    'food' => 0.92, 'transport' => 0.9,  'utilities' => 1,    'extras' => 0.65],
-    'pressionado' => ['housing' => 1.05, 'food' => 1.1,  'transport' => 1.12, 'utilities' => 1.08, 'extras' => 1.05],
-];
-
 $categoriasCalculadas = [];
 $comprometido = 0.0;
-$categoriasAtivasCount = 0;
-
 foreach ($categorias as $cat) {
-    $chave = $mapaCategoriaParaChave[$cat['nome']] ?? null;
-    $multiplicador = $chave ? $multiplicadores[$cenarioAtual][$chave] : 1;
-    // CORRIGIDO: valor_base agora é o gasto real do mês (gasto_real),
-    // não mais a coluna estática valor_base_orcamento.
-    $valorBase = (float)($cat['gasto_real'] ?? 0);
-    $ativo = (bool)$cat['ativo_no_orcamento'];
-
-    $valorCalculado = $ativo ? round($valorBase * $multiplicador, 2) : 0.0;
-
-    if ($ativo) {
-        $comprometido += $valorCalculado;
-        $categoriasAtivasCount++;
-    }
-
+    $valor = (float)($cat['gasto_real'] ?? 0);
+    $comprometido += $valor;
     $categoriasCalculadas[] = [
-        'id'         => (int)$cat['id'],
-        'nome'       => $cat['nome'],
-        'icone'      => $cat['icone'],
-        'cor'        => $cat['cor'],
-        'ativo'      => $ativo,
-        'valor'      => $valorCalculado,
-        'valor_base' => $valorBase,
+        'id' => (int)$cat['id'],
+        'nome' => $cat['nome'],
+        'icone' => $cat['icone'],
+        'cor' => $cat['cor'],
+        'valor' => $valor,
     ];
 }
-
-// A tela permite salvar ou aprovar lançamentos ainda sem categoria. Eles não
-// devem desaparecer do comprometimento; aparecem separados para que possam
-// ser classificados depois, sem alterar o total do orçamento.
 if ($gastoSemCategoria > 0) {
     $comprometido += $gastoSemCategoria;
     $categoriasCalculadas[] = [
-        'id'         => 0,
-        'nome'       => 'Sem categoria',
-        'icone'      => 'question-circle',
-        'cor'        => 'orange',
-        'ativo'      => true,
-        'valor'      => $gastoSemCategoria,
-        'valor_base' => $gastoSemCategoria,
+        'id' => 0, 'nome' => 'Sem categoria', 'icone' => 'question-circle',
+        'cor' => 'orange', 'valor' => $gastoSemCategoria,
     ];
 }
-
-$livre = max($renda - $comprometido, 0);
+$saldo = $renda - $comprometido;
 $percentual = $renda > 0 ? ($comprometido / $renda) * 100 : 0;
-
-function statusOrcamento(float $percentual, int $faixaIdeal, int $faixaAlerta): array
-{
-    if ($percentual <= $faixaIdeal) {
-        return [
-            'label' => 'Saudável',
-            'texto' => 'Seu orçamento ainda mantém boa margem de segurança.',
-            'leitura' => 'Orçamento saudável',
-            'sugestao' => 'Preservar a folga atual e controlar lazer/extras',
-            'cor' => '#24bb45',
-        ];
-    }
-    if ($percentual <= $faixaAlerta) {
-        return [
-            'label' => 'Atenção',
-            'texto' => 'Seu orçamento entrou em uma faixa que exige mais controle.',
-            'leitura' => 'Orçamento em atenção',
-            'sugestao' => 'Evitar novos gastos variáveis e revisar categorias flexíveis',
-            'cor' => '#f59e0b',
-        ];
-    }
-    return [
-        'label' => 'Pressionado',
-        'texto' => 'Seu orçamento está em uma faixa arriscada para o restante do mês.',
-        'leitura' => 'Orçamento pressionado',
-        'sugestao' => 'Reduzir despesas flexíveis e revisar custos fixos imediatamente',
+if ($renda <= 0) {
+    $status = [
+        'label' => 'Renda não configurada',
+        'texto' => 'Informe sua renda mensal para comparar com as despesas.',
+        'sugestao' => 'Cadastre sua renda para começar a acompanhar o saldo.',
+        'cor' => '#64748b',
+    ];
+} elseif ($saldo < 0) {
+    $status = [
+        'label' => 'Despesas acima da renda',
+        'texto' => 'As despesas aprovadas já passaram da renda mensal informada.',
+        'sugestao' => 'Revise os lançamentos e as próximas despesas do mês.',
         'cor' => '#ef4444',
     ];
+} elseif (abs($saldo) < 0.005) {
+    $status = [
+        'label' => 'Renda totalmente utilizada',
+        'texto' => 'As despesas aprovadas já alcançaram a renda mensal informada.',
+        'sugestao' => 'Evite contar com saldo livre até registrar uma nova receita.',
+        'cor' => '#f59e0b',
+    ];
+} else {
+    $status = [
+        'label' => 'Ainda há saldo',
+        'texto' => 'Este é o valor que sobra da renda depois das despesas aprovadas.',
+        'sugestao' => 'Acompanhe as próximas despesas para preservar esse saldo.',
+        'cor' => '#24bb45',
+    ];
 }
-
-$status = statusOrcamento($percentual, (int)$faixaIdeal, (int)$faixaAlerta);
-
-$categoriaMaisPesada = 'Nenhuma categoria';
-$maiorValor = 0;
-foreach ($categoriasCalculadas as $c) {
-    if ($c['valor'] > $maiorValor) {
-        $maiorValor = $c['valor'];
-        $categoriaMaisPesada = $c['nome'];
+$categoriaMaisPesada = 'Nenhuma despesa registrada';
+$maiorValor = 0.0;
+foreach ($categoriasCalculadas as $categoria) {
+    if ($categoria['valor'] > $maiorValor) {
+        $maiorValor = $categoria['valor'];
+        $categoriaMaisPesada = $categoria['nome'];
     }
 }
 
-$labelsCenario = ['base' => 'Atual', 'cauteloso' => 'Cauteloso', 'pressionado' => 'Pressionado'];
-
+$paletaGrafico = [
+    'green' => '#22c55e', 'blue' => '#3b82f6', 'orange' => '#f97316',
+    'red' => '#ef4444', 'purple' => '#8b5cf6', 'yellow' => '#eab308',
+    'pink' => '#ec4899', 'teal' => '#14b8a6', 'indigo' => '#6366f1',
+];
+$dadosGraficoCategorias = [];
+$totalGrafico = array_sum(array_map(static fn($categoria) => (float)$categoria['valor'], $categoriasCalculadas));
+foreach ($categoriasCalculadas as $categoria) {
+    if ($categoria['valor'] <= 0) continue;
+    $dadosGraficoCategorias[] = [
+        'id' => (int)$categoria['id'],
+        'nome' => (string)$categoria['nome'],
+        'valor' => (float)$categoria['valor'],
+        'percentual' => $totalGrafico > 0 ? ((float)$categoria['valor'] / $totalGrafico) * 100 : 0,
+        'cor' => $paletaGrafico[$categoria['cor']] ?? '#64748b',
+    ];
+}
 function brl(float $valor): string
 {
     return 'R$ ' . number_format($valor, 2, ',', '.');
@@ -290,7 +201,7 @@ function brl(float $valor): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="../assets/css/dashboard.css">
-  <link rel="stylesheet" href="../assets/css/orcamento-mensal.css">
+  <link rel="stylesheet" href="../assets/css/orcamento-mensal.css?v=9">
 
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
@@ -342,33 +253,25 @@ function brl(float $valor): string
             </div>
           <?php endif; ?>
 
-          <div class="budget-hero-card__badge">
-            <i class="bi bi-calendar-check"></i>
-            <span>Controle mensal atualizado</span>
-          </div>
+          <h2>Quanto da renda já foi gasta</h2>
 
-          <h2>Quanto da sua renda já foi comprometido</h2>
-
-          <p>
-            Visualize o peso atual das suas despesas no mês, entenda quais categorias
-            pressionam mais o orçamento e simule ajustes para recuperar folga financeira.
-          </p>
+          <p>Compare sua renda mensal com as despesas aprovadas neste mês.</p>
 
           <div class="budget-hero-card__stats">
             <article class="budget-kpi budget-kpi--main">
               <span>Renda mensal</span>
               <strong id="incomeValue"><?= brl($renda) ?></strong>
-              <small>base usada no orçamento atual</small>
+              
             </article>
 
             <article class="budget-kpi">
-              <span>Comprometido</span>
+              <span>Despesas aprovadas no mês</span>
               <strong id="committedValue"><?= brl($comprometido) ?></strong>
             </article>
 
             <article class="budget-kpi">
-              <span>Livre no mês</span>
-              <strong id="remainingValue"><?= brl($livre) ?></strong>
+              <span>Saldo após despesas</span>
+              <strong id="remainingValue" class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
             </article>
           </div>
 
@@ -378,10 +281,7 @@ function brl(float $valor): string
               Ajustar renda
             </button>
 
-            <button class="budget-btn budget-btn--secondary" id="openPlannerModal" type="button">
-              <i class="bi bi-sliders"></i>
-              Configurar limites
-            </button>
+            
           </div>
 
           <?php if ($renda <= 0): ?>
@@ -394,94 +294,71 @@ function brl(float $valor): string
         <article class="budget-visual-card">
           <div class="budget-visual-card__header">
             <div>
-              <h3>Comprometimento do mês</h3>
-              <p>Leitura visual da parcela da sua renda já ocupada por despesas</p>
+              <h3>Despesas por categoria</h3>
+              <p>Selecione uma categoria para ver sua participação no total.</p>
             </div>
 
             <button class="panel-action-btn" id="openDetailsModal" type="button">
-              <i class="bi bi-pie-chart"></i>
-              Ver detalhes
+              <i class="bi bi-bar-chart-line"></i>
+              Detalhes
             </button>
           </div>
 
-          <div class="budget-ring-area">
-            <div class="budget-ring" id="budgetRing" style="--percent: <?= number_format($percentual, 1, '.', '') ?>; --ring-color: <?= htmlspecialchars($status['cor']) ?>;">
-              <div class="budget-ring__inner">
-                <span class="budget-ring__label">Comprometido</span>
-                <strong id="budgetPercent"><?= round($percentual) ?>%</strong>
-              </div>
-            </div>
+          <div class="budget-pie-layout">
+  <div class="budget-pie-wrap">
+    <svg class="budget-pie" viewBox="0 0 220 220" role="img" aria-label="Distribuição das despesas por categoria">
+      <circle class="budget-pie__track" cx="110" cy="110" r="76"></circle>
+      <?php $circunferencia = 2 * M_PI * 76; $offsetGrafico = 0; ?>
+      <?php foreach ($dadosGraficoCategorias as $indice => $item): $comprimento = ($item['percentual'] / 100) * $circunferencia; ?>
+        <circle class="budget-pie__slice" data-pie-index="<?= $indice ?>" data-pie-name="<?= htmlspecialchars($item['nome'], ENT_QUOTES) ?>" data-pie-amount="<?= htmlspecialchars(brl($item['valor']), ENT_QUOTES) ?>" data-pie-share="<?= number_format($item['percentual'], 1, ',', '.') ?>% das despesas" cx="110" cy="110" r="76"
+          stroke="<?= htmlspecialchars($item['cor']) ?>"
+          stroke-dasharray="<?= number_format($comprimento, 3, '.', '') ?> <?= number_format($circunferencia, 3, '.', '') ?>"
+          stroke-dashoffset="-<?= number_format($offsetGrafico, 3, '.', '') ?>"
+          tabindex="0" role="button"
+          aria-label="<?= htmlspecialchars($item['nome']) ?>: <?= brl($item['valor']) ?>, <?= number_format($item['percentual'], 1, ',', '.') ?>% das despesas"></circle>
+        <?php $offsetGrafico += $comprimento; endforeach; ?>
+    </svg>
+    <div class="budget-pie__center" aria-live="polite">
+      <span id="pieCenterLabel">Total gasto</span>
+      <strong id="pieCenterAmount"><?= brl($comprometido) ?></strong>
+      <small id="pieCenterPercent"><?= $totalGrafico > 0 ? '100% das despesas' : 'Neste mês' ?></small>
+    </div>
+  </div>
 
-            <div class="budget-ring-metrics">
-              <div class="budget-ring-metric">
-                <span>Faixa ideal</span>
-                <strong id="idealRangeText">até <?= (int)$faixaIdeal ?>%</strong>
-              </div>
-
-              <div class="budget-ring-metric">
-                <span>Status atual</span>
-                <strong id="budgetStatusText"><?= htmlspecialchars($status['label']) ?></strong>
-              </div>
-
-              <div class="budget-ring-metric">
-                <span>Folga estimada</span>
-                <strong id="bufferValue"><?= brl($livre) ?></strong>
-              </div>
-            </div>
-          </div>
-        </article>
+  <div class="budget-pie__legend" aria-label="Categorias de despesa">
+    <?php if (!$dadosGraficoCategorias): ?>
+      <p class="budget-pie__empty">Sem despesas aprovadas por categoria neste mês.</p>
+    <?php else: foreach ($dadosGraficoCategorias as $indice => $item): ?>
+      <button class="budget-pie__legend-item" type="button" data-pie-index="<?= $indice ?>"
+        aria-label="Ver <?= htmlspecialchars($item['nome']) ?>: <?= brl($item['valor']) ?>">
+        <span class="budget-pie__legend-dot" style="--slice-color: <?= htmlspecialchars($item['cor']) ?>"></span>
+        <span class="budget-pie__legend-name"><?= htmlspecialchars($item['nome']) ?></span>
+        <span class="budget-pie__legend-value"><?= brl($item['valor']) ?></span>
+        <small><?= number_format($item['percentual'], 1, ',', '.') ?>%</small>
+      </button>
+    <?php endforeach; endif; ?>
+  </div>
+</div>
+<div class="budget-pie-footer">
+  <span><i class="bi bi-wallet2"></i> Renda usada</span>
+  <strong><?= round($percentual) ?>%</strong>
+  <span class="budget-pie-footer__separator"></span>
+  <span>Saldo</span>
+  <strong class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
+</div>
+</article>
       </section>
 
-      <section class="budget-overview-grid">
-        <article class="budget-summary-card">
-          <div class="budget-summary-card__icon budget-summary-card__icon--green">
-            <i class="bi bi-wallet2"></i>
-          </div>
-
-          <div class="budget-summary-card__content">
-            <span>Disponível no mês</span>
-            <strong id="summaryAvailable"><?= brl($livre) ?></strong>
-            <p>Valor ainda livre antes de novas despesas no período.</p>
-          </div>
-        </article>
-
-        <article class="budget-summary-card">
-          <div class="budget-summary-card__icon budget-summary-card__icon--orange">
-            <i class="bi bi-exclamation-circle"></i>
-          </div>
-
-          <div class="budget-summary-card__content">
-            <span>Faixa atual</span>
-            <strong id="summaryRange"><?= htmlspecialchars($status['label']) ?></strong>
-            <p id="summaryRangeText"><?= htmlspecialchars($status['texto']) ?></p>
-          </div>
-        </article>
-
-        <article class="budget-summary-card">
-          <div class="budget-summary-card__icon budget-summary-card__icon--blue">
-            <i class="bi bi-collection"></i>
-          </div>
-
-          <div class="budget-summary-card__content">
-            <span>Categorias ativas</span>
-            <strong id="summaryCategories"><?= $categoriasAtivasCount ?> categorias</strong>
-            <p>Áreas consideradas no cálculo do orçamento mensal atual.</p>
-          </div>
-        </article>
-      </section>
+      
 
       <section class="budget-dashboard__bottom budget-dashboard__bottom--balanced">
         <section class="budget-panel budget-panel--equal">
           <div class="budget-panel__header">
             <div>
-              <h3>Onde sua renda está sendo comprometida</h3>
-              <p>As categorias que mais pressionam seu orçamento neste mês</p>
+              <h3>Detalhamento</h3>
             </div>
 
-            <button class="panel-action-btn" id="openCategoriesModal" type="button">
-              <i class="bi bi-grid-3x3-gap"></i>
-              Categorias
-            </button>
+            
           </div>
 
           <div class="budget-category-list">
@@ -492,7 +369,7 @@ function brl(float $valor): string
             <?php foreach ($categoriasCalculadas as $c):
               $catPercent = $renda > 0 ? ($c['valor'] / $renda) * 100 : 0;
             ?>
-              <article class="budget-category-item" style="<?= $c['ativo'] ? '' : 'opacity:0.45;' ?>">
+              <article class="budget-category-item">
                 <div class="budget-category-item__top">
                   <div class="budget-category-item__left">
                     <div class="budget-category-item__icon budget-category-item__icon--<?= htmlspecialchars($c['cor']) ?>">
@@ -500,13 +377,12 @@ function brl(float $valor): string
                     </div>
                     <div>
                       <h4><?= htmlspecialchars($c['nome']) ?></h4>
-                      <p><?= $c['ativo'] ? 'Considerada no cálculo deste mês' : 'Desativada do cálculo atual' ?></p>
                     </div>
                   </div>
 
                   <div class="budget-category-item__right">
                     <strong><?= brl($c['valor']) ?></strong>
-                    <span><?= number_format($catPercent, 1, ',', '.') ?>%</span>
+                    <span><?= number_format($catPercent, 1, ',', '.') ?>% da renda</span>
                   </div>
                 </div>
 
@@ -521,47 +397,28 @@ function brl(float $valor): string
         <section class="budget-panel budget-panel--equal">
           <div class="budget-panel__header">
             <div>
-              <h3>Leitura do mês</h3>
-              <p>Resumo do comportamento do seu orçamento atual</p>
+              <h3>Resumo do mês</h3>
             </div>
 
-            <button class="panel-action-btn" id="openScenarioModal" type="button">
-              <i class="bi bi-bar-chart-line"></i>
-              Cenários
-            </button>
+            
           </div>
 
-          <div class="budget-reading-card budget-reading-card--expanded">
-            <div class="budget-reading-card__item">
-              <span>Status atual</span>
-              <strong><?= htmlspecialchars($status['leitura']) ?></strong>
-            </div>
-
-            <div class="budget-reading-card__item">
-              <span>Categoria mais pesada</span>
-              <strong><?= htmlspecialchars($categoriaMaisPesada) ?></strong>
-            </div>
-
-            <div class="budget-reading-card__item">
-              <span>Recomendação principal</span>
-              <strong><?= htmlspecialchars($status['sugestao']) ?></strong>
-            </div>
-
-            <div class="budget-reading-card__item">
-              <span>Cenário selecionado</span>
-              <strong><?= htmlspecialchars($labelsCenario[$cenarioAtual] ?? 'Atual') ?></strong>
-            </div>
-
-            <div class="budget-reading-card__item">
-              <span>Faixa ideal configurada</span>
-              <strong>Até <?= (int)$faixaIdeal ?>%</strong>
-            </div>
-
-            <div class="budget-reading-card__item">
-              <span>Faixa de alerta</span>
-              <strong>Acima de <?= (int)$faixaAlerta ?>%</strong>
-            </div>
-          </div>
+          <div class="budget-reading-card budget-reading-card--expanded" style="--reading-color: <?= htmlspecialchars($status['cor']) ?>">
+  <div class="budget-summary-hero">
+    <div class="budget-summary-hero__icon"><i class="bi bi-activity"></i></div>
+    <div><span>Situação do mês</span><strong><?= htmlspecialchars($status['label']) ?></strong></div>
+    <i class="bi bi-arrow-up-right budget-summary-hero__arrow"></i>
+  </div>
+  <button class="budget-summary-feature" type="button" <?= $maiorValor > 0 ? 'data-pie-select="0"' : 'disabled' ?>>
+    <span class="budget-summary-feature__icon"><i class="bi bi-trophy"></i></span>
+    <span class="budget-summary-feature__text"><small>Maior gasto</small><strong><?= htmlspecialchars($categoriaMaisPesada) ?></strong></span>
+    <strong class="budget-summary-feature__amount"><?= $maiorValor > 0 ? brl($maiorValor) : '—' ?></strong>
+  </button>
+  <div class="budget-summary-next">
+    <span class="budget-summary-next__icon"><i class="bi bi-lightbulb"></i></span>
+    <div><small>Próximo passo</small><p><?= htmlspecialchars($status['sugestao']) ?></p></div>
+  </div>
+</div>
         </section>
       </section>
     </section>
@@ -605,56 +462,13 @@ function brl(float $valor): string
     </div>
   </div>
 
-  <!-- MODAL LIMITES -->
-  <div class="budget-modal-overlay" id="plannerModal">
-    <div class="budget-modal budget-modal--medium">
-      <div class="budget-modal__header">
-        <div class="budget-modal__title-group">
-          <div class="budget-modal__icon">
-            <i class="bi bi-sliders"></i>
-          </div>
-          <div>
-            <h3>Configurar limites</h3>
-            <p>Defina a faixa de comprometimento considerada saudável no seu mês.</p>
-          </div>
-        </div>
-
-        <button class="budget-modal__close" data-close-budget-modal="plannerModal" type="button" aria-label="Fechar">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <form method="post" action="orcamento-mensal.php">
-        <input type="hidden" name="acao" value="atualizar_limites">
-
-        <div class="budget-modal__body">
-          <div class="planner-grid">
-            <label class="budget-field">
-              <span>Faixa ideal (%)</span>
-              <input name="faixa_ideal" id="idealLimitInput" type="number" min="1" max="100" value="<?= (int)$faixaIdeal ?>">
-            </label>
-
-            <label class="budget-field">
-              <span>Faixa de alerta (%)</span>
-              <input name="faixa_alerta" id="warningLimitInput" type="number" min="1" max="100" value="<?= (int)$faixaAlerta ?>">
-            </label>
-
-            <button class="budget-btn budget-btn--primary budget-btn--full" type="submit">
-              Aplicar limites
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- MODAL DETALHES (só leitura) -->
   <div class="budget-modal-overlay" id="detailsModal">
     <div class="budget-modal">
       <div class="budget-modal__header">
         <div class="budget-modal__title-group">
           <div class="budget-modal__icon">
-            <i class="bi bi-pie-chart"></i>
+            <i class="bi bi-bar-chart-line"></i>
           </div>
           <div>
             <h3>Detalhes do orçamento</h3>
@@ -676,124 +490,22 @@ function brl(float $valor): string
           </article>
 
           <article class="details-box">
-            <span>Total comprometido</span>
+            <span>Despesas aprovadas no mês</span>
             <strong><?= brl($comprometido) ?></strong>
-            <p>Soma das despesas consideradas no orçamento deste mês.</p>
+            <p>Todas as despesas aprovadas neste mês, inclusive as sem categoria.</p>
           </article>
 
           <article class="details-box">
-            <span>Comprometimento</span>
+            <span>Renda usada</span>
             <strong><?= round($percentual) ?>%</strong>
             <p>Percentual da sua renda já absorvido por despesas no período.</p>
           </article>
 
           <article class="details-box">
-            <span>Valor livre</span>
-            <strong><?= brl($livre) ?></strong>
-            <p>Margem ainda disponível antes de novos gastos.</p>
+            <span>Saldo após despesas</span>
+            <strong><?= brl($saldo) ?></strong>
+            <p>Diferença entre renda mensal e despesas reais.</p>
           </article>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL CATEGORIAS: um form com um checkbox por categoria -->
-  <div class="budget-modal-overlay" id="categoriesModal">
-    <div class="budget-modal">
-      <div class="budget-modal__header">
-        <div class="budget-modal__title-group">
-          <div class="budget-modal__icon">
-            <i class="bi bi-grid-3x3-gap"></i>
-          </div>
-          <div>
-            <h3>Categorias do orçamento</h3>
-            <p>Gerencie quais categorias entram no cálculo do comprometimento mensal.</p>
-          </div>
-        </div>
-
-        <button class="budget-modal__close" data-close-budget-modal="categoriesModal" type="button" aria-label="Fechar">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <form method="post" action="orcamento-mensal.php">
-        <input type="hidden" name="acao" value="atualizar_categorias">
-
-        <div class="budget-modal__body">
-          <div class="budget-config-list">
-            <?php foreach ($categoriasCalculadas as $c): ?>
-              <?php if ((int)$c['id'] <= 0) continue; ?>
-              <div class="budget-config-row">
-                <div>
-                  <h4><?= htmlspecialchars($c['nome']) ?></h4>
-                  <p>Gasto real neste mês: <?= brl($c['valor_base']) ?></p>
-                </div>
-                <label class="switch switch--green">
-                  <input type="checkbox" name="categoria_ativa[]" value="<?= $c['id'] ?>" <?= $c['ativo'] ? 'checked' : '' ?>>
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
-
-        <div class="budget-modal__footer">
-          <button class="budget-btn budget-btn--secondary" type="button" data-close-budget-modal="categoriesModal">
-            Cancelar
-          </button>
-          <button class="budget-btn budget-btn--primary" type="submit">
-            Salvar categorias
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL CENÁRIOS: cada opção é o próprio botão de submit de um mini-form -->
-  <div class="budget-modal-overlay" id="scenarioModal">
-    <div class="budget-modal budget-modal--medium">
-      <div class="budget-modal__header">
-        <div class="budget-modal__title-group">
-          <div class="budget-modal__icon">
-            <i class="bi bi-bar-chart-line"></i>
-          </div>
-          <div>
-            <h3>Explorar cenários</h3>
-            <p>Escolha um cenário para recalcular o orçamento com base nele.</p>
-          </div>
-        </div>
-
-        <button class="budget-modal__close" data-close-budget-modal="scenarioModal" type="button" aria-label="Fechar">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="budget-modal__body">
-        <div class="budget-simulation-list budget-simulation-list--modal">
-          <?php foreach (['base' => 'Cenário atual', 'cauteloso' => 'Cenário cauteloso', 'pressionado' => 'Cenário pressionado'] as $chaveCenario => $tituloCenario): ?>
-            <form method="post" action="orcamento-mensal.php">
-              <input type="hidden" name="acao" value="selecionar_cenario">
-              <input type="hidden" name="cenario" value="<?= $chaveCenario ?>">
-              <button
-                type="submit"
-                class="budget-sim-option <?= $cenarioAtual === $chaveCenario ? 'budget-sim-option--active' : '' ?>"
-                style="all: unset; display: flex; width: 100%; cursor: pointer; box-sizing: border-box;"
-              >
-                <div>
-                  <h4><?= $tituloCenario ?></h4>
-                  <p>
-                    <?php if ($chaveCenario === 'base'): ?>
-                      Baseado nos valores atuais cadastrados.
-                    <?php elseif ($chaveCenario === 'cauteloso'): ?>
-                      Redução de despesas variáveis e preservação de margem.
-                    <?php else: ?>
-                      Aumento em custos fixos e menor folga financeira.
-                    <?php endif; ?>
-                  </p>
-                </div>
-              </button>
-            </form>
-          <?php endforeach; ?>
         </div>
       </div>
     </div>
@@ -827,8 +539,8 @@ function brl(float $valor): string
           <i class="bi bi-exclamation-triangle"></i>
         </div>
         <div class="notif-card__content">
-          <h4>Faixa de alerta próxima</h4>
-          <p>Seu orçamento pode se aproximar da faixa de alerta se novas despesas entrarem.</p>
+          <h4>Resumo do orçamento</h4>
+          <p><?= htmlspecialchars($status['texto']) ?></p>
           <span>Agora mesmo</span>
         </div>
       </article>
@@ -862,8 +574,8 @@ function brl(float $valor): string
               <span class="ai-summary-card__label">Análise geral</span>
               <i class="bi bi-activity"></i>
             </div>
-            <strong>Orçamento com boa margem</strong>
-            <p>Seu comprometimento atual ainda está dentro da faixa saudável.</p>
+            <strong><?= htmlspecialchars($status['label']) ?></strong>
+            <p><?= htmlspecialchars($status['texto']) ?></p>
           </div>
 
           <div class="ai-shortcuts">
@@ -924,10 +636,7 @@ function brl(float $valor): string
 
     const budgetModalMap = {
       openIncomeModal: "incomeModal",
-      openPlannerModal: "plannerModal",
-      openDetailsModal: "detailsModal",
-      openCategoriesModal: "categoriesModal",
-      openScenarioModal: "scenarioModal"
+      openDetailsModal: "detailsModal"
     };
 
     Object.entries(budgetModalMap).forEach(([buttonId, modalId]) => {
@@ -1009,6 +718,61 @@ function brl(float $valor): string
         closeAiModal();
         unlockBody();
       }
+    });
+    const pieSlices = [...document.querySelectorAll(".budget-pie__slice")];
+    const pieTargets = [...document.querySelectorAll(".budget-pie__legend-item, .budget-pie__slice")];
+    const pieLabel = document.getElementById("pieCenterLabel");
+    const pieAmount = document.getElementById("pieCenterAmount");
+    const piePercent = document.getElementById("pieCenterPercent");
+    let selectedPieIndex = null;
+
+    function showPieCategory(index) {
+      const slice = pieSlices.find((item) => Number(item.dataset.pieIndex) === Number(index));
+      if (!slice) return;
+      pieLabel.textContent = slice.dataset.pieName;
+      pieAmount.textContent = slice.dataset.pieAmount;
+      piePercent.textContent = slice.dataset.pieShare;
+      pieSlices.forEach((item) => item.classList.toggle("is-dimmed", Number(item.dataset.pieIndex) !== Number(index)));
+      document.querySelectorAll(".budget-pie__legend-item").forEach((item) => {
+        item.classList.toggle("is-active", Number(item.dataset.pieIndex) === Number(index));
+      });
+    }
+
+    function resetPiePreview() {
+      if (selectedPieIndex !== null) return showPieCategory(selectedPieIndex);
+      pieLabel.textContent = "Total gasto";
+      pieAmount.textContent = "<?= brl($comprometido) ?>";
+      piePercent.textContent = "<?= $totalGrafico > 0 ? '100% das despesas' : 'Neste mês' ?>";
+      pieSlices.forEach((item) => item.classList.remove("is-dimmed"));
+      document.querySelectorAll(".budget-pie__legend-item").forEach((item) => item.classList.remove("is-active"));
+    }
+
+    pieTargets.forEach((target) => {
+      const index = Number(target.dataset.pieIndex);
+      target.addEventListener("pointerenter", () => showPieCategory(index));
+      target.addEventListener("pointerleave", resetPiePreview);
+      target.addEventListener("focus", () => showPieCategory(index));
+      target.addEventListener("blur", resetPiePreview);
+      target.addEventListener("click", () => {
+        selectedPieIndex = selectedPieIndex === index ? null : index;
+        resetPiePreview();
+      });
+      if (target.classList.contains("budget-pie__slice")) {
+        target.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            target.click();
+          }
+        });
+      }
+    });
+
+    document.querySelectorAll("[data-pie-select]").forEach((button) => {
+      button.addEventListener("click", () => {
+        selectedPieIndex = Number(button.dataset.pieSelect);
+        showPieCategory(selectedPieIndex);
+        document.querySelector(".budget-visual-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
     });
   </script>
 
