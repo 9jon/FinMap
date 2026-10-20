@@ -33,8 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['usuario_id'] = $usuario['id'];
             $_SESSION['usuario_nome'] = $usuario['nome'];
             $conn->close();
-
-            // A configuração inicial pertence ao cadastro, não ao login.
+            
             header('Location: ../pages/onboarding-concluido.php');
             exit;
         }
