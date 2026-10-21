@@ -16,15 +16,21 @@ if (empty($_SESSION['csrf_importacao'])) {
     $_SESSION['csrf_importacao'] = bin2hex(random_bytes(32));
 }
 $csrfImportacao = $_SESSION['csrf_importacao'];
+if(empty($_SESSION['csrf_conta']))$_SESSION['csrf_conta']=bin2hex(random_bytes(32));
+$csrfConta=$_SESSION['csrf_conta'];
 $importacaoFeedback = $_SESSION['importacao_feedback'] ?? null;
 unset($_SESSION['importacao_feedback']);
 
 
-$stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
+$stmt = $conn->prepare("SELECT nome, email, telefone, avatar_iniciais, foto_perfil, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $usuario = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+$configuracoesPadrao = ['notificar_orcamento'=>1,'notificar_metas'=>1,'notificar_gastos'=>1,'notificar_revisao'=>1,'notificar_agendamentos'=>1,'notificar_economia'=>1,'ocultar_valores'=>0];
+$stmt = $conn->prepare('SELECT notificar_orcamento, notificar_metas, notificar_gastos, notificar_revisao, notificar_agendamentos, notificar_economia, ocultar_valores FROM preferencias_usuario WHERE usuario_id = ? LIMIT 1');
+$stmt->bind_param('i', $usuario_id); $stmt->execute(); $preferenciasUsuario = $stmt->get_result()->fetch_assoc() ?: $configuracoesPadrao; $stmt->close();
 
 $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
@@ -526,10 +532,10 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-30">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-33">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
-</head>
+  </head>
 <body class="dashboard-page">
 
 <?php if (is_array($importacaoFeedback)): ?>
@@ -556,6 +562,7 @@ foreach ($metas as $meta) {
         <span>Assistente IA</span>
       </button>
 
+      
       <button class="icon-plain" id="openSettingsModal" type="button" aria-label="Configurações" title="Configurações">
   <i class="bi bi-gear"></i>
 </button>
@@ -594,8 +601,8 @@ $stmt->close();
     <?php endif; ?>
 
 </button>
-      <button class="profile-avatar" type="button" aria-label="Perfil" title="Abrir perfil">
-        <?= htmlspecialchars($iniciais) ?>
+      <button class="profile-avatar" id="openProfileSettings" type="button" aria-label="Abrir meu perfil" title="Meu perfil">
+        <?php if (!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'], ENT_QUOTES, 'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?>
       </button>
     </div>
   </header>
@@ -1052,11 +1059,19 @@ $stmt = $conn->prepare("
         criado_em
     FROM notificacoes
     WHERE usuario_id = ?
+      AND NOT (categoria = 'meta' AND ? = 0)
+      AND NOT (categoria = 'gasto' AND ? = 0)
+      AND NOT (categoria = 'alerta' AND ? = 0)
+      AND NOT (categoria = 'ia' AND ? = 0)
     ORDER BY criado_em DESC
     LIMIT 30
 ");
 
-$stmt->bind_param("i", $usuario_id);
+$notificarMetas=(int)$preferenciasUsuario['notificar_metas'];
+$notificarGastos=(int)$preferenciasUsuario['notificar_gastos'];
+$notificarOrcamento=(int)$preferenciasUsuario['notificar_orcamento'];
+$notificarEconomia=(int)$preferenciasUsuario['notificar_economia'];
+$stmt->bind_param("iiiii", $usuario_id, $notificarMetas, $notificarGastos, $notificarOrcamento, $notificarEconomia);
 $stmt->execute();
 
 $notificacoes =
@@ -1387,13 +1402,6 @@ $stmt->close();
           <span class="settings-sidebar__text">Notificações</span>
         </button>
 
-        <button class="settings-sidebar__item" type="button" data-target="settings-bank">
-          <span class="settings-sidebar__icon settings-sidebar__icon--blue">
-            <i class="bi bi-bank2"></i>
-          </span>
-          <span class="settings-sidebar__text">API bancária</span>
-        </button>
-
         <button class="settings-sidebar__item" type="button" data-target="settings-security">
           <span class="settings-sidebar__icon settings-sidebar__icon--purple">
             <i class="bi bi-shield-lock-fill"></i>
@@ -1401,7 +1409,7 @@ $stmt->close();
           <span class="settings-sidebar__text">Proteção</span>
         </button>
 <button class="settings-sidebar__item" type="button" data-target="settings-account">
-          <span class="settings-sidebar__icon settings-sidebar__icon--red">
+          <span class="settings-sidebar__icon settings-sidebar__icon--green">
             <i class="bi bi-person-circle"></i>
           </span>
           <span class="settings-sidebar__text">Conta</span>
@@ -1435,7 +1443,7 @@ $stmt->close();
                   <p id="notification-budget-description">Alertas quando os gastos comprometerem a renda do mês.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_orcamento" aria-labelledby="notification-budget-label" aria-describedby="notification-budget-description" checked>
+                  <input type="checkbox" name="notificar_orcamento" aria-labelledby="notification-budget-label" aria-describedby="notification-budget-description" <?= !empty($preferenciasUsuario['notificar_orcamento']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1446,7 +1454,7 @@ $stmt->close();
                   <p id="notification-goals-description">Avisos ao atingir 50%, 75% e 100% do valor de uma meta.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_metas" aria-labelledby="notification-goals-label" aria-describedby="notification-goals-description" checked>
+                  <input type="checkbox" name="notificar_metas" aria-labelledby="notification-goals-label" aria-describedby="notification-goals-description" <?= !empty($preferenciasUsuario['notificar_metas']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1457,7 +1465,7 @@ $stmt->close();
                   <p id="notification-spending-description">Atualizações dos totais gastos em alimentação, moradia e outras categorias no mês.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_gastos" aria-labelledby="notification-spending-label" aria-describedby="notification-spending-description" checked>
+                  <input type="checkbox" name="notificar_gastos" aria-labelledby="notification-spending-label" aria-describedby="notification-spending-description" <?= !empty($preferenciasUsuario['notificar_gastos']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1468,7 +1476,7 @@ $stmt->close();
                   <p id="notification-review-description">Lembretes de transações pendentes de aprovação ou com categoria ainda não definida.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_revisao" aria-labelledby="notification-review-label" aria-describedby="notification-review-description" checked>
+                  <input type="checkbox" name="notificar_revisao" aria-labelledby="notification-review-label" aria-describedby="notification-review-description" <?= !empty($preferenciasUsuario['notificar_revisao']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1479,7 +1487,7 @@ $stmt->close();
                   <p id="notification-scheduled-description">Lembretes na data do lançamento para você revisar e aprovar a movimentação.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_agendamentos" aria-labelledby="notification-scheduled-label" aria-describedby="notification-scheduled-description" checked>
+                  <input type="checkbox" name="notificar_agendamentos" aria-labelledby="notification-scheduled-label" aria-describedby="notification-scheduled-description" <?= !empty($preferenciasUsuario['notificar_agendamentos']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1490,76 +1498,10 @@ $stmt->close();
                   <p id="notification-savings-description">Sugestões da Poupança Invisível para reduzir gastos com assinaturas, lanches, compras e transporte por aplicativo.</p>
                 </div>
                 <label class="switch switch--green">
-                  <input type="checkbox" name="notificar_economia" aria-labelledby="notification-savings-label" aria-describedby="notification-savings-description" checked>
+                  <input type="checkbox" name="notificar_economia" aria-labelledby="notification-savings-label" aria-describedby="notification-savings-description" <?= !empty($preferenciasUsuario['notificar_economia']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- API BANCÁRIA -->
-        <section class="settings-group" id="settings-bank">
-          <button class="settings-group__trigger" type="button">
-            <div class="settings-group__trigger-left">
-              <span class="settings-group__badge settings-group__badge--blue">
-                <i class="bi bi-bank2"></i>
-              </span>
-              <div>
-                <h4>API bancária</h4>
-                <p>Conexão e sincronização das contas</p>
-              </div>
-            </div>
-
-            <span class="settings-group__arrow">
-              <i class="bi bi-chevron-down"></i>
-            </span>
-          </button>
-
-          <div class="settings-group__content">
-            <div class="settings-bank-status">
-              <div>
-                <h5>Banco principal conectado</h5>
-                <p>Sincronização automática ativa.</p>
-              </div>
-
-              <span class="settings-pill settings-pill--success">Conectado</span>
-            </div>
-
-            <div class="settings-list">
-              <div class="settings-row">
-                <div class="settings-row__info">
-                  <h5>Sincronização automática</h5>
-                  <p>Atualiza transações e saldo automaticamente.</p>
-                </div>
-                <label class="switch switch--blue">
-                  <input type="checkbox" checked>
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-row__info">
-                  <h5>Atualizar saldo total</h5>
-                  <p>Usa os dados da API para atualizar o dashboard.</p>
-                </div>
-                <label class="switch switch--blue">
-                  <input type="checkbox" checked>
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-            </div>
-
-            <div class="settings-actions-row">
-              <button class="settings-action-btn settings-action-btn--blue" type="button">
-                <i class="bi bi-arrow-repeat"></i>
-                Reconectar
-              </button>
-
-              <button class="settings-action-btn settings-action-btn--blue-soft" type="button">
-                <i class="bi bi-link-45deg"></i>
-                Gerenciar contas
-              </button>
             </div>
           </div>
         </section>
@@ -1586,40 +1528,30 @@ $stmt->close();
             <div class="settings-list">
               <div class="settings-row">
                 <div class="settings-row__info">
-                  <h5>Autenticação em duas etapas</h5>
-                  <p>Camada extra de segurança no login.</p>
+                  <h5>Senha de acesso</h5>
+                  <p>Atualize sua senha para proteger sua conta.</p>
                 </div>
-                <label class="switch switch--purple">
-                  <input type="checkbox" checked>
-                  <span class="switch-slider"></span>
-                </label>
+                <button class="settings-action-btn settings-action-btn--purple" id="changePasswordBtn" type="button"><i class="bi bi-key-fill"></i> Alterar senha</button>
               </div>
-
               <div class="settings-row">
                 <div class="settings-row__info">
                   <h5>Ocultar valores</h5>
                   <p>Esconde os valores em ambientes públicos.</p>
                 </div>
                 <label class="switch switch--red">
-                  <input type="checkbox">
+                  <input type="checkbox" name="ocultar_valores" <?= !empty($preferenciasUsuario['ocultar_valores']) ? 'checked' : '' ?>>
                   <span class="switch-slider"></span>
                 </label>
               </div>
             </div>
 
-            <div class="settings-actions-row">
-              <button class="settings-action-btn settings-action-btn--purple" type="button">
-                <i class="bi bi-key-fill"></i>
-                Alterar senha
-              </button>
-            </div>
           </div>
         </section>
 <!-- CONTA -->
         <section class="settings-group" id="settings-account">
           <button class="settings-group__trigger" type="button">
             <div class="settings-group__trigger-left">
-              <span class="settings-group__badge settings-group__badge--red">
+              <span class="settings-group__badge settings-group__badge--green">
                 <i class="bi bi-person-circle"></i>
               </span>
               <div>
@@ -1634,23 +1566,53 @@ $stmt->close();
           </button>
 
           <div class="settings-group__content">
-            <div class="settings-account-grid">
-              <article class="settings-profile-card">
-                <h5>E-mail principal</h5>
-                <p><?= htmlspecialchars($usuario['email'] ?? '—') ?></p>
-                <button class="settings-action-btn settings-action-btn--red-soft" type="button">
-                  <i class="bi bi-envelope"></i>
-                  Alterar e-mail
-                </button>
-              </article>  
+            <div class="settings-account-grid settings-account-grid--clean">
+              <article class="settings-profile-card settings-profile-card--edit">
+                <div class="profile-edit-heading">
+                  <div class="profile-avatar-wrap">
+                    <div class="profile-edit-avatar" id="profilePreview" data-initials="<?= htmlspecialchars($iniciais,ENT_QUOTES,'UTF-8') ?>"><?php if(!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'],ENT_QUOTES,'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?></div>
+                    <button class="profile-photo-pencil" id="profilePhotoToggle" type="button" aria-label="Editar foto de perfil" aria-haspopup="true" aria-expanded="false"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button>
+                    <div class="profile-photo-menu" id="profilePhotoMenu" hidden>
+                      <button class="profile-photo-menu__item" id="chooseProfilePhoto" type="button"><i class="bi bi-images"></i><span>Escolher da galeria</span></button>
+                      <button class="profile-photo-menu__item profile-photo-menu__item--remove" id="removeProfilePhoto" type="button" <?= empty($usuario['foto_perfil']) ? 'hidden' : '' ?>><i class="bi bi-trash3"></i><span>Remover foto</span></button>
+                    </div>
+                  </div>
+                  <div><h5>Seu perfil</h5><p>Gerencie seus dados pessoais e sua foto no FinMap.</p></div>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfConta,ENT_QUOTES,'UTF-8') ?>">
+                  <input type="hidden" name="acao" value="salvar_perfil">
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profileName">Nome completo</label>
+                    <input class="profile-field" id="profileName" name="nome" maxlength="120" value="<?= htmlspecialchars($usuario['nome']??'',ENT_QUOTES,'UTF-8') ?>" required>
+                  </div>
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profileEmail">E-mail</label>
+                    <input class="profile-field" id="profileEmail" name="email" type="email" maxlength="190" value="<?= htmlspecialchars($usuario['email']??'',ENT_QUOTES,'UTF-8') ?>" required>
+                  </div>
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profilePhone">Telefone</label>
+                    <input class="profile-field" id="profilePhone" name="telefone" type="tel" maxlength="25" autocomplete="tel" placeholder="+55 11 99999-9999" value="<?= htmlspecialchars($usuario['telefone']??'',ENT_QUOTES,'UTF-8') ?>">
+                  </div>
+                  <input type="file" class="profile-file-input" id="profilePhoto" name="foto_perfil" accept="image/jpeg,image/png,image/webp">
+                  <input type="hidden" id="removeProfilePhotoFlag" name="remover_foto" value="0">
 
-              <article class="settings-profile-card settings-profile-card--danger">
-                <h5>Excluir conta</h5>
-                <p>Essa ação é permanente.</p>
-                <button class="settings-action-btn settings-action-btn--danger" type="button">
-                  <i class="bi bi-trash3-fill"></i>
-                  Excluir conta
-                </button>
+                  <div class="profile-form-actions">
+                    <p id="profileFeedback" class="profile-feedback" role="status" aria-live="polite"></p>
+                    <button class="settings-action-btn settings-action-btn--save" type="submit"><i class="bi bi-check2"></i> Salvar perfil</button>
+                  </div>
+                </form>
+              </article>
+              <article class="settings-profile-card settings-profile-card--logout-row">
+                <div class="profile-logout-copy"><span class="profile-logout-icon"><i class="bi bi-box-arrow-right"></i></span><div><h5>Sair da conta</h5><p>Encerre sua sessão neste dispositivo.</p></div></div>
+                <form action="../login/logout.php" method="post">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfConta,ENT_QUOTES,'UTF-8') ?>">
+                  <button class="settings-action-btn settings-action-btn--logout" type="submit">Desconectar</button>
+                </form>
+              </article>
+              <article class="settings-profile-card settings-profile-card--danger settings-profile-card--danger-row">
+                <div class="profile-danger-copy"><span class="profile-danger-icon"><i class="bi bi-trash3"></i></span><div><h5>Excluir conta</h5><p>A exclusão é permanente e remove seus dados de acesso.</p></div></div>
+                <button class="settings-action-btn settings-action-btn--danger" id="deleteAccountBtn" type="button">Excluir conta</button>
               </article>
             </div>
           </div>
@@ -1660,7 +1622,7 @@ $stmt->close();
 
     <div class="settings-modal__footer">
       <button class="settings-footer-btn settings-footer-btn--secondary" id="cancelSettingsModal" type="button">Cancelar</button>
-      <button class="settings-footer-btn settings-footer-btn--primary" type="button">Salvar alterações</button>
+      <button class="settings-footer-btn settings-footer-btn--primary" type="button">Salvar altera&#231;&#245;es</button>
     </div>
   </div>
 </div>
@@ -1806,6 +1768,9 @@ $stmt->close();
 
  <script>
   const body = document.body;
+  function formatDatabaseBRL(value){
+    return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value)||0);
+  }
 
   const openTransactionModal = document.getElementById("openTransactionModal");
   const closeTransactionModal = document.getElementById("closeTransactionModal");
@@ -1833,6 +1798,48 @@ $stmt->close();
   const settingsSidebarItems = document.querySelectorAll(".settings-sidebar__item");
   const settingsGroups = document.querySelectorAll(".settings-group");
   const settingsTriggers = document.querySelectorAll(".settings-group__trigger");
+  const profileOpener=document.getElementById("openProfileSettings"), profileForm=document.getElementById("profileForm"), photoInput=document.getElementById("profilePhoto"), preview=document.getElementById("profilePreview"), feedback=document.getElementById("profileFeedback"), deleteBtn=document.getElementById("deleteAccountBtn");
+  const photoToggle=document.getElementById("profilePhotoToggle"), photoMenu=document.getElementById("profilePhotoMenu"), choosePhoto=document.getElementById("chooseProfilePhoto"), removePhoto=document.getElementById("removeProfilePhoto"), removePhotoFlag=document.getElementById("removeProfilePhotoFlag"), photoStatus=document.getElementById("profilePhotoStatus");
+  const settingsSaveButton=settingsModal?.querySelector(".settings-modal__footer .settings-footer-btn--primary");
+  const csrfSettings=document.querySelector('#profileForm [name="csrf_token"]')?.value||"";
+  const setValuesVisibility=hidden=>document.body.classList.toggle("finmap-values-hidden",hidden);
+  setValuesVisibility(<?= !empty($preferenciasUsuario['ocultar_valores']) ? 'true' : 'false' ?>);
+  if(settingsSaveButton)settingsSaveButton.addEventListener("click",async()=>{
+    const fields=[...settingsModal.querySelectorAll('#settings-notifications input[type="checkbox"], #settings-security input[name="ocultar_valores"]')];
+    const data=new FormData();data.append("csrf_token",csrfSettings);fields.forEach(input=>data.append(input.name,input.checked?"1":"0"));
+    const originalLabel="Salvar altera\u00e7\u00f5es";settingsSaveButton.disabled=true;settingsSaveButton.textContent="Salvando...";
+    try{
+      const response=await fetch("../pages/salvar-configuracoes.php",{method:"POST",body:data});const result=await response.json();
+      if(!response.ok||!result.sucesso)throw Error(result.erro||"Nao foi possivel salvar as configuracoes.");
+      setValuesVisibility(fields.find(input=>input.name==="ocultar_valores")?.checked||false);
+      settingsSaveButton.textContent="Salvo";setTimeout(()=>{settingsSaveButton.textContent=originalLabel;},1300);
+    }catch(error){alert(error.message);settingsSaveButton.textContent=originalLabel;}
+    finally{settingsSaveButton.disabled=false;}
+  });
+  const changePasswordBtn=document.getElementById("changePasswordBtn");
+  if(changePasswordBtn)changePasswordBtn.addEventListener("click",async()=>{const atual=prompt("Digite sua senha atual:");if(atual===null)return;const nova=prompt("Digite a nova senha (m?nimo de 8 caracteres):");if(nova===null)return;const confirmacao=prompt("Digite novamente a nova senha:");if(confirmacao===null)return;const data=new FormData();data.append("acao","alterar_senha");data.append("csrf_token",csrfSettings);data.append("senha_atual",atual);data.append("nova_senha",nova);data.append("confirmar_senha",confirmacao);try{const response=await fetch("../pages/atualizar-conta.php",{method:"POST",body:data});const result=await response.json();if(!response.ok||!result.sucesso)throw Error(result.erro||"N?o foi poss?vel alterar a senha.");alert(result.mensagem);}catch(error){alert(error.message);}});
+  if(profileOpener)profileOpener.addEventListener("click",()=>{openModal(settingsModal);openSettingsSection("settings-account",false);});
+  if(photoToggle)photoToggle.addEventListener("click",()=>{const open=photoMenu.hidden;photoMenu.hidden=!open;photoToggle.setAttribute("aria-expanded",String(open));});
+  if(choosePhoto)choosePhoto.addEventListener("click",()=>{photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");photoInput.click();});
+  if(removePhoto)removePhoto.addEventListener("click",()=>{photoInput.value="";removePhotoFlag.value="1";preview.innerHTML=preview.dataset.initials||"US";removePhoto.hidden=true;photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");});
+  document.addEventListener("click",e=>{if(photoMenu&&!e.target.closest(".profile-avatar-wrap")){photoMenu.hidden=true;if(photoToggle)photoToggle.setAttribute("aria-expanded","false");}});
+  if(photoInput)photoInput.addEventListener("change",()=>{const f=photoInput.files[0];if(f&&f.size>3145728){photoInput.value="";feedback.textContent="A foto deve ter até 3 MB.";return;}if(f){removePhotoFlag.value="0";removePhoto.hidden=false;const rd=new FileReader();rd.onload=()=>preview.innerHTML='<img src="'+rd.result+'" alt="">';rd.readAsDataURL(f);}});
+  if(profileForm)profileForm.addEventListener("submit",async e=>{
+    e.preventDefault();feedback.textContent="Salvando...";
+    try{
+      const r=await fetch("../pages/atualizar-conta.php",{method:"POST",body:new FormData(profileForm)}),d=await r.json();
+      if(!r.ok||!d.sucesso)throw Error(d.erro);
+      feedback.textContent=d.mensagem;
+      const avatar=document.getElementById("openProfileSettings"),bust="?v="+Date.now();
+      avatar.innerHTML=d.foto?'<img src="'+d.foto+bust+'" alt="">':d.iniciais;
+      preview.innerHTML=avatar.innerHTML;preview.dataset.initials=d.iniciais;
+      removePhotoFlag.value="0";removePhoto.hidden=!d.foto;photoInput.value="";
+      
+      document.querySelector(".overview-title-group h2").textContent="Olá, "+d.nome.split(/\s+/)[0]+"!";
+    }catch(x){feedback.textContent=x.message;}
+  });
+  if(deleteBtn)deleteBtn.addEventListener("click",async()=>{if(prompt("Digite EXCLUIR para confirmar a exclusão permanente.")!=="EXCLUIR")return;const f=new FormData();f.append("csrf_token",document.querySelector('#profileForm [name="csrf_token"]').value);f.append("acao","excluir_conta");f.append("confirmacao","EXCLUIR");try{const r=await fetch("../pages/atualizar-conta.php",{method:"POST",body:f}),d=await r.json();if(!r.ok||!d.sucesso)throw Error(d.erro);location.href=d.redirecionar;}catch(x){alert(x.message);}});
+
 
   const openAllTransactionsModal = document.getElementById("openAllTransactionsModal");
   const closeAllTransactionsModal = document.getElementById("closeAllTransactionsModal");
@@ -1954,6 +1961,8 @@ $stmt->close();
     if (content) content.classList.add("open");
 
     activateSidebarItemById(groupId);
+    const settingsSaveButton = settingsModal?.querySelector(".settings-modal__footer .settings-footer-btn--primary");
+    if (settingsSaveButton) settingsSaveButton.hidden = groupId === "settings-account";
 
     if (scrollToSection) {
       // Role somente o conteúdo, preservando cabeçalho, menu e rodapé.
@@ -1962,10 +1971,7 @@ $stmt->close();
   }
 
   function formatBRL(value) {
-    return value.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
+    return formatDatabaseBRL(value);
   }
 
   function escapeHtml(value) {
@@ -2567,9 +2573,9 @@ $stmt->close();
 
   if (openBalanceModal) {
     openBalanceModal.addEventListener("click", () => {
-      const currentValue = saldoCardValue ? saldoCardValue.textContent : "R$ 0,00";
+      const currentValue = saldoCardValue ? Number(saldoCardValue.dataset.countUp||0) : 0;
       if (saldoEditInput) {
-        saldoEditInput.value = formatCurrencyBRL(currentValue);
+        saldoEditInput.value = formatCurrencyBRL(String(Math.round(currentValue*100)));
       }
       openModal(balanceModal);
       setTimeout(() => {
@@ -2592,7 +2598,8 @@ if (balanceForm) {
   balanceForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const valorNumerico = parseCurrencyToNumber(saldoEditInput ? saldoEditInput.value : "0");
+    const digitado = parseCurrencyToNumber(saldoEditInput ? saldoEditInput.value : "0");
+    const valorNumerico = digitado;
     const submitBtn = balanceForm.querySelector(".balance-modal__primary");
 
     if (submitBtn) {
@@ -2611,7 +2618,7 @@ if (balanceForm) {
 
       if (resultado.sucesso) {
         if (saldoCardValue) {
-          saldoCardValue.textContent = "R$ " + resultado.novo_saldo;
+          saldoCardValue.textContent = formatBRL(Number(resultado.novo_saldo));
           saldoCardValue.dataset.countUp = String(valorNumerico);
           const incomeUsageProgress = document.getElementById("incomeUsageProgress");
           const incomeUsagePercent = document.getElementById("incomeUsagePercent");
@@ -2695,12 +2702,7 @@ function animateFinanceCardValues() {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!counters.length || reduceMotion) return;
 
-  const formatter = new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  const formatter = {format: value => formatBRL(value)};
   const duration = 1200;
   const startedAt = performance.now();
 

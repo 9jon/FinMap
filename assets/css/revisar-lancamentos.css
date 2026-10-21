@@ -800,3 +800,37 @@ body {
     padding-right: 18px;
   }
 }
+
+/* Select de categoria no padrão visual dos dropdowns FinMap. */
+.review-field select{
+  width:100%;
+  height:56px;
+  padding:0 42px 0 16px;
+  border:1px solid rgba(15,23,40,.08);
+  border-radius:16px;
+  outline:none;
+  background-color:#fff;
+  color:#0f1728;
+  font-size:.96rem;
+  font-weight:500;
+  box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);
+  transition:border-color .25s ease,box-shadow .25s ease;
+  cursor:pointer;
+}
+.review-field select:focus{
+  border-color:rgba(36,187,69,.45);
+  box-shadow:0 0 0 4px rgba(36,187,69,.10);
+}
+
+/* Dropdown de categoria da edição no padrão dos menus FinMap. */
+.review-category-dropdown{position:relative;width:100%}
+.review-category-native{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.review-category-trigger{width:100%;height:56px;padding:0 16px;border:1px solid rgba(15,23,40,.08);border-radius:16px;background:#fff;color:#0f1728;font:500 .96rem "Inter",sans-serif;text-align:left;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);transition:all .25s ease;cursor:pointer}
+.review-category-trigger:hover,.review-category-dropdown.show .review-category-trigger{border-color:rgba(36,187,69,.45);box-shadow:0 0 0 4px rgba(36,187,69,.10)}
+.review-category-trigger i{color:#667085;font-size:.85rem;transition:transform .2s ease}
+.review-category-dropdown.show .review-category-trigger i{transform:rotate(180deg)}
+.review-category-menu{display:none;position:absolute;inset:calc(100% + 6px) 0 auto;z-index:1085;max-height:240px;overflow-y:auto;margin:0;padding:8px;list-style:none;border:1px solid rgba(15,23,40,.08);border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(15,23,40,.12)}
+.review-category-menu.show{display:block}
+.review-category-option{width:100%;padding:10px 14px;border:0;border-radius:10px;background:transparent;color:#0f1728;font:500 .92rem "Inter",sans-serif;text-align:left;cursor:pointer;transition:all .2s ease}
+.review-category-option:hover,.review-category-option:focus{outline:0;background:rgba(36,187,69,.08);color:#16a34a}
+.review-category-option[aria-selected="true"]{background:rgba(36,187,69,.10);color:#16a34a;font-weight:700}
