@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
-require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+require_once __DIR__ . '/../config/conn.php'; // ajuste se necessário
+
 require_once __DIR__ . '/../includes/insights-financeiros.php';
 
 
@@ -117,7 +118,8 @@ $stmtConfig->close();
 
 $sensibilidade = $config['sensibilidade'] ?? 'equilibrado';
 $alertasOrcamentoAtivo = $config['alertas_orcamento_ativo'] ?? 1;
-$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+$alertasCategoriaAtivo = $config['alertas_categoria_ativo'] ?? 1;
+
 $insightSemanal = finmapBuscarOuGerarInsightSemanal($conn, (int)$usuario_id);
 
 // -----------------------------------------------------------------

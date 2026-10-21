@@ -664,10 +664,7 @@ function brl(float $valor): string
     function formatCurrencyInput(value) {
       const digits = String(value || "").replace(/\D/g, "");
       if (!digits) return "R$ 0,00";
-
-      let formatado = (Number(digits) / 100).toFixed(2);
-      formatado = formatado.replace(".", ",");
-      formatado = formatado.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      let formatado = (Number(digits) / 100).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       return "R$ " + formatado;
     }
 

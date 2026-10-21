@@ -5891,17 +5891,9 @@ body.dashboard-page .topbar::before {
  #settings-account .profile-edit-avatar{width:86px;height:86px}
 }
 
-.profile-optional{font-weight:500;color:#89918b;font-size:.82em}.profile-currency-select{appearance:auto;background-color:#fff}
 
 
 /* Dropdown de moeda do perfil no mesmo padrão visual de config-renda. */
-#settings-account .profile-currency-dropdown{position:relative}
-#settings-account .profile-currency-btn{height:56px;border-radius:16px;border:1px solid rgba(15,23,40,.08);background:#fff;color:#0f1728;font-weight:500;text-align:left;padding:0 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);transition:all .25s ease}
-#settings-account .profile-currency-btn:hover{border-color:rgba(36,187,69,.35);box-shadow:0 8px 20px rgba(15,23,40,.06);background:#fff;color:#0f1728}
-#settings-account .profile-currency-btn:focus,#settings-account .profile-currency-dropdown.show .profile-currency-btn{border-color:rgba(36,187,69,.45);box-shadow:0 0 0 4px rgba(36,187,69,.10);background:#fff;color:#0f1728}
-#settings-account .profile-currency-menu{z-index:1085;max-height:280px;overflow-y:auto;border-radius:16px;border:1px solid rgba(15,23,40,.08);padding:8px;box-shadow:0 10px 30px rgba(15,23,40,.12)}
-#settings-account .profile-currency-menu .dropdown-item{border:0;border-radius:10px;padding:10px 14px;font-weight:500;white-space:normal;text-align:left}
-#settings-account .profile-currency-menu .dropdown-item:hover,#settings-account .profile-currency-menu .dropdown-item:focus{background:rgba(36,187,69,.08);color:#16a34a}
 
 /* Selects do dashboard no padrão visual dos dropdowns FinMap. */
 .dashboard-popout--form .form-select{
@@ -5932,3 +5924,16 @@ body.dashboard-page .topbar::before {
 #settings-account .settings-action-btn--logout:hover{background:#f0faf2;border-color:#b9dec2}
 #settings-account .settings-profile-card--logout-row form{margin:0}
 @media(max-width:700px){#settings-account .settings-profile-card--logout-row{align-items:stretch;flex-direction:column}#settings-account .settings-profile-card--logout-row form,.settings-action-btn--logout{width:100%}}
+
+
+
+/* Oculta valores financeiros quando a prefer?ncia de privacidade est? ativa. */
+body.finmap-values-hidden .finance-card__value,
+body.finmap-values-hidden .transaction-item__value,
+body.finmap-values-hidden .goal-card__bottom,
+body.finmap-values-hidden .goal-card__info p,
+body.finmap-values-hidden .category-item strong { filter: blur(6px); user-select: none; }
+
+
+/* A preferencia de privacidade usa roxo, sem alterar os demais toggles. */
+#settings-security .switch--red input:checked + .switch-slider { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }

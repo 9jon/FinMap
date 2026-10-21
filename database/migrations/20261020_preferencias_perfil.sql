@@ -1,1 +1,1 @@
-ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(25) NULL AFTER email, ADD COLUMN moeda_preferida CHAR(3) NOT NULL DEFAULT 'BRL';
+ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(25) NULL AFTER email;

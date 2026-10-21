@@ -342,12 +342,7 @@ $labelsOrigemExtra = [
 
     function parseBRL(value) {
       if (!value) return 0;
-      return Number(
-        value
-          .replace(/[R$\s]/g, "")
-          .replace(/\./g, "")
-          .replace(",", ".")
-      ) || 0;
+      return Number(value.replace(/[R$\s]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
     }
 
     document.querySelectorAll(".money").forEach((input) => {
@@ -451,6 +446,7 @@ $labelsOrigemExtra = [
 
      
     });
+
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
