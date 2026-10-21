@@ -103,7 +103,7 @@ $conn->begin_transaction();
 $sucesso = $stmt->execute();
 
 // Mantém o saldo total sincronizado com lançamentos aprovados.
-if ($sucesso && !$agendado) {
+if ($sucesso && !$agendado && substr($dataTransacao, 0, 7) === date('Y-m')) {
     $variacaoSaldo = $tipo === 'receita' ? $valor : -$valor;
     $stmtSaldo = $conn->prepare(
         "UPDATE usuarios

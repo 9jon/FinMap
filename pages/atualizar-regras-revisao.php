@@ -13,13 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $dados = json_decode(file_get_contents('php://input'), true);
+if (!is_array($dados)) {
+    http_response_code(400);
+    echo json_encode(['sucesso' => false, 'erro' => 'Dados inválidos']);
+    exit;
+}
 
 $priorizarOcr = !empty($dados['priorizar_ocr_baixa_confianca']) ? 1 : 0;
 $ocultarAprovados = !empty($dados['ocultar_aprovados']) ? 1 : 0;
 $limiteConfianca = isset($dados['limite_confianca_percentual']) ? (int) $dados['limite_confianca_percentual'] : 80;
 
 if ($limiteConfianca < 1 || $limiteConfianca > 100) {
-    $limiteConfianca = 80;
+    http_response_code(422);
+    echo json_encode(['sucesso' => false, 'erro' => 'O limite precisa estar entre 1 e 100.']);
+    exit;
 }
 
 $stmt = $conn->prepare("

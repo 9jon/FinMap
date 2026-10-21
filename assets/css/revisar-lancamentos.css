@@ -651,6 +651,35 @@ body {
   box-shadow: 0 0 0 4px rgba(36, 187, 69, 0.10);
 }
 
+.rules-list .switch {
+  display: inline-block;
+  position: relative;
+  width: 54px;
+  height: 30px;
+  flex: 0 0 54px;
+  cursor: pointer;
+}
+
+.rules-list .switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rules-list .switch .switch-slider {
+  pointer-events: none;
+}
+
+.rules-list .switch input:focus-visible + .switch-slider {
+  outline: 3px solid rgba(36, 187, 69, 0.3);
+  outline-offset: 3px;
+}
 .rules-row {
   padding: 18px;
   border-radius: 20px;

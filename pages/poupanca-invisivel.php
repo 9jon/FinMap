@@ -12,6 +12,12 @@ $usuario = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 
+$stmt = $conn->prepare("SELECT renda_mensal FROM configuracoes_renda WHERE usuario_id = ? LIMIT 1");
+$stmt->bind_param("i", $usuario_id);
+$stmt->execute();
+$rendaConfigurada = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$rendaMensal = (float) ($rendaConfigurada['renda_mensal'] ?? 0);
 $stmt = $conn->prepare("SELECT * FROM poupanca_configuracao WHERE usuario_id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -155,7 +161,7 @@ $valorAnualInicial = $valorMensalInicial * 12;
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="../assets/css/dashboard.css">
-  <link rel="stylesheet" href="../assets/css/poupanca-invisivel.css">
+  <link rel="stylesheet" href="../assets/css/poupanca-invisivel.css?v=hero-style-17">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
 </head>
@@ -180,7 +186,6 @@ $valorAnualInicial = $valorMensalInicial * 12;
       </button>
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
         <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
@@ -200,36 +205,34 @@ $valorAnualInicial = $valorMensalInicial * 12;
 
       <section class="savings-dashboard__top">
         <article class="hero-summary-card">
-          <div class="hero-summary-card__badge">
-            <i class="bi bi-stars"></i>
-            <span>Leitura inteligente de desperdícios</span>
-          </div>
-
+          <div class="hero-summary-card__header">
           <h2>Sua caixinha de economia potencial</h2>
 
           <p>
             O FinMap identificou quanto você poderia guardar se reduzisse pequenos
             gastos recorrentes e hábitos que pesam silenciosamente no mês.
           </p>
-
-          <div class="hero-summary-card__amounts">
-            <article class="hero-kpi hero-kpi--main">
-              <span>Potencial deste mês</span>
-              <strong id="mainMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
-              <small>valor que poderia entrar na sua caixinha</small>
-            </article>
-
-            <article class="hero-kpi">
-              <span>Projeção em 12 meses</span>
-              <strong id="mainYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
-            </article>
-
-            <article class="hero-kpi">
-              <span>Cenário atual</span>
-              <strong id="mainScenarioLabel"><?= htmlspecialchars($rotulosCenario[$cenarioInicial]) ?></strong>
-            </article>
           </div>
 
+          <div class="hero-summary-card__metrics">
+            <div class="hero-summary-card__primary-metric">
+              <span class="hero-summary-card__metric-label">Potencial deste mês</span>
+              <strong id="mainMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
+              <small id="mainMonthlyIncomeShare">Valor que poderia entrar na sua caixinha.</small>
+            </div>
+
+            <div class="hero-summary-card__secondary-metrics">
+              <div class="hero-summary-card__secondary-metric hero-summary-card__secondary-metric--annual">
+                <span class="hero-summary-card__metric-label">Projeção em 12 meses</span>
+                <strong id="mainYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
+              </div>
+
+              <div class="hero-summary-card__secondary-metric hero-summary-card__secondary-metric--scenario">
+                <span class="hero-summary-card__metric-label">Cenário atual</span>
+                <strong id="mainScenarioLabel"><?= htmlspecialchars($rotulosCenario[$cenarioInicial]) ?></strong>
+              </div>
+            </div>
+          </div>
           <div class="hero-summary-card__actions">
             <button class="savings-btn savings-btn--primary" id="openSimulationModal" type="button">
               <i class="bi bi-magic"></i>
@@ -260,31 +263,31 @@ $valorAnualInicial = $valorMensalInicial * 12;
             <div class="economy-chart__grid"></div>
 
             <div class="economy-chart__bars">
-              <div class="economy-bar">
+              <div class="economy-bar" role="button" tabindex="0" aria-pressed="false">
                 <div class="economy-bar__value" id="barLabel1">R$ <?= number_format($valorMensalInicial, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar1" style="height: 18%;"></div>
                 <span>1º mês</span>
               </div>
 
-              <div class="economy-bar">
+              <div class="economy-bar" role="button" tabindex="0" aria-pressed="false">
                 <div class="economy-bar__value" id="barLabel3">R$ <?= number_format($valorMensalInicial * 3, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar3" style="height: 36%;"></div>
                 <span>3 meses</span>
               </div>
 
-              <div class="economy-bar">
+              <div class="economy-bar" role="button" tabindex="0" aria-pressed="false">
                 <div class="economy-bar__value" id="barLabel6">R$ <?= number_format($valorMensalInicial * 6, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar6" style="height: 58%;"></div>
                 <span>6 meses</span>
               </div>
 
-              <div class="economy-bar">
+              <div class="economy-bar" role="button" tabindex="0" aria-pressed="false">
                 <div class="economy-bar__value" id="barLabel9">R$ <?= number_format($valorMensalInicial * 9, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar9" style="height: 78%;"></div>
                 <span>9 meses</span>
               </div>
 
-              <div class="economy-bar economy-bar--highlight">
+              <div class="economy-bar economy-bar--highlight" role="button" tabindex="0" aria-pressed="false">
                 <div class="economy-bar__value" id="barLabel12">R$ <?= number_format($valorAnualInicial, 0, ',', '.') ?></div>
                 <div class="economy-bar__column" id="bar12" style="height: 100%;"></div>
                 <span>12 meses</span>
@@ -317,7 +320,6 @@ $valorAnualInicial = $valorMensalInicial * 12;
           <div class="overview-card__content">
             <span>Potencial mensal</span>
             <strong id="overviewMonthlyValue">R$ <?= number_format($valorMensalInicial, 2, ',', '.') ?></strong>
-            <p>Total identificado em gastos com chance real de redução.</p>
           </div>
         </article>
 
@@ -329,7 +331,6 @@ $valorAnualInicial = $valorMensalInicial * 12;
           <div class="overview-card__content">
             <span>Projeção anual</span>
             <strong id="overviewYearlyValue">R$ <?= number_format($valorAnualInicial, 2, ',', '.') ?></strong>
-            <p>Estimativa acumulada mantendo o mesmo padrão de economia.</p>
           </div>
         </article>
 
@@ -341,7 +342,6 @@ $valorAnualInicial = $valorMensalInicial * 12;
           <div class="overview-card__content">
             <span>Oportunidades detectadas</span>
             <strong id="overviewOpportunities"><?= $oportunidadesAtivas ?> categorias</strong>
-            <p id="overviewOpportunitiesText">Oportunidades encontradas nos seus lançamentos deste mês.</p>
           </div>
         </article>
       </section>
@@ -754,89 +754,7 @@ $valorAnualInicial = $valorMensalInicial * 12;
   </aside>
 
   <!-- MODAL IA -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
-          </div>
-
-          <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
-          </div>
-        </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Análise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong>Poupança invisível com bom potencial</strong>
-            <p>Seu maior espaço de economia está em assinaturas pouco usadas e compras por impulso.</p>
-          </div>
-
-          <div class="ai-summary-card ai-summary-card--soft">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Sugestão principal</span>
-              <i class="bi bi-lightbulb"></i>
-            </div>
-            <strong>Priorizar cortes recorrentes</strong>
-            <p>Reduzir gastos recorrentes tende a gerar mais impacto do que cortar itens isolados.</p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar minha caixinha</button>
-            <button class="ai-shortcut" type="button">Onde posso economizar mais?</button>
-            <button class="ai-shortcut" type="button">Comparar cenários</button>
-            <button class="ai-shortcut" type="button">Criar plano rápido</button>
-          </div>
-        </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages">
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Analisei sua Poupança Invisível. Hoje seus maiores focos de atenção estão em assinaturas, compras por impulso e pequenos gastos recorrentes.
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--user">
-              <div class="ai-message__bubble">
-                Onde eu teria o maior impacto mais rápido?
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                O maior impacto rápido viria da revisão de assinaturas pouco usadas. Depois disso, compras por impulso e lanches recorrentes já geram uma melhora visível no cenário anual.
-              </div>
-            </div>
-          </div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <script>
     const body = document.body;
@@ -858,21 +776,24 @@ $valorAnualInicial = $valorMensalInicial * 12;
         multiplier: 0.514,
         range: "R$ 180,00 a R$ 250,00 / mês",
         goal: "Quitar pequenas contas",
-        profile: "Cortes leves e sustentáveis"
+        profile: "Cortes leves e sustentáveis",
+        description: "Baseado em hábitos realistas e mudanças graduais"
       },
       equilibrado: {
         label: "Equilibrado",
         multiplier: 1,
         range: "R$ 300,00 a R$ 430,00 / mês",
         goal: "Reserva de emergência",
-        profile: "Desperdícios distribuídos"
+        profile: "Desperdícios distribuídos",
+        description: "Combina ajustes moderados em gastos recorrentes"
       },
       agressivo: {
         label: "Agressivo",
         multiplier: 1.425,
         range: "R$ 500,00 a R$ 620,00 / mês",
         goal: "Meta de crescimento rápido",
-        profile: "Redução forte de excessos"
+        profile: "Redução forte de excessos",
+        description: "Considera reduções maiores em categorias flexíveis"
       }
     };
 
@@ -1023,16 +944,16 @@ $valorAnualInicial = $valorMensalInicial * 12;
 
       document.getElementById("mainMonthlyValue").textContent = formatBRL(monthly);
       document.getElementById("mainYearlyValue").textContent = formatBRL(value12);
+      const incomeValue = Number(document.getElementById("mainMonthlyIncomeShare").dataset.monthlyIncome) || 0;
+      const incomeShare = document.getElementById("mainMonthlyIncomeShare");
+      incomeShare.innerHTML = incomeValue > 0
+        ? `<i class="bi bi-arrow-up-right" aria-hidden="true"></i> equivalente a ${(monthly / incomeValue * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% da sua renda`
+        : "Configure sua renda mensal para ver essa relação";
       document.getElementById("mainScenarioLabel").textContent = scenario.label;
 
       document.getElementById("overviewMonthlyValue").textContent = formatBRL(monthly);
       document.getElementById("overviewYearlyValue").textContent = formatBRL(value12);
       document.getElementById("overviewOpportunities").textContent = enabledCount + " categorias";
-      document.getElementById("overviewOpportunitiesText").textContent =
-        enabledCount > 0
-          ? "Categorias com oportunidades encontradas nos seus lançamentos deste mês."
-          : "Nenhuma oportunidade foi encontrada nas categorias ativas.";
-
       document.getElementById("realisticRange").textContent = monthly > 0
         ? `${formatBRL(monthly * 0.7)} a ${formatBRL(monthly)} / mês`
         : "Nenhuma oportunidade detectada";
@@ -1065,6 +986,12 @@ $valorAnualInicial = $valorMensalInicial * 12;
       document.getElementById("bar6").style.height = Math.max((value6 / maxValue) * 100, 36) + "%";
       document.getElementById("bar9").style.height = Math.max((value9 / maxValue) * 100, 58) + "%";
       document.getElementById("bar12").style.height = "100%";
+
+      document.querySelectorAll(".economy-bar").forEach((bar) => {
+        const period = bar.querySelector("span")?.textContent.trim() || "Período";
+        const amount = bar.querySelector(".economy-bar__value")?.textContent.trim() || "";
+        bar.setAttribute("aria-label", `${period}: ${amount} de economia potencial`);
+      });
 
       updateScenarioButtons();
       updateToggles();
@@ -1193,8 +1120,41 @@ $valorAnualInicial = $valorMensalInicial * 12;
     });
 
     updateUI();
+
+    const economyChart = document.querySelector(".economy-chart");
+    const economyBars = Array.from(document.querySelectorAll(".economy-bar"));
+
+    function toggleEconomyBar(bar) {
+      const shouldSelect = bar.getAttribute("aria-pressed") !== "true";
+      economyBars.forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-pressed", "false");
+      });
+      if (shouldSelect) {
+        bar.classList.add("is-selected");
+        bar.setAttribute("aria-pressed", "true");
+      }
+    }
+
+    economyBars.forEach((bar) => {
+      bar.addEventListener("click", () => toggleEconomyBar(bar));
+      bar.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleEconomyBar(bar);
+        }
+      });
+    });
+
+    if (economyChart && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      requestAnimationFrame(() => requestAnimationFrame(() => economyChart.classList.add("is-animated")));
+    } else {
+      economyChart?.classList.add("is-animated");
+    }
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>

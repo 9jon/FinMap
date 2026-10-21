@@ -30,13 +30,6 @@ $primeiroNome = explode(' ', $usuario['nome'] ?? 'Usuário')[0];
 $iniciais = $usuario['avatar_iniciais'] ?? 'US';
 $saldoTotal = (float) ($usuario['saldo_total'] ?? 0);
 
-$stmt = $conn->prepare("SELECT renda_mensal FROM configuracoes_renda WHERE usuario_id = ? LIMIT 1");
-$stmt->bind_param("i", $usuario_id);
-$stmt->execute();
-$configuracaoRenda = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-$rendaMensalConfigurada = (float) ($configuracaoRenda['renda_mensal'] ?? 0);
 
 function formatarDataCurta(string $data): string
 {
@@ -89,11 +82,11 @@ $stmt->close();
 
 $receitasMes = (float) $comparativoMensal['receitas_atual'];
 $despesasMes = (float) $comparativoMensal['despesas_atual'];
-$rendaBaseCalculo = $receitasMes > 0 ? $receitasMes : $rendaMensalConfigurada;
-$rendaConsumida = $despesasMes;
-$percentualRendaConsumida = $rendaBaseCalculo > 0
-    ? min(100, ($rendaConsumida / $rendaBaseCalculo) * 100)
-    : 0;
+$totalDisponivelMes = $saldoTotal + $despesasMes;
+$percentualGastosSaldo = $totalDisponivelMes > 0
+    ? ($despesasMes / $totalDisponivelMes) * 100
+    : (($saldoTotal < 0 || $despesasMes > 0) ? null : 0);
+$percentualBarraGastos = $percentualGastosSaldo === null ? 100 : min(100, $percentualGastosSaldo);
 $receitasMesAnterior = (float) $comparativoMensal['receitas_anterior'];
 $despesasMesAnterior = (float) $comparativoMensal['despesas_anterior'];
 $temRegistroMesAnterior = (int) $comparativoMensal['lancamentos_anterior'] > 0;
@@ -539,10 +532,11 @@ foreach ($metas as $meta) {
 </head>
 <body class="dashboard-page">
 
-<?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'erro'): ?>
-  <div class="import-feedback import-feedback--error" role="alert">
-    <i class="bi bi-exclamation-circle"></i>
-    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'Não foi possível importar o arquivo.')) ?></span>
+<?php if (is_array($importacaoFeedback)): ?>
+  <?php $importacaoSucesso = ($importacaoFeedback['tipo'] ?? '') === 'sucesso'; ?>
+  <div class="import-feedback import-feedback--<?= $importacaoSucesso ? 'success' : 'error' ?>" role="<?= $importacaoSucesso ? 'status' : 'alert' ?>">
+    <i class="bi bi-<?= $importacaoSucesso ? 'check-circle' : 'exclamation-circle' ?>"></i>
+    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'N�o foi poss�vel importar o arquivo.')) ?></span>
   </div>
 <?php endif; ?>
 
@@ -639,29 +633,27 @@ $stmt->close();
           </div>
         </div>
 
-        <?php if ($rendaBaseCalculo > 0): ?>
+
           <div class="finance-card__progress">
             <div class="finance-card__progress-heading">
-              <span>Renda já consumida</span>
-              <strong id="incomeUsagePercent"><?= number_format($percentualRendaConsumida, 0, ',', '.') ?>%</strong>
+              <span>Do total dispon&iacute;vel, j&aacute; gasto</span>
+              <strong id="incomeUsagePercent"><?= $percentualGastosSaldo === null ? 'Saldo negativo' : number_format($percentualGastosSaldo, 0, ',', '.') . '%' ?></strong>
             </div>
             <div
               class="finance-card__progress-track"
               id="incomeUsageProgress"
               role="progressbar"
-              aria-label="Progresso da renda mensal consumida"
+              aria-label="Proporcao dos gastos do mes em relacao ao saldo atual"
               aria-valuemin="0"
               aria-valuemax="100"
-              aria-valuenow="<?= number_format($percentualRendaConsumida, 1, '.', '') ?>"
-              aria-valuetext="R$ <?= number_format($rendaConsumida, 2, ',', '.') ?> de R$ <?= number_format($rendaBaseCalculo, 2, ',', '.') ?>"
-              data-renda-mensal="<?= number_format($rendaBaseCalculo, 2, '.', '') ?>"
+              aria-valuenow="<?= number_format($percentualBarraGastos, 1, '.', '') ?>"
+              aria-valuetext="<?= $percentualGastosSaldo === null ? 'Saldo negativo; ' : number_format($percentualGastosSaldo, 1, ',', '.') . '% gasto; ' ?>R$ <?= number_format($despesasMes, 2, ',', '.') ?> gastos; saldo atual de R$ <?= number_format($saldoTotal, 2, ',', '.') ?>"
+              data-gastos-mes="<?= number_format($despesasMes, 2, '.', '') ?>"
             >
-              <span class="finance-card__progress-fill" style="width: <?= number_format($percentualRendaConsumida, 2, '.', '') ?>%"></span>
+              <span class="finance-card__progress-fill" style="width: <?= number_format($percentualBarraGastos, 2, '.', '') ?>%"></span>
             </div>
           </div>
-        <?php else: ?>
-          <a class="finance-card__progress-empty" href="config-renda.php">Configure sua renda mensal para acompanhar o consumo</a>
-        <?php endif; ?>
+
       </article>
 
       <article class="finance-card">
@@ -1111,9 +1103,10 @@ $stmt->close();
         ?>
 
         <article
-            class="notif-card notif-card--<?= $classe ?>"
+            class="notif-card notif-card--<?= $classe ?><?= (int) $n['lida'] === 1 ? ' is-read' : '' ?>"
             data-tipo="<?= htmlspecialchars($n['categoria']) ?>"
             data-id="<?= (int) $n['id'] ?>"
+            data-lida="<?= (int) $n['lida'] ?>"
         >
 
             <div class="notif-card__icon">
@@ -1148,43 +1141,7 @@ $stmt->close();
   </aside>
 
   <!-- ASSISTENTE FINANCEIRO -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <section class="ai-modal" role="dialog" aria-modal="true" aria-labelledby="aiAssistantTitle">
-      <header class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon" aria-hidden="true">
-            <i class="bi bi-chat-square-text"></i>
-          </div>
-          <div>
-            <h3 id="aiAssistantTitle">Assistente financeiro</h3>
-            <p>Pergunte sobre seus gastos, seu orçamento ou suas metas.</p>
-          </div>
-        </div>
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </header>
-
-      <div class="ai-modal__body ai-workspace">
-        <aside class="ai-modal__sidebar ai-workspace__sidebar" aria-label="Histórico e sugestões">
-          <button class="ai-new-chat" id="aiNewChat" type="button"><i class="bi bi-plus-lg"></i> Nova conversa</button>
-          <div class="ai-history"><div class="ai-workspace__section-label">RECENTES</div><div id="aiHistoryList" class="ai-history__list" aria-live="polite"><p class="ai-history__empty">Suas conversas salvas aparecerão aqui.</p></div></div>
-          <div class="ai-shortcut-group"><div class="ai-workspace__section-label">COMECE POR AQUI</div><div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button" data-prompt="Analise meus gastos deste mês e destaque os principais pontos."><i class="bi bi-calendar3"></i><span>Analisar meus gastos</span></button>
-            <button class="ai-shortcut" type="button" data-prompt="Onde posso economizar com base nas minhas despesas recentes?"><i class="bi bi-piggy-bank"></i><span>Onde posso economizar?</span></button>
-            <button class="ai-shortcut" type="button" data-prompt="Faça uma previsão do meu saldo considerando meu ritmo recente de receitas e despesas."><i class="bi bi-graph-up-arrow"></i><span>Prever meu saldo</span></button>
-            <button class="ai-shortcut" type="button" data-prompt="Como está o andamento das minhas metas financeiras?"><i class="bi bi-bullseye"></i><span>Acompanhar minhas metas</span></button>
-          </div></div>
-        </aside>
-        <section class="ai-chat-area ai-workspace__chat" aria-label="Conversa com o assistente">
-          <div class="ai-chat-toolbar"><span id="aiCurrentChatTitle">Nova conversa</span><button id="aiDeleteChat" class="ai-delete-chat" type="button" aria-label="Excluir conversa" title="Excluir conversa" hidden><i class="bi bi-trash3"></i></button></div>
-          <div class="ai-chat-area__messages" id="aiMessages" aria-live="polite"><div class="ai-empty-state"><h4>Como posso ajudar com suas finanças?</h4><p>Pergunte sobre seus gastos, orçamento, saldo ou metas. Seu histórico fica salvo nesta conta.</p></div></div>
-          <form class="ai-chat-area__input" id="aiChatForm"><textarea id="aiChatInput" rows="1" aria-label="Escreva sua pergunta" placeholder="Pergunte sobre suas finanças..."></textarea><button class="ai-send-btn" type="submit" aria-label="Enviar pergunta"><i class="bi bi-arrow-up"></i></button></form>
-          <p class="ai-chat-area__hint" id="aiChatStatus">As respostas usam os dados financeiros registrados no FinMap.</p>
-        </section>
-      </div>
-    </section>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <!-- MODAL DE TRANSAÇÃO -->
   <div class="transaction-modal-overlay" id="transactionModal">
@@ -1368,8 +1325,8 @@ $stmt->close();
           <div class="import-file-callout import-file-callout--minimal">
             <i class="bi bi-shield-check"></i>
             <div>
-              <strong>Importação segura e pendente</strong>
-              <p>O saldo não é alterado agora. Cada lançamento será enviado para aprovação em Revisar lançamentos.</p>
+              <strong>Importação automática</strong>
+              <p>Lançamentos com data passada ou atual são aprovados automaticamente. Apenas datas futuras ficam agendadas; o saldo atual considera somente este mês.</p>
             </div>
           </div>
 
@@ -1954,34 +1911,11 @@ $stmt->close();
     unlockBody();
   }
 
-  async function openNotifications() {
+  function openNotifications() {
     if (!notifPanel || !notifOverlay) return;
     notifPanel.classList.add("active");
     notifOverlay.classList.add("active");
     lockBody();
-
-    const notificacaoNaoLida = document.querySelector(".notification-dot");
-    if (!notificacaoNaoLida) return;
-
-    const dados = new FormData();
-    dados.append("todas", "1");
-
-    try {
-      const resposta = await fetch("marcar-notificacao.php", {
-        method: "POST",
-        body: dados
-      });
-      const resultado = await resposta.json();
-
-      if (resultado.sucesso) {
-        notificacaoNaoLida.remove();
-        document.querySelectorAll(".notif-card").forEach((card) => {
-          card.style.opacity = "0.6";
-        });
-      }
-    } catch (erro) {
-      console.error("Erro ao marcar notificações como lidas:", erro);
-    }
   }
 
   function closeNotifications() {
@@ -2679,6 +2613,19 @@ if (balanceForm) {
         if (saldoCardValue) {
           saldoCardValue.textContent = "R$ " + resultado.novo_saldo;
           saldoCardValue.dataset.countUp = String(valorNumerico);
+          const incomeUsageProgress = document.getElementById("incomeUsageProgress");
+          const incomeUsagePercent = document.getElementById("incomeUsagePercent");
+          if (incomeUsageProgress && incomeUsagePercent) {
+            const monthExpenses = Number(incomeUsageProgress.dataset.gastosMes || 0);
+            const currentBalance = valorNumerico;
+            const totalAvailable = currentBalance + monthExpenses;
+            const percentage = totalAvailable > 0 ? monthExpenses / totalAvailable * 100 : ((currentBalance < 0 || monthExpenses > 0) ? null : 0);
+            const fill = incomeUsageProgress.querySelector(".finance-card__progress-fill");
+            incomeUsagePercent.textContent = percentage === null ? "Saldo negativo" : Math.round(percentage) + "%";
+            incomeUsageProgress.setAttribute("aria-valuenow", (percentage === null ? 100 : Math.min(100, percentage)).toFixed(1));
+            incomeUsageProgress.setAttribute("aria-valuetext", (percentage === null ? "Saldo negativo; " : percentage.toFixed(1) + "% gasto; ") + "gastos do mes: " + formatCurrencyBRL(String(Math.round(monthExpenses * 100))) + "; saldo atual: " + formatCurrencyBRL(String(Math.round(valorNumerico * 100))));
+            if (fill) fill.style.width = (percentage === null ? 100 : Math.min(100, percentage)).toFixed(2) + "%";
+          }
         }
         closeModal(balanceModal);
       } else {
@@ -2702,9 +2649,6 @@ if (balanceForm) {
 const notifTabs =
     document.querySelectorAll(".notif-tab");
 
-const notifCards =
-    document.querySelectorAll(".notif-card");
-
 
 /* FILTROS */
 
@@ -2721,7 +2665,7 @@ notifTabs.forEach((tab) => {
 
         tab.classList.add("active");
 
-        notifCards.forEach((card) => {
+        document.querySelectorAll(".notif-card").forEach((card) => {
 
             const tipo =
                 card.getAttribute("data-tipo");
@@ -2745,89 +2689,6 @@ notifTabs.forEach((tab) => {
 
 });
 
-
-/* MARCAR NOTIFICAÇÃO COMO LIDA */
-
-notifCards.forEach((card) => {
-
-    card.addEventListener("click", async () => {
-
-        const id =
-            card.getAttribute("data-id");
-
-        if (!id) {
-            return;
-        }
-
-        const dados = new FormData();
-
-        dados.append("id", id);
-
-        try {
-
-            const resposta = await fetch(
-                "marcar-notificacao.php",
-                {
-                    method: "POST",
-                    body: dados
-                }
-            );
-
-            const resultado =
-                await resposta.json();
-
-            if (resultado.sucesso) {
-
-                card.style.opacity = "0.6";
-
-                const dot =
-                    document.querySelector(
-                        ".notification-dot"
-                    );
-
-                if (dot) {
-
-                    const naoLidas =
-                        document.querySelectorAll(
-                            ".notif-card:not([style*='opacity'])"
-                        );
-
-                    if (naoLidas.length === 0) {
-                        dot.remove();
-                    }
-                }
-            }
-
-        } catch (erro) {
-
-            console.error(
-                "Erro ao marcar notificação:",
-                erro
-            );
-
-        }
-
-    });
-
-});
-
-(() => {
- const root=document.getElementById('aiModal'); if(!root) return;
- const csrf=<?= json_encode($csrfImportacao) ?>, api='assistente-chat-api.php';
- const history=document.getElementById('aiHistoryList'), messages=document.getElementById('aiMessages'), form=document.getElementById('aiChatForm'), input=document.getElementById('aiChatInput'), status=document.getElementById('aiChatStatus'), title=document.getElementById('aiCurrentChatTitle'), del=document.getElementById('aiDeleteChat');
- let current=null, busy=false;
- async function call(action, extra={}) { const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),155000); try { const r=await fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,csrf,...extra}),signal:controller.signal}); const d=await r.json(); if(!r.ok){const error=new Error(d.erro||'Ocorreu um erro.');error.id=d.id;throw error;} return d; } catch(error) { if(error.name==='AbortError') throw new Error('A IA demorou demais para responder. Confira se o serviço está ativo e tente novamente.'); throw error; } finally { clearTimeout(timer); } }
- function bubble(role,text){ const row=document.createElement('div'); row.className='ai-message '+(role==='assistant'?'ai-message--bot':'ai-message--user'); const b=document.createElement('div'); b.className='ai-message__bubble'; b.textContent=text; row.appendChild(b); messages.appendChild(row); }
- function render(items){ messages.replaceChildren(); if(!items.length){ messages.innerHTML='<div class="ai-empty-state"><h4>Como posso ajudar com suas finanças?</h4><p>Envie uma pergunta ou escolha uma sugestão. Suas conversas ficam salvas nesta conta.</p></div>'; return; } items.forEach(m=>bubble(m.papel,m.conteudo)); messages.scrollTop=messages.scrollHeight; }
- async function refresh(){ try { const d=await call('list'); history.replaceChildren(); if(!d.conversas.length){const p=document.createElement('p');p.className='ai-history__empty';p.textContent='Suas conversas salvas aparecerão aqui.';history.appendChild(p);return;} d.conversas.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='ai-history-item'+(Number(c.id)===Number(current)?' is-active':'');b.textContent=c.titulo;b.title=c.titulo;b.addEventListener('click',()=>load(c.id));history.appendChild(b);}); } catch(e){status.textContent=e.message;} }
- async function load(id){ try { const d=await call('load',{id}); current=Number(id); title.textContent=d.conversa.titulo; del.hidden=false; render(d.mensagens); await refresh(); } catch(e){status.textContent=e.message;} }
- function fresh(){current=null;title.textContent='Nova conversa';del.hidden=true;render([]);input.focus();refresh();}
- async function send(text){if(busy||!text.trim())return;busy=true;input.value='';input.style.height='';status.textContent='Analisando seus dados... a primeira resposta pode levar alguns segundos.';bubble('user',text);const wait=document.createElement('div');wait.className='ai-message ai-message--bot';wait.innerHTML='<div class="ai-message__bubble"><span class="ai-typing"><i></i><i></i><i></i></span></div>';messages.appendChild(wait);messages.scrollTop=messages.scrollHeight;try{const d=await call('send',{id:current,message:text});current=Number(d.id);wait.remove();bubble('assistant',d.resposta);title.textContent=d.titulo||'Conversa';del.hidden=false;status.textContent='As respostas são geradas pelo Ollama com dados financeiros da sua conta.';await refresh();}catch(e){wait.remove();if(e.id){current=Number(e.id);title.textContent='Conversa';del.hidden=false;}status.textContent=e.message;await refresh();}finally{busy=false;input.focus();}}
- form.addEventListener('submit',e=>{e.preventDefault();send(input.value);}); input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,140)+'px';}); input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});
- document.getElementById('aiNewChat').addEventListener('click',fresh); del.addEventListener('click',async()=>{if(!current||!confirm('Excluir esta conversa e todas as mensagens?'))return;try{await call('delete',{id:current});fresh();}catch(e){status.textContent=e.message;}});
- root.querySelectorAll('.ai-shortcut[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
- document.getElementById('openAiModal')?.addEventListener('click',refresh); refresh();
-})();
 
 function animateFinanceCardValues() {
   const counters = Array.from(document.querySelectorAll(".finance-card__value[data-count-up]"));
@@ -2903,6 +2764,8 @@ document.addEventListener("keydown", (event) => {
 
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>
 

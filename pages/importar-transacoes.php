@@ -118,11 +118,10 @@ try {
         $confianca = $linha['confianca'];
         $observacao = $linha['observacao'];
         $data = $linha['data'];
-        $status = 'pendente';
+        $status = 'aprovado';
         if ($data > date('Y-m-d')) {
+            $status = 'pendente';
             $observacao = $tipo === 'receita' ? 'Receita agendada' : 'Fatura agendada';
-        } elseif ($extensao === 'csv' && $tipo === 'despesa') {
-            $status = 'aprovado';
         }
         $stmtTransacao->bind_param(
             'iiisdssisss',
@@ -144,7 +143,9 @@ try {
         $importadas++;
         if ($status === 'aprovado') {
             $aprovadas++;
-            $variacaoSaldo -= $valor;
+            if (substr($data, 0, 7) === date('Y-m')) {
+                $variacaoSaldo += $tipo === 'receita' ? $valor : -$valor;
+            }
         }
     }
     $stmtDuplicado->close();
@@ -166,9 +167,9 @@ try {
 
     $_SESSION['importacao_feedback'] = [
         'tipo' => 'sucesso',
-        'mensagem' => sprintf('%d lançamento(s) disponíveis na revisão para editar ou excluir. %d despesa(s) aprovadas automaticamente com saldo atualizado. Datas futuras permanecem agendadas. %d duplicado(s) e %d linha(s) inválida(s) foram ignorados.', $importadas, $aprovadas, $duplicadas, $invalidas),
+        'mensagem' => sprintf('%d lançamento(s) importado(s); %d aprovado(s) automaticamente. O saldo do mês atual considera apenas lançamentos com data neste mês; datas futuras ficam agendadas. %d duplicado(s) e %d linha(s) inválida(s) foram ignorados.', $importadas, $aprovadas, $duplicadas, $invalidas),
     ];
-    header('Location: revisar-lancamentos.php?importacao=' . $importacaoId);
+    header('Location: dashboard.php');
     exit;
 } catch (Throwable $erro) {
     if ($transacaoIniciada) {

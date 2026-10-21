@@ -146,7 +146,7 @@ function brl(float $valor): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="../assets/css/dashboard.css">
-  <link rel="stylesheet" href="../assets/css/metas-financeiras.css">
+  <link rel="stylesheet" href="../assets/css/metas-financeiras.css?v=goals-summary-inline-1">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
 </head>
@@ -171,7 +171,6 @@ function brl(float $valor): string
       </button>
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
         <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
@@ -211,7 +210,6 @@ function brl(float $valor): string
           <div class="summary-card__content">
             <span>Total de metas</span>
             <strong id="totalGoalsCount"><?= $totalMetas ?></strong>
-            <p>Quantidade de objetivos cadastrados no momento.</p>
           </div>
         </article>
 
@@ -222,7 +220,6 @@ function brl(float $valor): string
           <div class="summary-card__content">
             <span>Total já guardado</span>
             <strong id="totalSavedValue"><?= brl($totalGuardado) ?></strong>
-            <p>Soma acumulada entre todas as metas ativas.</p>
           </div>
         </article>
 
@@ -233,7 +230,6 @@ function brl(float $valor): string
           <div class="summary-card__content">
             <span>Progresso médio</span>
             <strong id="averageProgressValue"><?= $progressoMedio ?>%</strong>
-            <p>Média geral de avanço das metas cadastradas.</p>
           </div>
         </article>
       </section>
@@ -503,77 +499,7 @@ function brl(float $valor): string
   </aside>
 
   <!-- MODAL IA -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
-          </div>
-
-          <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
-          </div>
-        </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Análise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong>Metas com bom potencial</strong>
-            <p>Suas metas estão organizadas e prontas para acompanhamento contínuo.</p>
-          </div>
-
-          <div class="ai-summary-card ai-summary-card--soft">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Sugestão principal</span>
-              <i class="bi bi-lightbulb"></i>
-            </div>
-            <strong>Manter consistência nos aportes</strong>
-            <p>Pequenos valores recorrentes geram evolução mais previsível nas metas.</p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar minhas metas</button>
-            <button class="ai-shortcut" type="button">Qual priorizar?</button>
-            <button class="ai-shortcut" type="button">Criar plano rápido</button>
-            <button class="ai-shortcut" type="button">Revisar progresso</button>
-          </div>
-        </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages">
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Posso te ajudar a organizar suas metas por prioridade, prazo ou impacto financeiro.
-              </div>
-            </div>
-          </div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <script>
     const body = document.body;
@@ -712,5 +638,7 @@ function brl(float $valor): string
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>

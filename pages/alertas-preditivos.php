@@ -415,7 +415,6 @@ $dadosSensibilidade = [
       </button>
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
         <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
@@ -1003,57 +1002,7 @@ if ($sensibilidade === 'baixo') {
   </aside>
 
   <!-- MODAL IA -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
-          </div>
-          <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
-          </div>
-        </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Análise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong>Risco moderado detectado</strong>
-            <p>Seu cenário ainda é controlável, mas já existem sinais claros de pressão no fechamento do mês.</p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar meus alertas</button>
-            <button class="ai-shortcut" type="button">Onde está o maior risco?</button>
-          </div>
-        </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages"></div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <script>
     const body = document.body;
@@ -1268,5 +1217,7 @@ if ($sensibilidade === 'baixo') {
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>

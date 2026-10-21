@@ -72,6 +72,12 @@ function valorComSinal($tipo, $valor) {
     return $tipo === 'receita' ? (float) $valor : -(float) $valor;
 }
 
+function valorAplicadoAoSaldo($tipo, $valor, $dataTransacao) {
+    return substr((string) $dataTransacao, 0, 7) === date('Y-m')
+        ? valorComSinal($tipo, $valor)
+        : 0.0;
+}
+
 $conn->begin_transaction();
 
 $stmt = $conn->prepare(
@@ -114,7 +120,7 @@ switch ($acao) {
                 $sucesso = aplicarVariacaoNoSaldo(
                     $conn,
                     $usuario_id,
-                    valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+                    valorAplicadoAoSaldo($transacaoAtual['tipo'], $transacaoAtual['valor'], $transacaoAtual['data_transacao'])
                 );
             }
         }
@@ -130,7 +136,7 @@ switch ($acao) {
             $sucesso = aplicarVariacaoNoSaldo(
                 $conn,
                 $usuario_id,
-                -valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+                -valorAplicadoAoSaldo($transacaoAtual['tipo'], $transacaoAtual['valor'], $transacaoAtual['data_transacao'])
             );
         }
         break;
@@ -145,7 +151,7 @@ switch ($acao) {
             $sucesso = aplicarVariacaoNoSaldo(
                 $conn,
                 $usuario_id,
-                -valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor'])
+                -valorAplicadoAoSaldo($transacaoAtual['tipo'], $transacaoAtual['valor'], $transacaoAtual['data_transacao'])
             );
         }
         break;
@@ -199,8 +205,13 @@ switch ($acao) {
         $stmt->close();
 
         if ($sucesso && $transacaoAtual['status'] === 'aprovado') {
-            $variacaoSaldo = ($novoStatus === 'aprovado' ? valorComSinal($transacaoAtual['tipo'], $valor) : 0)
-                - valorComSinal($transacaoAtual['tipo'], $transacaoAtual['valor']);
+            $contribuicaoAnterior = $transacaoAtual['status'] === 'aprovado'
+                ? valorAplicadoAoSaldo($transacaoAtual['tipo'], $transacaoAtual['valor'], $transacaoAtual['data_transacao'])
+                : 0.0;
+            $contribuicaoNova = $novoStatus === 'aprovado'
+                ? valorAplicadoAoSaldo($transacaoAtual['tipo'], $valor, $dataTransacao)
+                : 0.0;
+            $variacaoSaldo = $contribuicaoNova - $contribuicaoAnterior;
             $sucesso = aplicarVariacaoNoSaldo($conn, $usuario_id, $variacaoSaldo);
         }
         break;

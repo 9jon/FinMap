@@ -13,7 +13,17 @@ if (($_POST['todas'] ?? '') === '1') {
     $sucesso = $stmt->execute();
     $stmt->close();
 
-    echo json_encode(['sucesso' => $sucesso]);
+    $contagem = $conn->prepare("SELECT COUNT(*) FROM notificacoes WHERE usuario_id = ? AND lida = 0");
+    $contagem->bind_param("i", $usuario_id);
+    $contagem->execute();
+    $contagem->bind_result($naoLidas);
+    $contagem->fetch();
+    $contagem->close();
+
+    echo json_encode([
+        'sucesso' => $sucesso,
+        'nao_lidas' => (int) $naoLidas
+    ]);
     exit;
 }
 
@@ -32,6 +42,14 @@ $stmt->bind_param("ii", $id, $usuario_id);
 $sucesso = $stmt->execute();
 $stmt->close();
 
+$contagem = $conn->prepare("SELECT COUNT(*) FROM notificacoes WHERE usuario_id = ? AND lida = 0");
+$contagem->bind_param("i", $usuario_id);
+$contagem->execute();
+$contagem->bind_result($naoLidas);
+$contagem->fetch();
+$contagem->close();
+
 echo json_encode([
-    'sucesso' => $sucesso
+    'sucesso' => $sucesso,
+    'nao_lidas' => (int) $naoLidas
 ]);

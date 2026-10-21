@@ -2640,6 +2640,10 @@ body {
   transition: 0.25s ease;
 }
 
+.notif-card.is-read {
+  opacity: 0.6;
+}
+
 .notif-card__content {
   flex: 1 1 auto;
   min-width: 0;
@@ -5158,6 +5162,11 @@ body {
   font-weight: 700;
 }
 
+.import-feedback--success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
 .all-transactions-list {
   display: flex;
   flex-direction: column;

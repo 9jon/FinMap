@@ -35,6 +35,67 @@ if (!$regras) {
     ];
 }
 
+// Aprova automaticamente lanÁamentos pendentes cuja data j· chegou.
+$conn->begin_transaction();
+try {
+    $stmtPendentes = $conn->prepare(
+        "SELECT id, tipo, valor, data_transacao
+         FROM transacoes
+         WHERE usuario_id = ? AND status = 'pendente' AND data_transacao <= CURDATE()
+         FOR UPDATE"
+    );
+    if (!$stmtPendentes) {
+        throw new RuntimeException('N„o foi possÌvel buscar lanÁamentos pendentes.');
+    }
+    $stmtPendentes->bind_param('i', $usuario_id);
+    if (!$stmtPendentes->execute()) {
+        throw new RuntimeException('N„o foi possÌvel buscar lanÁamentos pendentes.');
+    }
+    $pendentesParaAprovar = $stmtPendentes->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmtPendentes->close();
+
+    $stmtAprovarPendentes = $conn->prepare(
+        "UPDATE transacoes
+         SET status = 'aprovado'
+         WHERE usuario_id = ? AND status = 'pendente' AND data_transacao <= CURDATE()"
+    );
+    if (!$stmtAprovarPendentes) {
+        throw new RuntimeException('N„o foi possÌvel aprovar lanÁamentos pendentes.');
+    }
+    $stmtAprovarPendentes->bind_param('i', $usuario_id);
+    if (!$stmtAprovarPendentes->execute()) {
+        throw new RuntimeException('N„o foi possÌvel aprovar lanÁamentos pendentes.');
+    }
+    $stmtAprovarPendentes->close();
+
+    $ajusteSaldoMesAtual = 0.0;
+    foreach ($pendentesParaAprovar as $pendente) {
+        if (substr($pendente['data_transacao'], 0, 7) !== date('Y-m')) {
+            continue;
+        }
+        $valor = (float) $pendente['valor'];
+        $ajusteSaldoMesAtual += $pendente['tipo'] === 'receita' ? $valor : -$valor;
+    }
+
+    if (abs($ajusteSaldoMesAtual) > 0.00001) {
+        $stmtSaldo = $conn->prepare(
+            'UPDATE usuarios SET saldo_total = COALESCE(saldo_total, 0) + ? WHERE id = ?'
+        );
+        if (!$stmtSaldo) {
+            throw new RuntimeException('N„o foi possÌvel atualizar o saldo.');
+        }
+        $stmtSaldo->bind_param('di', $ajusteSaldoMesAtual, $usuario_id);
+        if (!$stmtSaldo->execute()) {
+            throw new RuntimeException('N„o foi possÌvel atualizar o saldo.');
+        }
+        $stmtSaldo->close();
+    }
+
+    $conn->commit();
+} catch (Throwable $erro) {
+    $conn->rollback();
+    error_log('Falha ao aprovar lanÁamentos automaticamente: ' . $erro->getMessage());
+}
 $stmt = $conn->prepare("SELECT id, nome, tipo FROM categorias WHERE usuario_id = ? ORDER BY tipo, nome");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
@@ -159,7 +220,6 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       </button>
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notifica√ß√µes">
         <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
@@ -182,7 +242,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       <section class="review-header-minimal">
         <div class="review-header-minimal__content">
           <h2>Revisar lan√ßamentos</h2>
-          <p>Valide cadastros manuais e capturas autom√°ticas vindas de OCR, SMS ou importa√ß√£o.</p>
+          <p>Lan√ßamentos com data passada ou atual s√£o aprovados automaticamente. Consulte, edite ou remova seus lan√ßamentos aqui; datas futuras ficam agendadas.</p>
         </div>
 
         <div class="review-header-minimal__actions">
@@ -456,7 +516,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
               <p>Remove automaticamente da fila os itens j√° validados.</p>
             </div>
             <label class="switch switch--green">
-              <input type="checkbox" id="toggleHideApproved" checked disabled>
+              <input type="checkbox" id="toggleHideApproved" <?= $regras['ocultar_aprovados'] ? 'checked' : '' ?>>
               <span class="switch-slider"></span>
             </label>
           </div>
@@ -552,89 +612,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
   </aside>
 
   <!-- MODAL IA -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
-          </div>
-
-          <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>An√°lise inteligente, sugest√µes r√°pidas e apoio financeiro em tempo real.</p>
-          </div>
-        </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">An√°lise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong>Fila com boa consist√™ncia</strong>
-            <p>A maior parte dos lan√ßamentos est√° consistente, mas OCRs com confian√ßa baixa ainda precisam de revis√£o mais cuidadosa.</p>
-          </div>
-
-          <div class="ai-summary-card ai-summary-card--soft">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Sugest√£o principal</span>
-              <i class="bi bi-lightbulb"></i>
-            </div>
-            <strong>Validar OCR primeiro</strong>
-            <p>Comece pelas capturas com menor confian√ßa para reduzir erros na base financeira.</p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar fila atual</button>
-            <button class="ai-shortcut" type="button">Quais itens revisar primeiro?</button>
-            <button class="ai-shortcut" type="button">Comparar fontes</button>
-            <button class="ai-shortcut" type="button">Criar regra autom√°tica</button>
-          </div>
-        </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages">
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Analisei sua fila de revis√£o. Hoje as capturas mais sens√≠veis est√£o nas entradas de OCR com confian√ßa abaixo de 80%.
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--user">
-              <div class="ai-message__bubble">
-                Por onde eu devo come√ßar?
-              </div>
-            </div>
-
-            <div class="ai-message ai-message--bot">
-              <div class="ai-message__bubble">
-                Comece pelos OCRs com descri√ß√£o ou valor incerto. Depois avance para SMS e importa√ß√µes, que tendem a ter consist√™ncia maior.
-              </div>
-            </div>
-          </div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <script>
     const body = document.body;
@@ -642,7 +620,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
     const state = {
       filter: "all",
-      hideApproved: false,
+      hideApproved: <?= $regras['ocultar_aprovados'] ? 'true' : 'false' ?>,
       prioritizeOCR: <?= $regras['priorizar_ocr_baixa_confianca'] ? 'true' : 'false' ?>,
       confidenceThreshold: <?= (int) $regras['limite_confianca_percentual'] ?>,
       selectedIds: [],
@@ -733,17 +711,16 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
 
     function getFilteredLaunches() {
-      let launches = state.launches;
-
-      if (state.filter !== "all") {
-        launches = launches.filter(item => item.source === state.filter);
-      }
+      let launches = state.launches.filter((item) => {
+        if (state.filter !== "all" && item.source !== state.filter) return false;
+        if (state.hideApproved && item.status === "approved") return false;
+        return true;
+      });
 
       if (state.prioritizeOCR) {
-        launches = launches.sort((a, b) => {
+        launches = [...launches].sort((a, b) => {
           const aPriority = a.source === "ocr" && a.confidence < state.confidenceThreshold ? 0 : 1;
           const bPriority = b.source === "ocr" && b.confidence < state.confidenceThreshold ? 0 : 1;
-
           if (aPriority !== bPriority) return aPriority - bPriority;
           return a.confidence - b.confidence;
         });
@@ -767,14 +744,22 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
     }
 
     function refreshListVisibility() {
-      const filteredIds = new Set(getFilteredLaunches().map(item => item.id));
+      const launches = getFilteredLaunches();
+      const filteredIds = new Set(launches.map(item => item.id));
+      const list = document.getElementById("reviewList");
+      const elements = new Map(
+        [...document.querySelectorAll(".review-item")].map((element) => [Number(element.dataset.id), element])
+      );
 
-      document.querySelectorAll(".review-item").forEach((element) => {
-        const id = Number(element.getAttribute("data-id"));
-        const launch = state.launches.find(item => item.id === id);
-        const shouldShow = launch && filteredIds.has(id);
+      if (list) {
+        launches.forEach((launch) => {
+          const element = elements.get(launch.id);
+          if (element) list.appendChild(element);
+        });
+      }
 
-        element.style.display = shouldShow ? "" : "none";
+      elements.forEach((element, id) => {
+        element.style.display = filteredIds.has(id) ? "" : "none";
       });
     }
 
@@ -1042,36 +1027,57 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       });
     }
 
+    const confidenceThresholdInput = document.getElementById("confidenceThresholdInput");
+    if (confidenceThresholdInput) {
+      confidenceThresholdInput.addEventListener("input", () => {
+        const value = Number(confidenceThresholdInput.value);
+        if (Number.isInteger(value) && value >= 1 && value <= 100) {
+          document.getElementById("confidenceThresholdText").textContent = `${value}%`;
+        }
+      });
+    }
     const saveRulesBtn = document.getElementById("saveRulesBtn");
     if (saveRulesBtn) {
       saveRulesBtn.addEventListener("click", async () => {
         const thresholdInput = document.getElementById("confidenceThresholdInput");
-        const threshold = parseInt(thresholdInput.value, 10);
-
-        if (!isNaN(threshold) && threshold > 0 && threshold <= 100) {
-          state.confidenceThreshold = threshold;
+        const threshold = Number(thresholdInput.value);
+        if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
+          thresholdInput.setCustomValidity("Informe um valor entre 1 e 100.");
+          thresholdInput.reportValidity();
+          return;
         }
+        thresholdInput.setCustomValidity("");
 
-        state.prioritizeOCR = document.getElementById("togglePrioritizeOCR").checked;
-        state.hideApproved = false;
-        document.getElementById("confidenceThresholdText").textContent = state.confidenceThreshold + "%";
+        const regras = {
+          priorizar_ocr_baixa_confianca: document.getElementById("togglePrioritizeOCR").checked,
+          ocultar_aprovados: document.getElementById("toggleHideApproved").checked,
+          limite_confianca_percentual: threshold
+        };
+        saveRulesBtn.disabled = true;
 
         try {
-          await fetch("atualizar-regras-revisao.php", {
+          const response = await fetch("atualizar-regras-revisao.php", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              priorizar_ocr_baixa_confianca: state.prioritizeOCR,
-              ocultar_aprovados: state.hideApproved,
-              limite_confianca_percentual: state.confidenceThreshold
-            })
+            body: JSON.stringify(regras)
           });
-        } catch (error) {
-          console.error("N√£o foi poss√≠vel salvar as regras:", error);
-        }
+          const resultado = await response.json();
+          if (!response.ok || !resultado.sucesso) {
+            throw new Error(resultado.erro || "Falha ao salvar as regras.");
+          }
 
-        closeReviewModal("rulesModal");
-        updateUI();
+          state.prioritizeOCR = regras.priorizar_ocr_baixa_confianca;
+          state.hideApproved = regras.ocultar_aprovados;
+          state.confidenceThreshold = threshold;
+          document.getElementById("confidenceThresholdText").textContent = `${threshold}%`;
+          closeReviewModal("rulesModal");
+          updateUI();
+        } catch (error) {
+          console.error("N„o foi possÌvel salvar as regras:", error);
+          alert("N„o foi possÌvel aplicar as regras. Tente novamente.");
+        } finally {
+          saveRulesBtn.disabled = false;
+        }
       });
     }
 
@@ -1126,5 +1132,7 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>

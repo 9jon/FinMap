@@ -201,7 +201,7 @@ function brl(float $valor): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="../assets/css/dashboard.css">
-  <link rel="stylesheet" href="../assets/css/orcamento-mensal.css?v=9">
+  <link rel="stylesheet" href="../assets/css/orcamento-mensal.css?v=15">
 
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
@@ -227,7 +227,6 @@ function brl(float $valor): string
       </button>
       <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
         <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
       </button>
 
       <button class="profile-avatar" type="button" aria-label="Perfil">
@@ -253,28 +252,31 @@ function brl(float $valor): string
             </div>
           <?php endif; ?>
 
-          <h2>Quanto da renda já foi gasta</h2>
+          <div class="budget-hero-card__header">
+            <h2>Quanto da renda já foi gasta</h2>
 
           <p>Compare sua renda mensal com as despesas aprovadas neste mês.</p>
+          </div>
 
           <div class="budget-hero-card__stats">
             <article class="budget-kpi budget-kpi--main">
               <span>Renda mensal</span>
               <strong id="incomeValue"><?= brl($renda) ?></strong>
-              
+              <small>Base usada para acompanhar as despesas aprovadas.</small>
             </article>
 
-            <article class="budget-kpi">
-              <span>Despesas aprovadas no mês</span>
-              <strong id="committedValue"><?= brl($comprometido) ?></strong>
-            </article>
+            <div class="budget-kpi-stack">
+              <article class="budget-kpi budget-kpi--expenses">
+                <span>Despesas aprovadas no mês</span>
+                <strong id="committedValue"><?= brl($comprometido) ?></strong>
+              </article>
 
-            <article class="budget-kpi">
-              <span>Saldo após despesas</span>
-              <strong id="remainingValue" class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
-            </article>
+              <article class="budget-kpi budget-kpi--remaining <?= $saldo < 0 ? 'budget-kpi--negative' : '' ?>">
+                <span>Saldo após despesas</span>
+                <strong id="remainingValue" class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
+              </article>
+            </div>
           </div>
-
           <div class="budget-hero-card__actions">
             <button class="budget-btn budget-btn--primary" id="openIncomeModal" type="button">
               <i class="bi bi-cash-coin"></i>
@@ -340,11 +342,20 @@ function brl(float $valor): string
   </div>
 </div>
 <div class="budget-pie-footer">
-  <span><i class="bi bi-wallet2"></i> Renda usada</span>
-  <strong><?= round($percentual) ?>%</strong>
+  <div class="budget-pie-footer__usage">
+    <div class="budget-pie-footer__usage-heading">
+      <span><i class="bi bi-wallet2" aria-hidden="true"></i> Renda usada</span>
+      <strong><?= round($percentual) ?>%</strong>
+    </div>
+    <div class="budget-pie-footer__track" role="progressbar" aria-label="Percentual da renda usado com despesas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= number_format(min(max($percentual, 0), 100), 1, '.', '') ?>" aria-valuetext="<?= round($percentual) ?>% da renda usada">
+      <span class="budget-pie-footer__fill<?= $percentual >= 100 ? ' budget-pie-footer__fill--over' : '' ?>" style="width: <?= number_format(min(max($percentual, 0), 100), 2, '.', '') ?>%"></span>
+    </div>
+  </div>
   <span class="budget-pie-footer__separator"></span>
-  <span>Saldo</span>
-  <strong class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
+  <div class="budget-pie-footer__balance">
+    <span>Saldo</span>
+    <strong class="<?= $saldo < 0 ? 'text-danger' : '' ?>"><?= brl($saldo) ?></strong>
+  </div>
 </div>
 </article>
       </section>
@@ -548,60 +559,7 @@ function brl(float $valor): string
   </aside>
 
   <!-- MODAL IA -->
-  <div class="ai-modal-overlay" id="aiModal">
-    <div class="ai-modal">
-      <div class="ai-modal__header">
-        <div class="ai-modal__title-group">
-          <div class="ai-modal__icon">
-            <i class="bi bi-stars"></i>
-          </div>
-
-          <div>
-            <h3>Assistente IA FinMap</h3>
-            <p>Análise inteligente, sugestões rápidas e apoio financeiro em tempo real.</p>
-          </div>
-        </div>
-
-        <button class="ai-modal__close" id="closeAiModal" type="button" aria-label="Fechar assistente IA">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <div class="ai-modal__body">
-        <aside class="ai-modal__sidebar">
-          <div class="ai-summary-card ai-summary-card--green">
-            <div class="ai-summary-card__top">
-              <span class="ai-summary-card__label">Análise geral</span>
-              <i class="bi bi-activity"></i>
-            </div>
-            <strong><?= htmlspecialchars($status['label']) ?></strong>
-            <p><?= htmlspecialchars($status['texto']) ?></p>
-          </div>
-
-          <div class="ai-shortcuts">
-            <button class="ai-shortcut" type="button">Analisar meu orçamento</button>
-            <button class="ai-shortcut" type="button">Onde cortar gastos?</button>
-          </div>
-        </aside>
-
-        <section class="ai-chat-area">
-          <div class="ai-chat-area__messages"></div>
-
-          <form class="ai-chat-area__input">
-            <button class="ai-input-action" type="button" aria-label="Anexar">
-              <i class="bi bi-plus-lg"></i>
-            </button>
-
-            <input type="text" placeholder="Pergunte algo ao Assistente IA">
-
-            <button class="ai-send-btn" type="submit" aria-label="Enviar mensagem">
-              <i class="bi bi-send-fill"></i>
-            </button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
+  <?php require __DIR__ . '/../components/ai-assistant.php'; ?>
 
   <script>
     const body = document.body;
@@ -777,5 +735,7 @@ function brl(float $valor): string
   </script>
 
   <script src="../assets/js/page-entrance.js?v=3" defer></script>
+  <script src="../assets/js/notifications.js?v=1" defer></script>
+  <script src="../assets/js/ai-assistant.js?v=1" defer></script>
 </body>
 </html>
