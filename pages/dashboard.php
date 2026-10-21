@@ -16,11 +16,13 @@ if (empty($_SESSION['csrf_importacao'])) {
     $_SESSION['csrf_importacao'] = bin2hex(random_bytes(32));
 }
 $csrfImportacao = $_SESSION['csrf_importacao'];
+if(empty($_SESSION['csrf_conta']))$_SESSION['csrf_conta']=bin2hex(random_bytes(32));
+$csrfConta=$_SESSION['csrf_conta'];
 $importacaoFeedback = $_SESSION['importacao_feedback'] ?? null;
 unset($_SESSION['importacao_feedback']);
 
 
-$stmt = $conn->prepare("SELECT nome, avatar_iniciais, saldo_total FROM usuarios WHERE id = ?");
+$stmt = $conn->prepare("SELECT nome, email, telefone, moeda_preferida, avatar_iniciais, foto_perfil, saldo_total FROM usuarios WHERE id = ?");
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $usuario = $stmt->get_result()->fetch_assoc();
@@ -533,10 +535,10 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-30">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-31">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
   <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
-</head>
+  </head>
 <body class="dashboard-page">
 
 <?php if (is_array($importacaoFeedback) && ($importacaoFeedback['tipo'] ?? '') === 'erro'): ?>
@@ -562,6 +564,7 @@ foreach ($metas as $meta) {
         <span>Assistente IA</span>
       </button>
 
+      
       <button class="icon-plain" id="openSettingsModal" type="button" aria-label="Configurações" title="Configurações">
   <i class="bi bi-gear"></i>
 </button>
@@ -600,8 +603,8 @@ $stmt->close();
     <?php endif; ?>
 
 </button>
-      <button class="profile-avatar" type="button" aria-label="Perfil" title="Abrir perfil">
-        <?= htmlspecialchars($iniciais) ?>
+      <button class="profile-avatar" id="openProfileSettings" type="button" aria-label="Abrir meu perfil" title="Meu perfil">
+        <?php if (!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'], ENT_QUOTES, 'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?>
       </button>
     </div>
   </header>
@@ -1444,7 +1447,7 @@ $stmt->close();
           <span class="settings-sidebar__text">Proteção</span>
         </button>
 <button class="settings-sidebar__item" type="button" data-target="settings-account">
-          <span class="settings-sidebar__icon settings-sidebar__icon--red">
+          <span class="settings-sidebar__icon settings-sidebar__icon--green">
             <i class="bi bi-person-circle"></i>
           </span>
           <span class="settings-sidebar__text">Conta</span>
@@ -1662,7 +1665,7 @@ $stmt->close();
         <section class="settings-group" id="settings-account">
           <button class="settings-group__trigger" type="button">
             <div class="settings-group__trigger-left">
-              <span class="settings-group__badge settings-group__badge--red">
+              <span class="settings-group__badge settings-group__badge--green">
                 <i class="bi bi-person-circle"></i>
               </span>
               <div>
@@ -1677,23 +1680,61 @@ $stmt->close();
           </button>
 
           <div class="settings-group__content">
-            <div class="settings-account-grid">
-              <article class="settings-profile-card">
-                <h5>E-mail principal</h5>
-                <p><?= htmlspecialchars($usuario['email'] ?? '—') ?></p>
-                <button class="settings-action-btn settings-action-btn--red-soft" type="button">
-                  <i class="bi bi-envelope"></i>
-                  Alterar e-mail
-                </button>
-              </article>  
+            <div class="settings-account-grid settings-account-grid--clean">
+              <article class="settings-profile-card settings-profile-card--edit">
+                <div class="profile-edit-heading">
+                  <div class="profile-avatar-wrap">
+                    <div class="profile-edit-avatar" id="profilePreview" data-initials="<?= htmlspecialchars($iniciais,ENT_QUOTES,'UTF-8') ?>"><?php if(!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'],ENT_QUOTES,'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?></div>
+                    <button class="profile-photo-pencil" id="profilePhotoToggle" type="button" aria-label="Editar foto de perfil" aria-haspopup="true" aria-expanded="false"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button>
+                    <div class="profile-photo-menu" id="profilePhotoMenu" hidden>
+                      <button class="profile-photo-menu__item" id="chooseProfilePhoto" type="button"><i class="bi bi-images"></i><span>Escolher da galeria</span></button>
+                      <button class="profile-photo-menu__item profile-photo-menu__item--remove" id="removeProfilePhoto" type="button" <?= empty($usuario['foto_perfil']) ? 'hidden' : '' ?>><i class="bi bi-trash3"></i><span>Remover foto</span></button>
+                    </div>
+                  </div>
+                  <div><h5>Seu perfil</h5><p>Gerencie seus dados pessoais e a forma como você aparece no FinMap.</p></div>
+                </div>
+                <form id="profileForm" enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfConta,ENT_QUOTES,'UTF-8') ?>">
+                  <input type="hidden" name="acao" value="salvar_perfil">
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profileName">Nome completo</label>
+                    <input class="profile-field" id="profileName" name="nome" maxlength="120" value="<?= htmlspecialchars($usuario['nome']??'',ENT_QUOTES,'UTF-8') ?>" required>
+                  </div>
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profileEmail">E-mail</label>
+                    <input class="profile-field" id="profileEmail" name="email" type="email" maxlength="190" value="<?= htmlspecialchars($usuario['email']??'',ENT_QUOTES,'UTF-8') ?>" required>
+                  </div>
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profilePhone">Telefone</label>
+                    <input class="profile-field" id="profilePhone" name="telefone" type="tel" maxlength="25" autocomplete="tel" placeholder="+55 11 99999-9999" value="<?= htmlspecialchars($usuario['telefone']??'',ENT_QUOTES,'UTF-8') ?>">
+                  </div>
+                  <div class="profile-form-row">
+                    <label class="profile-field-label" for="profileCurrency">Moeda preferida</label>
+                    <div class="dropdown w-100 profile-currency-dropdown" id="profileCurrencyDropdown">
+                      <button class="btn dropdown-toggle profile-currency-btn" id="profileCurrencyButton" type="button" aria-haspopup="listbox" aria-expanded="false"><span id="profileCurrencyLabel">Real brasileiro (BRL)</span></button>
+                      <ul class="dropdown-menu w-100 profile-currency-menu" id="profileCurrencyMenu" role="listbox" aria-labelledby="profileCurrencyButton"></ul>
+                      <input type="hidden" id="profileCurrency" name="moeda_preferida" value="<?= htmlspecialchars($usuario['moeda_preferida']??'BRL',ENT_QUOTES,'UTF-8') ?>">
+                    </div>
+                  </div>
+                  <input type="file" class="profile-file-input" id="profilePhoto" name="foto_perfil" accept="image/jpeg,image/png,image/webp">
+                  <input type="hidden" id="removeProfilePhotoFlag" name="remover_foto" value="0">
 
-              <article class="settings-profile-card settings-profile-card--danger">
-                <h5>Excluir conta</h5>
-                <p>Essa ação é permanente.</p>
-                <button class="settings-action-btn settings-action-btn--danger" type="button">
-                  <i class="bi bi-trash3-fill"></i>
-                  Excluir conta
-                </button>
+                  <div class="profile-form-actions">
+                    <p id="profileFeedback" class="profile-feedback" role="status" aria-live="polite"></p>
+                    <button class="settings-action-btn settings-action-btn--save" type="submit"><i class="bi bi-check2"></i> Salvar perfil</button>
+                  </div>
+                </form>
+              </article>
+              <article class="settings-profile-card settings-profile-card--logout-row">
+                <div class="profile-logout-copy"><span class="profile-logout-icon"><i class="bi bi-box-arrow-right"></i></span><div><h5>Sair da conta</h5><p>Encerre sua sessão neste dispositivo.</p></div></div>
+                <form action="../login/logout.php" method="post">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfConta,ENT_QUOTES,'UTF-8') ?>">
+                  <button class="settings-action-btn settings-action-btn--logout" type="submit">Desconectar</button>
+                </form>
+              </article>
+              <article class="settings-profile-card settings-profile-card--danger settings-profile-card--danger-row">
+                <div class="profile-danger-copy"><span class="profile-danger-icon"><i class="bi bi-trash3"></i></span><div><h5>Excluir conta</h5><p>A exclusão é permanente e remove seus dados de acesso.</p></div></div>
+                <button class="settings-action-btn settings-action-btn--danger" id="deleteAccountBtn" type="button">Excluir conta</button>
               </article>
             </div>
           </div>
@@ -1876,6 +1917,54 @@ $stmt->close();
   const settingsSidebarItems = document.querySelectorAll(".settings-sidebar__item");
   const settingsGroups = document.querySelectorAll(".settings-group");
   const settingsTriggers = document.querySelectorAll(".settings-group__trigger");
+  const profileOpener=document.getElementById("openProfileSettings"), profileForm=document.getElementById("profileForm"), photoInput=document.getElementById("profilePhoto"), preview=document.getElementById("profilePreview"), feedback=document.getElementById("profileFeedback"), deleteBtn=document.getElementById("deleteAccountBtn");
+  const photoToggle=document.getElementById("profilePhotoToggle"), photoMenu=document.getElementById("profilePhotoMenu"), choosePhoto=document.getElementById("chooseProfilePhoto"), removePhoto=document.getElementById("removeProfilePhoto"), removePhotoFlag=document.getElementById("removeProfilePhotoFlag"), photoStatus=document.getElementById("profilePhotoStatus");
+  const currencySelect=document.getElementById("profileCurrency"),currencyButton=document.getElementById("profileCurrencyButton"),currencyMenu=document.getElementById("profileCurrencyMenu"),currencyLabel=document.getElementById("profileCurrencyLabel"),currencyDropdown=document.getElementById("profileCurrencyDropdown");
+  if(currencySelect&&currencyButton&&currencyMenu&&currencyLabel){
+    const fallbackCurrencies=["BRL","USD","EUR","GBP","JPY","CNY","CAD","AUD","CHF","INR","MXN","ARS","CLP","COP","PEN","UYU","PYG","BOB","VES","KRW","HKD","SGD","NZD","SEK","NOK","DKK","PLN","CZK","HUF","TRY","ZAR","AED","SAR","ILS","THB","IDR","MYR","PHP","TWD","PKR","BDT","EGP","NGN","KES","UAH","RUB","ISK","RON","BGN","HRK"];
+    let currencies=fallbackCurrencies;
+    try{if(Intl.supportedValuesOf)currencies=Intl.supportedValuesOf("currency");}catch(_){}
+    currencies=Array.from(new Set(["BRL",...currencies])).sort((a,b)=>a.localeCompare(b));
+    let displayNames=null;try{displayNames=new Intl.DisplayNames(["pt-BR"],{type:"currency"});}catch(_){}
+    const labels=new Map();
+    currencies.forEach(code=>{
+      let name=code;try{name=displayNames?.of(code)||code;}catch(_){}
+      const label=name===code?code:name+" ("+code+")";
+      labels.set(code,label);
+      const item=document.createElement("li"),option=document.createElement("button");
+      option.type="button";option.className="dropdown-item";option.setAttribute("role","option");option.dataset.value=code;option.textContent=label;
+      item.appendChild(option);currencyMenu.appendChild(item);
+      option.addEventListener("click",()=>{currencySelect.value=code;currencyLabel.textContent=label;currencyMenu.classList.remove("show");currencyDropdown.classList.remove("show");currencyButton.setAttribute("aria-expanded","false");currencyMenu.querySelectorAll(".dropdown-item").forEach(entry=>entry.setAttribute("aria-selected",String(entry.dataset.value===code)));currencyButton.focus();});
+    });
+    const selected=currencySelect.value||"BRL";
+    currencySelect.value=selected;currencyLabel.textContent=labels.get(selected)||labels.get("BRL")||"Real brasileiro (BRL)";
+    currencyButton.addEventListener("click",()=>{const open=!currencyMenu.classList.contains("show");currencyMenu.classList.toggle("show",open);currencyDropdown.classList.toggle("show",open);currencyButton.setAttribute("aria-expanded",String(open));if(open){const current=currencyMenu.querySelector('[data-value="'+CSS.escape(currencySelect.value)+'"]');if(current)current.scrollIntoView({block:"nearest"});}});
+    document.addEventListener("click",event=>{if(currencyDropdown&&!currencyDropdown.contains(event.target)){currencyMenu.classList.remove("show");currencyDropdown.classList.remove("show");currencyButton.setAttribute("aria-expanded","false");}});
+    currencyButton.addEventListener("keydown",event=>{if(event.key==="Escape"){currencyMenu.classList.remove("show");currencyDropdown.classList.remove("show");currencyButton.setAttribute("aria-expanded","false");}});
+  }
+
+  if(profileOpener)profileOpener.addEventListener("click",()=>{openModal(settingsModal);openSettingsSection("settings-account",false);});
+  if(photoToggle)photoToggle.addEventListener("click",()=>{const open=photoMenu.hidden;photoMenu.hidden=!open;photoToggle.setAttribute("aria-expanded",String(open));});
+  if(choosePhoto)choosePhoto.addEventListener("click",()=>{photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");photoInput.click();});
+  if(removePhoto)removePhoto.addEventListener("click",()=>{photoInput.value="";removePhotoFlag.value="1";preview.innerHTML=preview.dataset.initials||"US";removePhoto.hidden=true;photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");});
+  document.addEventListener("click",e=>{if(photoMenu&&!e.target.closest(".profile-avatar-wrap")){photoMenu.hidden=true;if(photoToggle)photoToggle.setAttribute("aria-expanded","false");}});
+  if(photoInput)photoInput.addEventListener("change",()=>{const f=photoInput.files[0];if(f&&f.size>3145728){photoInput.value="";feedback.textContent="A foto deve ter até 3 MB.";return;}if(f){removePhotoFlag.value="0";removePhoto.hidden=false;const rd=new FileReader();rd.onload=()=>preview.innerHTML='<img src="'+rd.result+'" alt="">';rd.readAsDataURL(f);}});
+  if(profileForm)profileForm.addEventListener("submit",async e=>{
+    e.preventDefault();feedback.textContent="Salvando...";
+    try{
+      const r=await fetch("../pages/atualizar-conta.php",{method:"POST",body:new FormData(profileForm)}),d=await r.json();
+      if(!r.ok||!d.sucesso)throw Error(d.erro);
+      feedback.textContent=d.mensagem;
+      const avatar=document.getElementById("openProfileSettings"),bust="?v="+Date.now();
+      avatar.innerHTML=d.foto?'<img src="'+d.foto+bust+'" alt="">':d.iniciais;
+      preview.innerHTML=avatar.innerHTML;preview.dataset.initials=d.iniciais;
+      removePhotoFlag.value="0";removePhoto.hidden=!d.foto;photoInput.value="";
+      
+      document.querySelector(".overview-title-group h2").textContent="Olá, "+d.nome.split(/\s+/)[0]+"!";
+    }catch(x){feedback.textContent=x.message;}
+  });
+  if(deleteBtn)deleteBtn.addEventListener("click",async()=>{if(prompt("Digite EXCLUIR para confirmar a exclusão permanente.")!=="EXCLUIR")return;const f=new FormData();f.append("csrf_token",document.querySelector('#profileForm [name="csrf_token"]').value);f.append("acao","excluir_conta");f.append("confirmacao","EXCLUIR");try{const r=await fetch("../pages/atualizar-conta.php",{method:"POST",body:f}),d=await r.json();if(!r.ok||!d.sucesso)throw Error(d.erro);location.href=d.redirecionar;}catch(x){alert(x.message);}});
+
 
   const openAllTransactionsModal = document.getElementById("openAllTransactionsModal");
   const closeAllTransactionsModal = document.getElementById("closeAllTransactionsModal");
@@ -2020,6 +2109,8 @@ $stmt->close();
     if (content) content.classList.add("open");
 
     activateSidebarItemById(groupId);
+    const settingsSaveButton = settingsModal?.querySelector(".settings-modal__footer .settings-footer-btn--primary");
+    if (settingsSaveButton) settingsSaveButton.hidden = groupId === "settings-account";
 
     if (scrollToSection) {
       // Role somente o conteúdo, preservando cabeçalho, menu e rodapé.

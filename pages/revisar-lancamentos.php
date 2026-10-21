@@ -400,9 +400,15 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
           <label class="review-field">
             <span>Categoria</span>
-            <select id="editCategorySelect">
-              <option value="">Sem categoria</option>
-            </select>
+            <div class="review-category-dropdown" id="editCategoryDropdown">
+              <select id="editCategorySelect" class="review-category-native" tabindex="-1" aria-hidden="true">
+                <option value="">Sem categoria</option>
+              </select>
+              <button class="review-category-trigger" id="editCategoryTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span id="editCategoryLabel">Sem categoria</span><i class="bi bi-chevron-down" aria-hidden="true"></i>
+              </button>
+              <ul class="review-category-menu" id="editCategoryMenu" role="listbox" aria-labelledby="editCategoryTrigger"></ul>
+            </div>
           </label>
 
           <label class="review-field">
@@ -808,17 +814,39 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
 
     function preencherCategoriasDaEdicao(launch) {
       const categorySelect = document.getElementById("editCategorySelect");
-      if (!categorySelect) return;
+      const categoryMenu = document.getElementById("editCategoryMenu");
+      const categoryLabel = document.getElementById("editCategoryLabel");
+      if (!categorySelect || !categoryMenu || !categoryLabel) return;
 
       categorySelect.replaceChildren(new Option("Sem categoria", ""));
-
       state.categories
         .filter(category => category.tipo === launch.type)
-        .forEach((category) => {
-          categorySelect.add(new Option(category.nome, String(category.id)));
-        });
-
+        .forEach(category => categorySelect.add(new Option(category.nome, String(category.id))));
       categorySelect.value = launch.categoryId === null ? "" : String(launch.categoryId);
+
+      categoryMenu.replaceChildren();
+      Array.from(categorySelect.options).forEach(option => {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "review-category-option";
+        button.setAttribute("role", "option");
+        button.dataset.value = option.value;
+        button.textContent = option.textContent;
+        button.setAttribute("aria-selected", String(option.value === categorySelect.value));
+        button.addEventListener("click", () => {
+          categorySelect.value = option.value;
+          categoryLabel.textContent = option.textContent;
+          categoryMenu.classList.remove("show");
+          document.getElementById("editCategoryDropdown").classList.remove("show");
+          document.getElementById("editCategoryTrigger").setAttribute("aria-expanded", "false");
+          categoryMenu.querySelectorAll(".review-category-option").forEach(entry => entry.setAttribute("aria-selected", String(entry.dataset.value === option.value)));
+        });
+        item.appendChild(button);
+        categoryMenu.appendChild(item);
+      });
+
+      categoryLabel.textContent = categorySelect.selectedOptions[0]?.textContent || "Sem categoria";
     }
 
     function openEdit(id) {
@@ -833,6 +861,13 @@ $rejeitadosHoje = (int) ($contadores['rejeitados_hoje'] ?? 0);
       document.getElementById("editSourceInput").value = launch.sourceLabel;
 
       openReviewModal("editModal");
+    }
+
+    const editCategoryTrigger=document.getElementById("editCategoryTrigger"),editCategoryMenu=document.getElementById("editCategoryMenu"),editCategoryDropdown=document.getElementById("editCategoryDropdown");
+    if(editCategoryTrigger&&editCategoryMenu&&editCategoryDropdown){
+      editCategoryTrigger.addEventListener("click",()=>{const open=!editCategoryMenu.classList.contains("show");editCategoryMenu.classList.toggle("show",open);editCategoryDropdown.classList.toggle("show",open);editCategoryTrigger.setAttribute("aria-expanded",String(open));});
+      document.addEventListener("click",event=>{if(!editCategoryDropdown.contains(event.target)){editCategoryMenu.classList.remove("show");editCategoryDropdown.classList.remove("show");editCategoryTrigger.setAttribute("aria-expanded","false");}});
+      editCategoryTrigger.addEventListener("keydown",event=>{if(event.key==="Escape"){editCategoryMenu.classList.remove("show");editCategoryDropdown.classList.remove("show");editCategoryTrigger.setAttribute("aria-expanded","false");}});
     }
 
     async function enviarAcao(payload) {

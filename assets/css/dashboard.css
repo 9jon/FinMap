@@ -5818,3 +5818,117 @@ body.dashboard-page .topbar::before {
 @media(max-width:900px){.ai-modal__body.ai-workspace{grid-template-columns:230px minmax(0,1fr)}.ai-workspace__sidebar{padding:14px 10px}}
 @media(max-width:680px){.ai-modal__body.ai-workspace{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:calc(100% - 82px)}.ai-workspace__sidebar{max-height:220px;border-right:0;border-bottom:1px solid #e8ece9;padding:10px 13px;gap:10px}.ai-history{min-height:72px;max-height:82px}.ai-shortcut-group{gap:4px}.ai-shortcut{min-height:34px}.ai-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.ai-chat-toolbar{min-height:42px;padding:0 15px}.ai-chat-area__messages{padding:20px 16px}.ai-chat-area__input{width:calc(100% - 24px)}.ai-message__bubble{max-width:92%}}
 .ai-typing{display:inline-flex;gap:4px;align-items:center;height:18px}.ai-typing i{width:6px;height:6px;border-radius:50%;background:#99a39c;animation:aiTyping 1s infinite ease-in-out}.ai-typing i:nth-child(2){animation-delay:.15s}.ai-typing i:nth-child(3){animation-delay:.3s}@keyframes aiTyping{50%{opacity:.35;transform:translateY(-3px)}}
+
+.profile-avatar{overflow:hidden;padding:0}.profile-avatar img,.profile-edit-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}.profile-edit-heading{display:flex;align-items:center;gap:14px;margin-bottom:18px}.profile-edit-avatar{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:linear-gradient(135deg,#21b66f,#139b63);color:white;font-weight:700}.profile-field-label{display:block;margin:14px 0 7px;font-weight:700}.profile-field{box-sizing:border-box;width:100%;min-height:44px;padding:10px;border:1px solid #dce5e0;border-radius:11px;font:inherit}.profile-help{display:block;margin-top:6px;color:var(--muted)}.profile-email{display:flex;flex-direction:column;gap:4px;padding:12px 0;border-top:1px solid #edf1ee}.profile-email span{color:var(--muted);overflow-wrap:anywhere}.settings-action-btn--save{width:100%;justify-content:center;background:#19b451;color:white}.profile-feedback{min-height:1.2em;color:#16864a}.profile-feedback:empty{display:none}
+
+/* Layout horizontal e enxuto dos dados da conta */
+.settings-account-grid--clean{grid-template-columns:minmax(0,1fr);gap:12px}
+.settings-account-grid--clean .settings-profile-card{min-height:0;justify-content:flex-start;gap:0;padding:20px 22px}
+.settings-account-grid--clean .settings-profile-card:hover{transform:none;box-shadow:none}
+.settings-account-grid--clean .profile-edit-heading{margin:0 0 12px;padding-bottom:14px;border-bottom:1px solid #edf1ee}
+.settings-account-grid--clean .profile-edit-heading p{margin-top:4px}
+.settings-account-grid--clean .profile-form-row{display:grid;grid-template-columns:minmax(140px,190px) minmax(0,1fr);align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid #f0f3f1}
+.settings-account-grid--clean .profile-field-label{margin:0;color:#475467;font-size:.9rem}
+.settings-account-grid--clean .profile-field{min-height:42px}
+.settings-account-grid--clean .profile-field--file{padding:6px}
+.settings-account-grid--clean .profile-photo-control{min-width:0}
+.settings-account-grid--clean .profile-help{font-size:.78rem}
+.settings-account-grid--clean .profile-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;padding-top:14px}
+.settings-account-grid--clean .profile-form-actions .profile-feedback{margin:0 auto 0 0}
+.settings-account-grid--clean .profile-form-actions .settings-action-btn--save{width:auto;min-width:150px}
+.settings-account-grid--clean .settings-profile-card--danger-row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:18px;padding:14px 18px}
+.profile-danger-copy{display:flex;align-items:center;gap:12px}
+.profile-danger-icon{width:38px;height:38px;display:grid;place-items:center;flex:none;border-radius:12px;background:#fff0f0;color:#dc2626}
+.profile-danger-copy p{margin-top:3px}
+.settings-account-grid--clean .settings-profile-card--danger-row .settings-action-btn{width:auto;min-width:145px;flex:none}
+@media(max-width:700px){
+ .settings-account-grid--clean .settings-profile-card{padding:16px}
+ .settings-account-grid--clean .profile-form-row{grid-template-columns:1fr;gap:7px}
+ .settings-account-grid--clean .profile-form-actions{align-items:stretch;flex-direction:column}
+ .settings-account-grid--clean .profile-form-actions .settings-action-btn--save{width:100%}
+ .settings-account-grid--clean .settings-profile-card--danger-row{align-items:stretch;flex-direction:column}
+ .settings-account-grid--clean .settings-profile-card--danger-row .settings-action-btn{width:100%}
+}
+/* Conta segue o padrão de linhas em largura total usado na API bancária */
+#settings-account .settings-account-grid--clean{grid-template-columns:minmax(0,1fr)}
+#settings-account .settings-account-grid--clean>.settings-profile-card{grid-column:1/-1;width:100%;box-sizing:border-box}
+#settings-account .settings-account-grid--clean>.settings-profile-card--danger-row{min-height:0;padding:12px 18px;border-color:#e8ede9;background:#fafbfa}
+#settings-account .profile-danger-icon{width:34px;height:34px;background:#f3f5f3;color:#8a433f}
+#settings-account .profile-danger-copy h5{font-size:.9rem;color:#4b5563}
+#settings-account .profile-danger-copy p{font-size:.8rem;color:#89918b}
+#settings-account .settings-profile-card--danger-row .settings-action-btn--danger{height:36px;min-width:130px;padding:0 12px;border:1px solid #eed3d1;border-radius:10px;background:#fff;color:#a63b35;box-shadow:none;font-size:.82rem}
+#settings-account .settings-profile-card--danger-row .settings-action-btn--danger:hover{background:#fff5f4;border-color:#e7b8b4}
+
+/* Destaque do perfil e troca de foto por menu de edição */
+#settings-account .profile-edit-heading{position:relative;overflow:visible;min-height:112px;padding:18px 20px;margin:0 0 10px;border:1px solid #e4f1e8;border-radius:16px;background:linear-gradient(110deg,#f2fbf5 0%,#fff 72%);gap:20px}
+#settings-account .profile-avatar-wrap{position:relative;width:96px;height:96px;flex:none}
+#settings-account .profile-edit-avatar{width:88px;height:88px;flex:none;border:4px solid #fff;box-shadow:0 4px 14px rgba(16,120,65,.15);font-size:1.25rem}
+#settings-account .profile-photo-pencil{position:absolute;right:1px;bottom:1px;width:34px;height:34px;display:grid;place-items:center;border:3px solid #fff;border-radius:50%;background:#18a957;color:#fff;box-shadow:0 3px 10px rgba(20,90,50,.2);cursor:pointer;transition:transform .18s ease,background .18s ease}
+#settings-account .profile-photo-pencil:hover{transform:scale(1.06);background:#118445}
+#settings-account .profile-photo-pencil:focus-visible,#settings-account .profile-photo-menu__item:focus-visible{outline:3px solid rgba(22,163,74,.3);outline-offset:2px}
+#settings-account .profile-photo-menu{position:absolute;z-index:20;top:calc(100% + 8px);left:0;width:210px;padding:6px;border:1px solid #e5eae6;border-radius:13px;background:#fff;box-shadow:0 12px 30px rgba(16,24,40,.14)}
+#settings-account .profile-photo-menu[hidden]{display:none}
+#settings-account .profile-photo-menu__item{width:100%;min-height:42px;display:flex;align-items:center;gap:10px;padding:0 11px;border:0;border-radius:9px;background:#fff;color:#27332b;text-align:left;font:inherit;font-size:.87rem;cursor:pointer}
+#settings-account .profile-photo-menu__item:hover{background:#f2f8f4}
+#settings-account .profile-photo-menu__item i{color:#159447}
+#settings-account .profile-photo-menu__item--remove{color:#b42318}
+#settings-account .profile-photo-menu__item--remove i{color:#dc2626}
+#settings-account .profile-file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#settings-account .profile-photo-status{font-size:.9rem;color:#34443a}
+#settings-account .settings-profile-card--danger-row .profile-danger-icon{background:#fff0ef;color:#dc2626}
+#settings-account .settings-profile-card--danger-row .profile-danger-copy h5{color:#b42318}
+#settings-account .settings-profile-card--danger-row .settings-action-btn--danger{border-color:#e92f32;background:#e92f32;color:#fff}
+#settings-account .settings-profile-card--danger-row .settings-action-btn--danger:hover{border-color:#cc252a;background:#cc252a}
+@media(max-width:700px){#settings-account .profile-edit-heading{gap:14px;padding:14px}#settings-account .profile-avatar-wrap{width:82px;height:82px}#settings-account .profile-edit-avatar{width:76px;height:76px}}
+
+/* Ajustes finais no avatar e no separador da linha de foto */
+#settings-account .profile-avatar-wrap{width:108px;height:108px}
+#settings-account .profile-edit-avatar{width:100px;height:100px;font-size:1.35rem}
+#settings-account .profile-photo-pencil{width:36px;height:36px}
+#settings-account .profile-form-row--photo{border-bottom:0}
+@media(max-width:700px){
+ #settings-account .profile-avatar-wrap{width:94px;height:94px}
+ #settings-account .profile-edit-avatar{width:86px;height:86px}
+}
+
+.profile-optional{font-weight:500;color:#89918b;font-size:.82em}.profile-currency-select{appearance:auto;background-color:#fff}
+
+
+/* Dropdown de moeda do perfil no mesmo padrão visual de config-renda. */
+#settings-account .profile-currency-dropdown{position:relative}
+#settings-account .profile-currency-btn{height:56px;border-radius:16px;border:1px solid rgba(15,23,40,.08);background:#fff;color:#0f1728;font-weight:500;text-align:left;padding:0 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);transition:all .25s ease}
+#settings-account .profile-currency-btn:hover{border-color:rgba(36,187,69,.35);box-shadow:0 8px 20px rgba(15,23,40,.06);background:#fff;color:#0f1728}
+#settings-account .profile-currency-btn:focus,#settings-account .profile-currency-dropdown.show .profile-currency-btn{border-color:rgba(36,187,69,.45);box-shadow:0 0 0 4px rgba(36,187,69,.10);background:#fff;color:#0f1728}
+#settings-account .profile-currency-menu{z-index:1085;max-height:280px;overflow-y:auto;border-radius:16px;border:1px solid rgba(15,23,40,.08);padding:8px;box-shadow:0 10px 30px rgba(15,23,40,.12)}
+#settings-account .profile-currency-menu .dropdown-item{border:0;border-radius:10px;padding:10px 14px;font-weight:500;white-space:normal;text-align:left}
+#settings-account .profile-currency-menu .dropdown-item:hover,#settings-account .profile-currency-menu .dropdown-item:focus{background:rgba(36,187,69,.08);color:#16a34a}
+
+/* Selects do dashboard no padrão visual dos dropdowns FinMap. */
+.dashboard-popout--form .form-select{
+  min-height:56px;
+  padding:0 42px 0 16px;
+  border:1px solid rgba(15,23,40,.08);
+  border-radius:16px;
+  background-color:#fff;
+  color:#0f1728;
+  font-weight:500;
+  box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);
+}
+.dashboard-popout--form .form-select:focus{
+  border-color:rgba(36,187,69,.45);
+  background-color:#fff;
+  box-shadow:0 0 0 4px rgba(36,187,69,.10);
+}
+
+/* Ícones de conta em verde e ação discreta para encerrar sessão. */
+.settings-sidebar__icon--green{background:rgba(36,187,69,.14);color:#16a34a}
+.settings-group__badge--green{background:rgba(36,187,69,.14);color:#16a34a}
+#settings-account .settings-profile-card--logout-row{min-height:0;padding:12px 18px;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:18px;border-color:#e8ede9;background:#fafbfa}
+#settings-account .profile-logout-copy{display:flex;align-items:center;gap:12px}
+#settings-account .profile-logout-icon{width:34px;height:34px;display:grid;place-items:center;flex:none;border-radius:11px;background:#eef8f0;color:#168343}
+#settings-account .profile-logout-copy h5{margin:0;font-size:.9rem;color:#34443a}
+#settings-account .profile-logout-copy p{margin:3px 0 0;font-size:.8rem;color:#89918b}
+#settings-account .settings-action-btn--logout{height:36px;min-width:130px;padding:0 12px;border:1px solid #dce9df;border-radius:10px;background:#fff;color:#168343;box-shadow:none;font-size:.82rem}
+#settings-account .settings-action-btn--logout:hover{background:#f0faf2;border-color:#b9dec2}
+#settings-account .settings-profile-card--logout-row form{margin:0}
+@media(max-width:700px){#settings-account .settings-profile-card--logout-row{align-items:stretch;flex-direction:column}#settings-account .settings-profile-card--logout-row form,.settings-action-btn--logout{width:100%}}
