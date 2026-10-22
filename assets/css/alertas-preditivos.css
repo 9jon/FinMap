@@ -144,30 +144,61 @@ body {
 .alerts-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
+  gap: 16px;
 }
 
 .summary-card {
-  padding: 22px;
+  position: relative;
+  min-height: 112px;
+  padding: 20px 22px;
   display: flex;
   gap: 16px;
-  align-items: flex-start;
-  border-radius: 26px;
+  align-items: center;
+  border-radius: 20px;
   background: rgba(255,255,255,0.94);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: 0 5px 16px rgba(16, 24, 40, 0.045);
   transition: 0.25s ease;
 }
 
+.summary-card::before {
+  position: absolute;
+  inset: 18px auto 18px 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #f97316;
+  content: "";
+}
+
+.summary-card--risk-controlado::before {
+  background: #24bb45;
+}
+
+.summary-card--risk-baixo::before {
+  background: #3b82f6;
+}
+
+.summary-card--risk-medio::before {
+  background: #f97316;
+}
+
+.summary-card--risk-alto::before {
+  background: #ef4444;
+}
+
+.summary-card:nth-child(3)::before {
+  background: #3b82f6;
+}
+
 .summary-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 9px 22px rgba(16, 24, 40, 0.07);
 }
 
 .summary-card__icon {
   width: 52px;
   height: 52px;
-  border-radius: 16px;
+  border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,6 +214,11 @@ body {
   color: var(--red);
 }
 
+.summary-card__icon--green {
+  background: rgba(36, 187, 69, 0.12);
+  color: var(--green-dark);
+}
+
 .summary-card__icon--orange {
   background: rgba(249, 115, 22, 0.14);
   color: var(--orange);
@@ -195,24 +231,92 @@ body {
 
 .summary-card__content span {
   display: block;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   color: var(--muted);
-  font-weight: 700;
-  margin-bottom: 8px;
+  font-weight: 650;
+  margin-bottom: 5px;
+}
+
+.summary-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.summary-card__content--risk {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 12px;
 }
 
 .summary-card__content strong {
   display: block;
-  font-size: 1.08rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 
 .summary-card__content p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   font-size: 0.9rem;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.summary-card__finance {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.summary-card__finance-item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 26px;
+  padding: 4px 0;
+}
+
+.summary-card__finance-item + .summary-card__finance-item {
+  border-top: 1px solid #edf0f3;
+}
+
+.summary-card__content .summary-card__finance-label {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin: 0;
+  color: #657189;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.summary-card__finance-item--income .summary-card__finance-label i,
+.summary-card__finance-item--income strong {
+  color: #258143;
+}
+
+.summary-card__finance-item--expense .summary-card__finance-label i,
+.summary-card__finance-item--expense strong {
+  color: #b14a35;
+}
+
+.summary-card__finance-item strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .alerts-main-grid {
@@ -246,7 +350,7 @@ body {
 
 .alerts-panel__header h3 {
   margin: 0;
-  font-size: 1.18rem;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text);
@@ -801,6 +905,10 @@ body {
 }
 
 @media (max-width: 1100px) {
+  .alerts-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .alerts-main-grid {
     grid-template-columns: 1fr;
   }
@@ -883,17 +991,102 @@ body {
     padding-right: 18px;
   }
 }
-/* Selects no padrão visual dos dropdowns FinMap. */
-.alert-field select{
-  height:56px;
-  padding:0 42px 0 16px;
-  border-color:rgba(15,23,40,.08);
-  border-radius:16px;
-  color:#0f1728;
-  box-shadow:0 1px 2px rgba(15,23,40,.04),inset 0 1px 0 rgba(255,255,255,.7);
-  cursor:pointer;
+
+/* Insight semanal: hierarquia editorial alinhada aos cards FinMap. */
+.insight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 28px;
+  border: 1px solid #cbdcff;
+  border-radius: 22px;
+  background: linear-gradient(112deg, #eef5ff 0%, #f8faff 62%, #f2f7ff 100%);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.09);
 }
-.alert-field select:focus{
-  border-color:rgba(36,187,69,.45);
-  box-shadow:0 0 0 4px rgba(36,187,69,.10);
+
+.insight-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.insight-card__title {
+  margin: 0;
+  color: #2454a6;
+  font-size: 1.28rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.insight-card__body {
+  padding-top: 17px;
+  border-top: 1px solid #edf0f3;
+}
+
+.insight-card__headline {
+  max-width: 900px;
+  margin: 0;
+  color: #141b2a;
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.18;
+}
+
+.insight-card__message {
+  max-width: 900px;
+  margin: 8px 0 0;
+  color: #59677e;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .summary-card {
+    min-height: 98px;
+    padding: 17px 18px;
+  }
+
+  .summary-card__finance {
+    gap: 5px;
+  }
+
+  .summary-card__content--risk {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .summary-card__finance-item strong {
+    font-size: 0.82rem;
+  }
+
+  .insight-card {
+    gap: 15px;
+    padding: 19px;
+    border-radius: 19px;
+  }
+
+  .insight-card__title {
+    font-size: 1.18rem;
+  }
+
+  .insight-card__header > .alert-badge {
+    flex-shrink: 0;
+  }
+
+  .insight-card__body {
+    padding-top: 15px;
+  }
+
+  .insight-card__headline {
+    font-size: 1.42rem;
+    line-height: 1.22;
+  }
+
+  .insight-card__message {
+    font-size: 0.94rem;
+  }
 }

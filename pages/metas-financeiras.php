@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
 require_once __DIR__ . '/../config/conn.php'; 
 
+require_once __DIR__ . '/../includes/avatar-usuario.php';
 
 $coresValidas = ['green', 'blue', 'orange', 'purple'];
 $iconesValidos = ['shield-check', 'airplane', 'car-front', 'house-door', 'mortarboard', 'heart-pulse', 'gift', 'stars'];
@@ -148,36 +149,11 @@ function brl(float $valor): string
   <link rel="stylesheet" href="../assets/css/dashboard.css">
   <link rel="stylesheet" href="../assets/css/metas-financeiras.css?v=goals-summary-inline-1">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
-  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
+  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=13">
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="brand">
-        <div class="brand-mark">
-          <img src="../assets/img/finmap-icone-branco.png" alt="">
-        </div>
-        <span class="brand-name">FinMap</span>
-      </div>
-    </div>
-
-    <?php require __DIR__ . '/../components/finmap-app-nav.php'; ?>
-
-    <div class="topbar-right">
-      <button class="ai-btn" id="openAiModal" type="button" aria-label="Abrir Assistente IA">
-        <i class="bi bi-stars"></i>
-        <span>Assistente IA</span>
-      </button>
-      <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
-        <i class="bi bi-bell"></i>
-      </button>
-
-      <button class="profile-avatar" type="button" aria-label="Perfil">
-        <?= htmlspecialchars($_SESSION['avatar_iniciais'] ?? 'JD') ?>
-      </button>
-    </div>
-  </header>
+  <?php require __DIR__ . '/../components/app-topbar.php'; ?>
 
   <main class="goals-page">
     <div class="back-navigation">

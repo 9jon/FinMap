@@ -1766,3 +1766,13 @@ body {
     padding: 12px;
   }
 }
+
+/* T?tulos das m?tricas do resumo de or?amento */
+.budget-hero-card__stats .budget-kpi > span {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.budget-pie__legend-name,
+.budget-pie__legend-value { font-size: 0.92rem; }
+.budget-pie__legend-item small { font-size: 0.78rem; }

@@ -5173,6 +5173,147 @@ body {
   gap: 12px;
 }
 
+#allTransactionsModal .dashboard-popout {
+  display: flex;
+  flex-direction: column;
+  height: min(78vh, 760px);
+  max-height: min(88vh, 920px);
+}
+
+#allTransactionsModal .dashboard-popout__header {
+  flex: 0 0 auto;
+}
+
+#allTransactionsModal .dashboard-popout__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+#allTransactionsModal .all-transactions-search {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  margin: 0 0 16px;
+}
+
+#allTransactionsModal .all-transactions-search i {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  color: #7b8794;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+#allTransactionsModal .all-transactions-search input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px 0 44px;
+  border: 1px solid #e2e8e4;
+  border-radius: 14px;
+  outline: none;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+#allTransactionsModal .all-transactions-search input:focus {
+  border-color: #18a957;
+  box-shadow: 0 0 0 3px rgba(24, 169, 87, 0.12);
+}
+
+#allTransactionsModal .all-transactions-search input::placeholder { color: #89949f; }
+
+#allTransactionsModal .all-transactions-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#allTransactionsModal .all-transactions-no-results {
+  display: none;
+  margin: 12px 0;
+  color: #667085;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  #allTransactionsModal.dashboard-popout-overlay { padding: 12px 10px 0; }
+  #allTransactionsModal .dashboard-popout {
+    width: 100%;
+    height: min(84vh, 760px);
+    height: min(84dvh, 760px);
+    max-height: 92vh;
+    border-radius: 24px 24px 0 0;
+  }
+  #allTransactionsModal .dashboard-popout__header {
+    gap: 10px;
+    padding: 18px 14px 14px;
+  }
+  #allTransactionsModal .dashboard-popout__title-group { gap: 10px; }
+  #allTransactionsModal .dashboard-popout__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+  #allTransactionsModal .dashboard-popout__title-group h3 { font-size: 1.08rem; }
+  #allTransactionsModal .dashboard-popout__title-group p { font-size: 0.78rem; }
+  #allTransactionsModal .dashboard-popout__close {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+  }
+  #allTransactionsModal .dashboard-popout__body {
+    padding: 14px 14px 18px;
+    max-height: 70vh;
+    max-height: 70dvh;
+  }
+  #allTransactionsModal .all-transactions-search { margin-bottom: 12px; }
+  #allTransactionsModal .all-transactions-search input {
+    min-height: 46px;
+    padding-left: 42px;
+    font-size: 16px;
+  }
+  #allTransactionsModal .all-transactions-list { gap: 9px; }
+  #allTransactionsModal .transaction-item {
+    min-height: 78px;
+    padding: 14px;
+    gap: 10px;
+    border-radius: 17px;
+  }
+  #allTransactionsModal .transaction-item__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  #allTransactionsModal .transaction-item__left { gap: 10px; }
+  #allTransactionsModal .transaction-item__info h4 { font-size: 0.96rem; }
+  #allTransactionsModal .transaction-item__info p { font-size: 0.84rem; }
+  #allTransactionsModal .transaction-item__right { min-width: max-content; }
+  #allTransactionsModal .transaction-item__value { font-size: 0.96rem; }
+  #allTransactionsModal .transaction-item__date { font-size: 0.82rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #allTransactionsModal .all-transactions-list { scroll-behavior: auto; }
+}
+
+#allTransactionsModal .all-transactions-list::-webkit-scrollbar { width: 8px; }
+#allTransactionsModal .all-transactions-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #b8c5bd;
+  background-clip: padding-box;
+}
+
 .dashboard-menu-list,
 .dashboard-period-list {
   display: flex;
@@ -5541,26 +5682,6 @@ body.dashboard-page .category-expense-card:hover {
   border-color: #ffffff;
   box-shadow: 0 12px 24px rgba(24, 32, 40, 0.055),
     inset 0 1px 0 rgba(255, 255, 255, 1);
-}
-
-body.dashboard-page .topbar {
-  isolation: isolate;
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(226, 232, 230, 0.92);
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-body.dashboard-page .topbar::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -7px;
-  border-radius: 32px;
-  background: rgba(201, 207, 203, 0.42);
-  filter: blur(10px);
-  pointer-events: none;
 }
 
 /* Interface inicial objetiva do Assistente Financeiro */
@@ -5936,13 +6057,44 @@ body.dashboard-page .topbar::before {
 
 
 
-/* Oculta valores financeiros quando a prefer?ncia de privacidade est? ativa. */
-body.finmap-values-hidden .finance-card__value,
-body.finmap-values-hidden .transaction-item__value,
-body.finmap-values-hidden .goal-card__bottom,
-body.finmap-values-hidden .goal-card__info p,
-body.finmap-values-hidden .category-item strong { filter: blur(6px); user-select: none; }
+/* Substitui valores financeiros por quatro pontos na visualiza????o privada. */
+body.finmap-values-hidden .finance-card__value:not(.is-value-revealed),
+body.finmap-values-hidden .transaction-item__value:not(.is-value-revealed),
+body.finmap-values-hidden .goal-card__bottom:not(.is-value-revealed),
+body.finmap-values-hidden .goal-card__info p:not(.is-value-revealed),
+body.finmap-values-hidden .category-item strong:not(.is-value-revealed) {
+  position: relative;
+  color: transparent !important;
+  text-shadow: none !important;
+  filter: none;
+  user-select: none;
+}
+
+body.finmap-values-hidden .finance-card__value:not(.is-value-revealed)::after,
+body.finmap-values-hidden .transaction-item__value:not(.is-value-revealed)::after,
+body.finmap-values-hidden .goal-card__bottom:not(.is-value-revealed)::after,
+body.finmap-values-hidden .goal-card__info p:not(.is-value-revealed)::after,
+body.finmap-values-hidden .category-item strong:not(.is-value-revealed)::after {
+  content: "\2022\2022\2022\2022";
+  position: absolute;
+  inset: 0 auto auto 0;
+  color: #172033;
+  font: inherit;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  filter: none;
+}
+
+body.finmap-values-hidden .transaction-item__value--positive:not(.is-value-revealed)::after { color: #138a4b; }
+body.finmap-values-hidden .transaction-item__value--negative:not(.is-value-revealed)::after { color: #d54b4b; }
+body.finmap-values-hidden .finance-card--highlight .finance-card__value:not(.is-value-revealed)::after { color: #fff; }
+body.finmap-values-hidden .finance-card__value:not(.is-value-revealed),
+body.finmap-values-hidden .transaction-item__value:not(.is-value-revealed) { cursor: pointer; }
 
 
 /* A preferencia de privacidade usa roxo, sem alterar os demais toggles. */
 #settings-security .switch--red input:checked + .switch-slider { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+/* Foto de perfil sem o aro verde do avatar vazio. */
+#settings-account .profile-edit-avatar.has-photo{border:0!important;background:transparent!important;box-shadow:0 0 0 4px #fff,0 4px 14px rgba(16,120,65,.15)}
+#settings-account .profile-edit-avatar.has-photo img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}

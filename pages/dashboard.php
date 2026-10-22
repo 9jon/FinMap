@@ -532,9 +532,9 @@ foreach ($metas as $meta) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-33">
+  <link rel="stylesheet" href="../assets/css/dashboard.css?v=features-43">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
-  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
+  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=13">
   </head>
 <body class="dashboard-page">
 
@@ -542,70 +542,11 @@ foreach ($metas as $meta) {
   <?php $importacaoSucesso = ($importacaoFeedback['tipo'] ?? '') === 'sucesso'; ?>
   <div class="import-feedback import-feedback--<?= $importacaoSucesso ? 'success' : 'error' ?>" role="<?= $importacaoSucesso ? 'status' : 'alert' ?>">
     <i class="bi bi-<?= $importacaoSucesso ? 'check-circle' : 'exclamation-circle' ?>"></i>
-    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'N�o foi poss�vel importar o arquivo.')) ?></span>
+    <span><?= htmlspecialchars((string) ($importacaoFeedback['mensagem'] ?? 'Não foi possível importar o arquivo.')) ?></span>
   </div>
 <?php endif; ?>
 
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="brand">
-        <span class="brand-mark"><img src="../assets/img/finmap-icone-branco.png" alt=""></span>
-        <span class="brand-name">FinMap</span>
-      </div>
-    </div>
-
-    <?php require __DIR__ . '/../components/finmap-app-nav.php'; ?>
-
-    <div class="topbar-right">
-      <button class="ai-btn" id="openAiModal" type="button" aria-label="Abrir Assistente IA">
-        <i class="bi bi-stars"></i>
-        <span>Assistente IA</span>
-      </button>
-
-      
-      <button class="icon-plain" id="openSettingsModal" type="button" aria-label="Configurações" title="Configurações">
-  <i class="bi bi-gear"></i>
-</button>
-
-      <?php
-
-$stmt = $conn->prepare("
-    SELECT COUNT(*)
-    FROM notificacoes
-    WHERE usuario_id = ?
-      AND lida = 0
-");
-
-$stmt->bind_param("i", $usuario_id);
-$stmt->execute();
-
-$stmt->bind_result($notificacoesNaoLidas);
-$stmt->fetch();
-
-$stmt->close();
-
-?>
-      <button
-    class="icon-plain notification-btn"
-    id="openNotificationsPanel"
-    type="button"
-    aria-label="Notificações" title="Abrir notificações">
-
-
-    <i class="bi bi-bell"></i>
-
-    <?php if ($notificacoesNaoLidas > 0): ?>
-
-        <span class="notification-dot"></span>
-
-    <?php endif; ?>
-
-</button>
-      <button class="profile-avatar" id="openProfileSettings" type="button" aria-label="Abrir meu perfil" title="Meu perfil">
-        <?php if (!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'], ENT_QUOTES, 'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?>
-      </button>
-    </div>
-  </header>
+  <?php require __DIR__ . '/../components/app-topbar.php'; ?>
 
   <section class="finance-overview">
     <div class="overview-header">
@@ -747,7 +688,7 @@ $stmt->close();
                 $isAgendado = $t['status'] === 'pendente'
                     && in_array($t['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true);
               ?>
-              <article class="transaction-item">
+              <article class="transaction-item" data-transaction-type="<?= $isReceita ? 'receita' : 'despesa' ?>">
                 <div class="transaction-item__left">
                   <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
                     <i class="bi bi-arrow-<?= $isReceita ? 'up' : 'down' ?>-right"></i>
@@ -1570,7 +1511,7 @@ $stmt->close();
               <article class="settings-profile-card settings-profile-card--edit">
                 <div class="profile-edit-heading">
                   <div class="profile-avatar-wrap">
-                    <div class="profile-edit-avatar" id="profilePreview" data-initials="<?= htmlspecialchars($iniciais,ENT_QUOTES,'UTF-8') ?>"><?php if(!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'],ENT_QUOTES,'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?></div>
+                    <div class="profile-edit-avatar<?= !empty($usuario['foto_perfil']) ? ' has-photo' : '' ?>" id="profilePreview" data-initials="<?= htmlspecialchars($iniciais,ENT_QUOTES,'UTF-8') ?>"><?php if(!empty($usuario['foto_perfil'])): ?><img src="../<?= htmlspecialchars($usuario['foto_perfil'],ENT_QUOTES,'UTF-8') ?>" alt=""><?php else: ?><?= htmlspecialchars($iniciais) ?><?php endif; ?></div>
                     <button class="profile-photo-pencil" id="profilePhotoToggle" type="button" aria-label="Editar foto de perfil" aria-haspopup="true" aria-expanded="false"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button>
                     <div class="profile-photo-menu" id="profilePhotoMenu" hidden>
                       <button class="profile-photo-menu__item" id="chooseProfilePhoto" type="button"><i class="bi bi-images"></i><span>Escolher da galeria</span></button>
@@ -1649,6 +1590,10 @@ $stmt->close();
 
     <div class="dashboard-popout__body" style="max-height: 70vh; overflow: hidden;">
       
+      <label class="all-transactions-search" for="allTransactionsSearch">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input id="allTransactionsSearch" type="search" placeholder="Buscar despesa ou receita" autocomplete="off">
+      </label>
       <div class="all-transactions-list" style="max-height: 100%; overflow-y: auto; padding-right: 4px;">
         <?php if (empty($todasTransacoes)): ?>
           <p style="padding: 16px 0; color: #888;">Nenhuma transação registrada ainda.</p>
@@ -1659,7 +1604,7 @@ $stmt->close();
               $isAgendado = $t['status'] === 'pendente'
                   && in_array($t['observacao_captura'], ['Fatura agendada', 'Receita agendada'], true);
             ?>
-            <article class="transaction-item">
+            <article class="transaction-item" data-transaction-type="<?= $isReceita ? 'receita' : 'despesa' ?>">
               <div class="transaction-item__left">
                 <div class="transaction-item__icon transaction-item__icon--<?= $isReceita ? 'income' : 'expense' ?>">
                   <i class="bi bi-arrow-<?= $isReceita ? 'up' : 'down' ?>-right"></i>
@@ -1802,7 +1747,31 @@ $stmt->close();
   const photoToggle=document.getElementById("profilePhotoToggle"), photoMenu=document.getElementById("profilePhotoMenu"), choosePhoto=document.getElementById("chooseProfilePhoto"), removePhoto=document.getElementById("removeProfilePhoto"), removePhotoFlag=document.getElementById("removeProfilePhotoFlag"), photoStatus=document.getElementById("profilePhotoStatus");
   const settingsSaveButton=settingsModal?.querySelector(".settings-modal__footer .settings-footer-btn--primary");
   const csrfSettings=document.querySelector('#profileForm [name="csrf_token"]')?.value||"";
-  const setValuesVisibility=hidden=>document.body.classList.toggle("finmap-values-hidden",hidden);
+  const privateValueSelector=".finance-card__value, .transaction-item__value, .goal-card__bottom, .goal-card__info p, .category-item strong";
+  const setValuesVisibility=hidden=>{
+    document.body.classList.toggle("finmap-values-hidden",hidden);
+    document.querySelectorAll(privateValueSelector).forEach(value=>{
+      value.classList.remove("is-value-revealed");
+      if(hidden){value.tabIndex=0;value.setAttribute("role","button");value.setAttribute("aria-label","Valor oculto. Clique para revelar.");value.setAttribute("aria-pressed","false");}
+      else{value.removeAttribute("tabindex");value.removeAttribute("role");value.removeAttribute("aria-label");value.removeAttribute("aria-pressed");}
+    });
+  };
+  const togglePrivateValue=value=>{
+    const revealed=value.classList.toggle("is-value-revealed");
+    value.setAttribute("aria-pressed",String(revealed));
+    if(revealed)value.removeAttribute("aria-label");
+    else value.setAttribute("aria-label","Valor oculto. Clique para revelar.");
+  };
+  document.addEventListener("click",event=>{
+    if(!document.body.classList.contains("finmap-values-hidden"))return;
+    const value=event.target.closest(privateValueSelector);
+    if(value)togglePrivateValue(value);
+  });
+  document.addEventListener("keydown",event=>{
+    if((event.key!=="Enter"&&event.key!==" ")||!document.body.classList.contains("finmap-values-hidden"))return;
+    const value=event.target.closest(privateValueSelector);
+    if(value){event.preventDefault();togglePrivateValue(value);}
+  });
   setValuesVisibility(<?= !empty($preferenciasUsuario['ocultar_valores']) ? 'true' : 'false' ?>);
   if(settingsSaveButton)settingsSaveButton.addEventListener("click",async()=>{
     const fields=[...settingsModal.querySelectorAll('#settings-notifications input[type="checkbox"], #settings-security input[name="ocultar_valores"]')];
@@ -1817,22 +1786,22 @@ $stmt->close();
     finally{settingsSaveButton.disabled=false;}
   });
   const changePasswordBtn=document.getElementById("changePasswordBtn");
-  if(changePasswordBtn)changePasswordBtn.addEventListener("click",async()=>{const atual=prompt("Digite sua senha atual:");if(atual===null)return;const nova=prompt("Digite a nova senha (m?nimo de 8 caracteres):");if(nova===null)return;const confirmacao=prompt("Digite novamente a nova senha:");if(confirmacao===null)return;const data=new FormData();data.append("acao","alterar_senha");data.append("csrf_token",csrfSettings);data.append("senha_atual",atual);data.append("nova_senha",nova);data.append("confirmar_senha",confirmacao);try{const response=await fetch("../pages/atualizar-conta.php",{method:"POST",body:data});const result=await response.json();if(!response.ok||!result.sucesso)throw Error(result.erro||"N?o foi poss?vel alterar a senha.");alert(result.mensagem);}catch(error){alert(error.message);}});
+  if(changePasswordBtn)changePasswordBtn.addEventListener("click",async()=>{const atual=prompt("Digite sua senha atual:");if(atual===null)return;const nova=prompt("Digite a nova senha (mínimo de 8 caracteres):");if(nova===null)return;const confirmacao=prompt("Digite novamente a nova senha:");if(confirmacao===null)return;const data=new FormData();data.append("acao","alterar_senha");data.append("csrf_token",csrfSettings);data.append("senha_atual",atual);data.append("nova_senha",nova);data.append("confirmar_senha",confirmacao);try{const response=await fetch("../pages/atualizar-conta.php",{method:"POST",body:data});const result=await response.json();if(!response.ok||!result.sucesso)throw Error(result.erro||"Não foi possível alterar a senha.");alert(result.mensagem);}catch(error){alert(error.message);}});
   if(profileOpener)profileOpener.addEventListener("click",()=>{openModal(settingsModal);openSettingsSection("settings-account",false);});
   if(photoToggle)photoToggle.addEventListener("click",()=>{const open=photoMenu.hidden;photoMenu.hidden=!open;photoToggle.setAttribute("aria-expanded",String(open));});
   if(choosePhoto)choosePhoto.addEventListener("click",()=>{photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");photoInput.click();});
-  if(removePhoto)removePhoto.addEventListener("click",()=>{photoInput.value="";removePhotoFlag.value="1";preview.innerHTML=preview.dataset.initials||"US";removePhoto.hidden=true;photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");});
+  if(removePhoto)removePhoto.addEventListener("click",()=>{photoInput.value="";removePhotoFlag.value="1";preview.innerHTML=preview.dataset.initials||"US";preview.classList.remove("has-photo");removePhoto.hidden=true;photoMenu.hidden=true;photoToggle.setAttribute("aria-expanded","false");});
   document.addEventListener("click",e=>{if(photoMenu&&!e.target.closest(".profile-avatar-wrap")){photoMenu.hidden=true;if(photoToggle)photoToggle.setAttribute("aria-expanded","false");}});
-  if(photoInput)photoInput.addEventListener("change",()=>{const f=photoInput.files[0];if(f&&f.size>3145728){photoInput.value="";feedback.textContent="A foto deve ter até 3 MB.";return;}if(f){removePhotoFlag.value="0";removePhoto.hidden=false;const rd=new FileReader();rd.onload=()=>preview.innerHTML='<img src="'+rd.result+'" alt="">';rd.readAsDataURL(f);}});
+  if(photoInput)photoInput.addEventListener("change",()=>{const f=photoInput.files[0];if(f&&f.size>3145728){photoInput.value="";feedback.textContent="A foto deve ter até 3 MB.";return;}if(f){removePhotoFlag.value="0";removePhoto.hidden=false;const rd=new FileReader();rd.onload=()=>{preview.innerHTML='<img src="'+rd.result+'" alt="">';preview.classList.add("has-photo");};rd.readAsDataURL(f);}});
   if(profileForm)profileForm.addEventListener("submit",async e=>{
     e.preventDefault();feedback.textContent="Salvando...";
     try{
       const r=await fetch("../pages/atualizar-conta.php",{method:"POST",body:new FormData(profileForm)}),d=await r.json();
       if(!r.ok||!d.sucesso)throw Error(d.erro);
       feedback.textContent=d.mensagem;
-      const avatar=document.getElementById("openProfileSettings"),bust="?v="+Date.now();
-      avatar.innerHTML=d.foto?'<img src="'+d.foto+bust+'" alt="">':d.iniciais;
-      preview.innerHTML=avatar.innerHTML;preview.dataset.initials=d.iniciais;
+      const avatar=document.getElementById("globalProfileLink"),bust="?v="+Date.now();
+      if(avatar)avatar.innerHTML=d.foto?'<img src="'+d.foto+bust+'" alt="">':d.iniciais;
+      preview.innerHTML=d.foto?'<img src="'+d.foto+bust+'" alt="">':d.iniciais;preview.dataset.initials=d.iniciais;preview.classList.toggle("has-photo",!!d.foto);
       removePhotoFlag.value="0";removePhoto.hidden=!d.foto;photoInput.value="";
       
       document.querySelector(".overview-title-group h2").textContent="Olá, "+d.nome.split(/\s+/)[0]+"!";
@@ -1844,7 +1813,31 @@ $stmt->close();
   const openAllTransactionsModal = document.getElementById("openAllTransactionsModal");
   const closeAllTransactionsModal = document.getElementById("closeAllTransactionsModal");
   const allTransactionsModal = document.getElementById("allTransactionsModal");
-
+  const allTransactionsSearch=document.getElementById("allTransactionsSearch");
+  if(allTransactionsSearch&&allTransactionsModal){
+    const transactionList=allTransactionsModal.querySelector(".all-transactions-list");
+    const transactionItems=[...allTransactionsModal.querySelectorAll(".all-transactions-list .transaction-item")];
+    const noTransactionResults=document.createElement("p");
+    noTransactionResults.className="all-transactions-no-results";
+    noTransactionResults.textContent="Nenhuma transa\u00e7\u00e3o encontrada.";
+    transactionList?.after(noTransactionResults);
+    const normalizeSearch=value=>value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("pt-BR");
+    allTransactionsSearch.addEventListener("input",()=>{
+      const query=normalizeSearch(allTransactionsSearch.value.trim());
+      let visibleCount=0;
+      transactionItems.forEach(item=>{
+        const content=normalizeSearch(`${item.textContent} ${item.dataset.transactionType||""}`);
+        const matches=content.includes(query);
+        const wasHidden=item.style.display==="none";
+        item.style.display=matches?"":"none";
+        if(matches&&wasHidden&&typeof item.animate==="function"&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+          item.animate([{opacity:0,transform:"translateY(5px)"},{opacity:1,transform:"translateY(0)"}],{duration:170,easing:"ease-out"});
+        }
+        if(matches)visibleCount++;
+      });
+      if(noTransactionResults)noTransactionResults.style.display=query&&visibleCount===0?"block":"none";
+    });
+  }
   const openGoalsMenuModal = document.getElementById("openGoalsMenuModal");
   const closeGoalsMenuModal = document.getElementById("closeGoalsMenuModal");
   const goalsMenuModal = document.getElementById("goalsMenuModal");
@@ -2287,6 +2280,13 @@ $stmt->close();
 
   if (cancelSettingsModal) {
     cancelSettingsModal.addEventListener("click", () => closeModal(settingsModal));
+  }
+
+  const requestedSettingsSection=new URLSearchParams(window.location.search).get("abrir");
+  if(requestedSettingsSection==="configuracoes"||requestedSettingsSection==="perfil"){
+    openModal(settingsModal);
+    openSettingsSection(requestedSettingsSection==="perfil"?"settings-account":"settings-notifications",false);
+    window.history.replaceState({},document.title,window.location.pathname);
   }
 
   if (settingsModal) {

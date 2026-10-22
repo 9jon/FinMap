@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/autenticacao.php';
 $usuario_id = exigirUsuarioAutenticado();
 include '../config/conn.php';
 
+require_once __DIR__ . '/../includes/avatar-usuario.php';
 
 
 $stmt = $conn->prepare("SELECT avatar_iniciais FROM usuarios WHERE id = ?");
@@ -163,36 +164,11 @@ $valorAnualInicial = $valorMensalInicial * 12;
   <link rel="stylesheet" href="../assets/css/dashboard.css">
   <link rel="stylesheet" href="../assets/css/poupanca-invisivel.css?v=hero-style-17">
   <link rel="stylesheet" href="../assets/css/page-entrance.css?v=2">
-  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=8">
+  <link rel="stylesheet" href="../assets/css/app-topbar.css?v=13">
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="topbar-left">
-      <div class="brand">
-        <div class="brand-mark">
-          <img src="../assets/img/finmap-icone-branco.png" alt="">
-        </div>
-        <span class="brand-name">FinMap</span>
-      </div>
-    </div>
-
-    <?php require __DIR__ . '/../components/finmap-app-nav.php'; ?>
-
-    <div class="topbar-right">
-      <button class="ai-btn" id="openAiModal" type="button" aria-label="Abrir Assistente IA">
-        <i class="bi bi-stars"></i>
-        <span>Assistente IA</span>
-      </button>
-      <button class="icon-plain notification-btn" id="openNotificationsPanel" type="button" aria-label="Notificações">
-        <i class="bi bi-bell"></i>
-      </button>
-
-      <button class="profile-avatar" type="button" aria-label="Perfil">
-        <?= htmlspecialchars($iniciais) ?>
-      </button>
-    </div>
-  </header>
+  <?php require __DIR__ . '/../components/app-topbar.php'; ?>
 
   <main class="invisible-savings-page">
     <div class="back-navigation">
