@@ -1,7 +1,7 @@
 # FinMap
 
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat&logo=php&logoColor=white)
-![SQL Server](https://img.shields.io/badge/SQL%20Server-CC2927?style=flat&logo=microsoftsqlserver&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=mysql&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
 ![Licença MIT](https://img.shields.io/badge/licença-MIT-green.svg)
 
@@ -41,7 +41,7 @@ Projeto Integrado do curso **Técnico em Informática do Senac**, desenvolvido a
 | Camada | Tecnologia |
 |---|---|
 | Back-end | PHP |
-| Banco de dados | Microsoft SQL Server (driver da Microsoft para PHP) |
+| Banco de dados | MySQL (extensão `mysqli`) |
 | Front-end | HTML, CSS, JavaScript e Bootstrap 5 |
 | E-mail | PHPMailer (via Composer) |
 | Autenticação social | Google OAuth 2.0 |
@@ -67,7 +67,7 @@ FinMap/
 
 ## Banco de dados
 
-O banco é **SQL Server** e se chama `finmap`. A pasta `database/migrations` guarda as alterações de estrutura em ordem cronológica, entre elas:
+O banco é MySQL e se chama `finmap`. A pasta `database/migrations` guarda as alterações de estrutura em ordem cronológica, entre elas:
 
 | Tabela | Finalidade |
 |---|---|
@@ -82,9 +82,9 @@ O banco é **SQL Server** e se chama `finmap`. A pasta `database/migrations` gua
 
 ### Pré-requisitos
 
-- PHP 8.1 ou superior, com a extensão `curl` e o driver da Microsoft para SQL Server (`sqlsrv` ou `pdo_sqlsrv`)
+- PHP 8.1 ou superior, com as extensões `mysqli` e `curl`
 - Composer
-- SQL Server (a edição Express é suficiente) e o SSMS ou o Azure Data Studio
+- MySQL
 - Servidor local, como o Apache do XAMPP
 - (Opcional) Ollama, para o assistente de IA
 
@@ -99,12 +99,12 @@ cd FinMap
 composer install
 ```
 
-3. **Banco de dados:** crie um banco chamado `finmap` no SQL Server, importe a estrutura base (`database/schema.sql`) e execute os arquivos de `database/migrations` em ordem de data.
-4. **Conexão:** informe o servidor, o banco, o usuário e a senha do SQL Server em `config/conn.php`.
+3. **Banco de dados:** crie um banco chamado `finmap` no MySQL, importe a estrutura base (`database/schema.sql`) e execute os arquivos de `database/migrations` em ordem de data.
+4. **Conexão:** confira usuário e senha do MySQL em `config/conn.php`. O padrão é `localhost`, usuário `root` e senha vazia.
 5. **E-mail (opcional):** informe suas credenciais SMTP em `config/email.php` para habilitar a recuperação de senha.
 6. **Login com Google (opcional):** copie `config/oauth-google.example.php` para `config/oauth-google.local.php` e preencha com as credenciais do seu projeto no Google Cloud. Também é possível usar variáveis de ambiente.
 7. **Assistente de IA (opcional):** copie `config/ai.example.php` para `config/ai.local.php`. Por padrão ele usa o Ollama em `http://127.0.0.1:11434` com o modelo `qwen3:4b-instruct`, ajustáveis pelas variáveis `FINMAP_OLLAMA_URL` e `FINMAP_OLLAMA_MODEL`.
-8. Inicie o Apache e o SQL Server e acesse `http://localhost/FinMap`.
+8. Inicie o Apache e o MySQL e acesse `http://localhost/FinMap`.
 
 > **Segurança:** nunca envie senhas ou chaves para o repositório. Os arquivos `*.local.php` já estão no `.gitignore`.
 
